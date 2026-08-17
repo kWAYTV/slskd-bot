@@ -2,9 +2,9 @@
 
 import pytest
 
-from music_downloader.metadata.spotify import TrackInfo
-from music_downloader.search.scorer import ResultScorer
-from music_downloader.search.slskd_client import SearchResult
+from music_downloader.catalog.track import TrackInfo
+from music_downloader.soulseek.result import SearchResult
+from music_downloader.soulseek.scoring import ResultScorer
 
 
 @pytest.fixture

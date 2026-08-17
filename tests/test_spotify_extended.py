@@ -4,15 +4,15 @@ from unittest.mock import patch
 
 import pytest
 
-from music_downloader.metadata.spotify import SpotifyResolver
+from music_downloader.catalog.spotify import SpotifyResolver
 
 
 class TestSpotifyResolver:
     @pytest.fixture
     def resolver(self):
         with (
-            patch("music_downloader.metadata.spotify.SpotifyClientCredentials"),
-            patch("music_downloader.metadata.spotify.spotipy.Spotify") as mock_sp,
+            patch("music_downloader.catalog.spotify.SpotifyClientCredentials"),
+            patch("music_downloader.catalog.spotify.spotipy.Spotify") as mock_sp,
         ):
             r = SpotifyResolver("test-id", "test-secret")
             r.sp = mock_sp.return_value

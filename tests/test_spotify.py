@@ -2,7 +2,7 @@
 
 import pytest
 
-from music_downloader.metadata.spotify import TrackInfo
+from music_downloader.catalog.track import TrackInfo
 
 
 class TestTrackInfo:

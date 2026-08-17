@@ -1,14 +1,14 @@
 """Tests for inline keyboard builders."""
 
-from music_downloader.bot.keyboards import (
+from music_downloader.catalog.track import TrackInfo
+from music_downloader.soulseek.result import SearchResult
+from music_downloader.telegram.keyboards import (
     build_approve_keyboard,
     build_auto_mode_keyboard,
     build_duplicate_keyboard,
     build_results_keyboard,
     build_spotify_keyboard,
 )
-from music_downloader.metadata.spotify import TrackInfo
-from music_downloader.search.slskd_client import SearchResult
 
 
 def _make_result(idx: int = 0) -> SearchResult:

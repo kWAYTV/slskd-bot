@@ -4,12 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from music_downloader.search.slskd_client import (
-    ActiveDownload,
-    DownloadStatus,
-    SearchResult,
-    SlskdClient,
-)
+from music_downloader.soulseek.client import SlskdClient
+from music_downloader.soulseek.result import ActiveDownload, DownloadStatus, SearchResult
 
 
 class TestSearchResult:

@@ -2,7 +2,7 @@
 
 import pytest
 
-from music_downloader.processor.file_handler import FileProcessor
+from music_downloader.library.files import FileProcessor
 
 
 class TestFindSimilar:

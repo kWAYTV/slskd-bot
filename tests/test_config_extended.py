@@ -4,7 +4,7 @@ import logging
 import os
 from unittest.mock import patch
 
-from music_downloader.config import Config, setup_logging
+from music_downloader.settings import Config, setup_logging
 
 
 class TestSetupLogging:
