@@ -8,7 +8,7 @@ import logging
 import sys
 
 from music_downloader import __version__
-from music_downloader.health.server import start_health_server
+from music_downloader.health.server import HealthHandler, start_health_server
 from music_downloader.settings import Config, setup_logging
 from music_downloader.telegram.app import create_bot
 
@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 # Re-exported for tests and the CLI health endpoint.
 _start_health_server = start_health_server
+
+__all__ = ["HealthHandler", "cmd_run", "main"]
 
 
 def cmd_run(args):

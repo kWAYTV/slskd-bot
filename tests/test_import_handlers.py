@@ -708,7 +708,7 @@ class TestHandleDirectSearch:
 
 
 class TestDoDirectSlskdSearch:
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("music_downloader.telegram.search_flow.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_direct_search_no_results(self, mock_edit):
         bot = _setup_bot()
         chat_id = 67890
@@ -719,7 +719,7 @@ class TestDoDirectSlskdSearch:
         mock_edit.assert_awaited()
         assert "No results" in mock_edit.call_args[0][1]
 
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("music_downloader.telegram.search_flow.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_direct_search_finds_results(self, mock_edit):
         bot = _setup_bot()
         chat_id = 67890
