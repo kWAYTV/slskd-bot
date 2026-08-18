@@ -21,7 +21,7 @@ from music_downloader.telegram.keyboards import (
     build_retry_keyboard,
     build_retry_next_keyboard,
 )
-from music_downloader.telegram.messages import safe_query_edit
+from music_downloader.telegram.messages import escape_md, safe_query_edit
 from music_downloader.telegram.session import PendingDownload
 
 logger = logging.getLogger(__name__)
@@ -58,11 +58,14 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     result = pending.results[index]
     track = pending.track
 
+    with contextlib.suppress(BadRequest):
+        await query.edit_message_reply_markup(reply_markup=None)
+
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=(
             f"⬇️ *Downloading #{index + 1}...*\n"
-            f"{track.artist} - {track.title}\n"
+            f"{escape_md(track.artist)} - {escape_md(track.title)}\n"
             f"From: `{result.username}`\n"
             f"File: `{result.basename}`"
         ),
@@ -89,7 +92,7 @@ async def do_download(
     label = f"#{result_index + 1}"
 
     try:
-        success = self.slskd.enqueue_download(result)
+        success = await asyncio.to_thread(self.slskd.enqueue_download, result)
         if not success:
             pending_dl = PendingDownload(
                 track=track,

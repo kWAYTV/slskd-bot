@@ -19,6 +19,14 @@ class TestSearchResult:
         r = SearchResult(username="u", filename="Song.flac", size=100)
         assert r.basename == "Song.flac"
 
+    def test_basename_posix_path(self):
+        r = SearchResult(username="u", filename="/Music/Artist/Song.flac", size=100)
+        assert r.basename == "Song.flac"
+
+    def test_basename_mixed_separators(self):
+        r = SearchResult(username="u", filename="\\Music/Artist\\Song.flac", size=100)
+        assert r.basename == "Song.flac"
+
     def test_extension(self):
         r = SearchResult(username="u", filename="\\Music\\Song.flac", size=100)
         assert r.extension == "flac"
@@ -337,6 +345,34 @@ class TestSlskdClientSearch:
         client.client.searches.get_all = MagicMock(side_effect=Exception("fail"))
         client.client.searches.search_text = MagicMock(side_effect=Exception("fail"))
         results = await client.search("test query", timeout_secs=2)
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_search_hard_timeout_collects_partial(self, client):
+        """Hard timeout should stop the in-flight search and return partial results."""
+        from unittest.mock import AsyncMock
+
+        async def fake_wait_for(coro, timeout):
+            client._current_search_id = "search-123"
+            coro.close()
+            raise TimeoutError()
+
+        client._stop_and_collect = AsyncMock(return_value=[{"username": "u"}])
+        with patch("music_downloader.soulseek.client.asyncio.wait_for", side_effect=fake_wait_for):
+            results = await client.search("query", timeout_secs=1)
+
+        client._stop_and_collect.assert_awaited_once_with("search-123")
+        assert results == [{"username": "u"}]
+
+    @pytest.mark.asyncio
+    async def test_search_hard_timeout_without_id_returns_empty(self, client):
+        async def fake_wait_for(coro, timeout):
+            coro.close()
+            raise TimeoutError()
+
+        with patch("music_downloader.soulseek.client.asyncio.wait_for", side_effect=fake_wait_for):
+            results = await client.search("query", timeout_secs=1)
+
         assert results == []
 
 

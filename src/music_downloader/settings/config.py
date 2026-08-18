@@ -31,7 +31,7 @@ class Config:
         self.data_dir = os.getenv("DATA_DIR", "/data")
 
         self.auto_mode = os.getenv("AUTO_MODE", "false").lower() == "true"
-        self.max_results = int(os.getenv("MAX_RESULTS", "10"))
+        self.max_results = int(os.getenv("MAX_RESULTS", "5"))
         self.duration_tolerance_secs = int(os.getenv("DURATION_TOLERANCE_SECS", "5"))
         self.search_timeout_secs = int(os.getenv("SEARCH_TIMEOUT_SECS", "30"))
         self.download_timeout_secs = int(os.getenv("DOWNLOAD_TIMEOUT_SECS", "600"))

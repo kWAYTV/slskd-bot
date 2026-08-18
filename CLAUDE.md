@@ -8,7 +8,7 @@ Telegram bot that automates music discovery and download. Resolves track metadat
 - python-telegram-bot (Telegram Bot API)
 - spotipy (Spotify Web API, Client Credentials flow)
 - slskd-api (Soulseek/slskd REST API)
-- FastAPI + uvicorn (health check endpoint)
+- stdlib `HTTPServer` (health check endpoint)
 - mutagen (audio metadata)
 - Docker (image: `ghcr.io/kwaytv/slskd-bot`)
 - Published on PyPI
@@ -64,7 +64,7 @@ Telegram is a delivery mechanism, not the domain. `telegram/app.py` composes `Mu
 
 Search results are ranked by 4 factors (total 100 points):
 1. **Duration match** (40 pts): Compared to Spotify reference duration
-2. **Audio quality** (25 pts): Prefers 16-bit/44.1kHz CD quality
+2. **Audio quality** (25 pts): Higher bit depth and sample rate score more (24/96 over CD 16/44.1)
 3. **Source reliability** (20 pts): Free slots, upload speed, queue
 4. **Filename relevance** (15 pts): Artist/title word matching
 

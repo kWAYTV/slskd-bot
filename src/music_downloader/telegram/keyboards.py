@@ -147,6 +147,19 @@ def build_import_skip_keyboard(job_id: int, track_id: int) -> InlineKeyboardMark
     )
 
 
+def build_import_failure_keyboard(job_id: int, track_id: int, dl_id: str) -> InlineKeyboardMarkup:
+    """Retry / skip / fail keyboard when an import download fails."""
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("\U0001f504 Retry", callback_data=f"retry:{dl_id}")],
+            [
+                InlineKeyboardButton("\U0001f6ab Mark failed", callback_data=f"ir:{job_id}:{track_id}"),
+                InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),
+            ],
+        ]
+    )
+
+
 def build_retry_keyboard(dl_id: str) -> InlineKeyboardMarkup:
     """Retry button shown on download failure."""
     return InlineKeyboardMarkup([[InlineKeyboardButton("\U0001f504 Retry", callback_data=f"retry:{dl_id}")]])

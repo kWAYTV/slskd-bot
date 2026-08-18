@@ -24,6 +24,7 @@ class SlskdClient:
 
     def __init__(self, host: str, api_key: str):
         self.client = slskd_api.SlskdClient(host, api_key)
+        self._current_search_id: str | None = None
         logger.info(f"slskd client initialized for {host}")
 
     async def search(self, query: str, timeout_secs: int = 30, response_limit: int = 500) -> list[dict]:
@@ -34,7 +35,7 @@ class SlskdClient:
         don't block the event loop.  On timeout the search is explicitly
         stopped and whatever partial results arrived are returned.
         """
-        search_id: str | None = None
+        self._current_search_id = None
 
         try:
             return await asyncio.wait_for(
@@ -43,6 +44,7 @@ class SlskdClient:
             )
         except TimeoutError:
             logger.warning(f"Hard timeout hit for search: {query}")
+            search_id = self._current_search_id
             if search_id:
                 return await self._stop_and_collect(search_id)
             return []
@@ -76,6 +78,7 @@ class SlskdClient:
             responseLimit=response_limit,
         )
         search_id = search_state["id"]
+        self._current_search_id = search_id
         logger.info(f"Search started: id={search_id}, query='{query}'")
 
         min_wait = 5
@@ -249,7 +252,7 @@ class SlskdClient:
 
         while time.time() - start < timeout_secs:
             await asyncio.sleep(3)
-            status = self.get_download_status(username, filename)
+            status = await asyncio.to_thread(self.get_download_status, username, filename)
 
             if status is None:
                 logger.debug(f"No status yet for {filename}")

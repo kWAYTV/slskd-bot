@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.soulseek.client import SlskdUnavailableError
 from music_downloader.soulseek.query import (
     build_reduced_queries,
     clean_search_title,
@@ -16,13 +17,14 @@ from music_downloader.soulseek.query import (
     has_non_latin_script,
     parse_query_artist_title,
 )
+from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.keyboards import (
     build_direct_search_keyboard,
     build_duplicate_keyboard,
     build_results_keyboard,
     build_spotify_keyboard,
 )
-from music_downloader.telegram.messages import safe_edit
+from music_downloader.telegram.messages import escape_md, safe_edit
 from music_downloader.telegram.session import PendingSearch
 
 logger = logging.getLogger(__name__)
@@ -60,7 +62,7 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         searching_msg = await context.bot.send_message(
             chat_id=chat_id,
             text=f"\U0001f50d Searching slskd for: `{search_query}`\n"
-            f"Saving as: *{synthetic_track.artist} - {synthetic_track.title}*",
+            f"Saving as: *{escape_md(synthetic_track.artist)} - {escape_md(synthetic_track.title)}*",
             parse_mode=ParseMode.MARKDOWN,
         )
 
@@ -171,10 +173,11 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
 async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searching_msg, generation: int):
     """Search slskd for a resolved Spotify track."""
     try:
+        header = _track_md(track)
         await safe_edit(
             searching_msg,
-            f"🎵 *{track.artist} - {track.title}*\n"
-            f"Album: {track.album} ({track.year})\n"
+            f"🎵 {header}\n"
+            f"Album: {escape_md(track.album)} ({escape_md(track.year)})\n"
             f"Duration: {track.duration_display}\n\n"
             f"Searching slskd...",
             parse_mode=ParseMode.MARKDOWN,
@@ -198,7 +201,7 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
             )
             await safe_edit(
                 searching_msg,
-                f"🎵 *{track.artist} - {track.title}*\n\nNo results with full query — retrying with song title only…",
+                f"🎵 {header}\n\nNo results with full query — retrying with song title only…",
                 parse_mode=ParseMode.MARKDOWN,
             )
             raw_responses = await self.slskd.search(clean_title, timeout_secs=self.config.search_timeout_secs)
@@ -218,7 +221,7 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
                 )
                 await safe_edit(
                     searching_msg,
-                    f"🎵 *{track.artist} - {track.title}*\n\nStill no results — trying keyword variations with year…",
+                    f"🎵 {header}\n\nStill no results — trying keyword variations with year…",
                     parse_mode=ParseMode.MARKDOWN,
                 )
                 for fallback_query in reduced_queries:
@@ -246,7 +249,7 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
             )
             await safe_edit(
                 searching_msg,
-                f"🎵 *{track.artist} - {track.title}*\n\nStill no results — trying artist + keyword search…",
+                f"🎵 {header}\n\nStill no results — trying artist + keyword search…",
                 parse_mode=ParseMode.MARKDOWN,
             )
             raw_responses = await self.slskd.search(
@@ -267,29 +270,32 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
         if not ranked:
             await safe_edit(
                 searching_msg,
-                f"🎵 *{track.artist} - {track.title}* ({track.duration_display})\n\n"
+                f"🎵 {header} ({track.duration_display})\n\n"
                 f"No results found on Soulseek matching this track.\n"
                 f"Try a different search query.",
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
 
-        self.pending[chat_id] = PendingSearch(
+        await present_search_results(
+            self,
+            context,
+            chat_id,
+            track,
+            ranked,
+            is_fallback,
+            searching_msg,
             query=f"{track.artist} {track.title}",
-            track=track,
-            results=ranked,
-            message_id=searching_msg.message_id,
-            is_fallback=is_fallback,
         )
 
-        results_text = self._format_results(track, ranked, is_fallback, page=0, page_size=self.config.max_results)
+    except SlskdUnavailableError:
+        logger.exception("slskd unreachable during search for: %s - %s", track.artist, track.title)
+        self.pending.pop(chat_id, None)
         await safe_edit(
             searching_msg,
-            results_text,
+            "Cannot reach slskd. Check `SLSKD_HOST` and the API key.",
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=build_results_keyboard(ranked, page=0, page_size=self.config.max_results),
         )
-
     except Exception:
         logger.exception(f"Unexpected error in _do_slskd_search for: {track.artist} - {track.title}")
         self.pending.pop(chat_id, None)
@@ -362,7 +368,7 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
 
     track = candidates[index]
     await query.edit_message_text(
-        f"Selected: *{track.artist} - {track.title}* ({track.duration_display})",
+        f"Selected: {_track_md(track)} ({track.duration_display})",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -465,24 +471,68 @@ async def do_direct_slskd_search(
             )
             return
 
-        self.pending[chat_id] = PendingSearch(
-            query=query,
-            track=synthetic_track,
-            results=ranked,
-            message_id=searching_msg.message_id,
-            is_fallback=is_fallback,
+        await present_search_results(
+            self, context, chat_id, synthetic_track, ranked, is_fallback, searching_msg, query=query
         )
 
-        results_text = self._format_results(
-            synthetic_track, ranked, is_fallback, page=0, page_size=self.config.max_results
-        )
+    except SlskdUnavailableError:
+        logger.exception("slskd unreachable during direct search for: %s", query)
         await safe_edit(
             searching_msg,
-            results_text,
+            "Cannot reach slskd. Check `SLSKD_HOST` and the API key.",
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=build_results_keyboard(ranked, page=0, page_size=self.config.max_results),
         )
-
     except Exception:
         logger.exception(f"Direct search failed for: {query}")
         await safe_edit(searching_msg, "Something went wrong. Please try again.")
+
+
+def _track_md(track: TrackInfo) -> str:
+    return f"*{escape_md(track.artist)} - {escape_md(track.title)}*"
+
+
+async def present_search_results(
+    self,
+    context,
+    chat_id: int,
+    track: TrackInfo,
+    ranked: list[SearchResult],
+    is_fallback: bool,
+    searching_msg,
+    query: str,
+):
+    """Store ranked results and either auto-download or show the pick keyboard."""
+    self.pending[chat_id] = PendingSearch(
+        query=query,
+        track=track,
+        results=ranked,
+        message_id=searching_msg.message_id,
+        is_fallback=is_fallback,
+    )
+
+    if self.auto_mode:
+        header = _track_md(track)
+        await safe_edit(
+            searching_msg,
+            f"⚡ Auto-downloading best match for {header}...",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        result = ranked[0]
+        status_msg = await context.bot.send_message(
+            chat_id=chat_id,
+            text=(f"⬇️ *Downloading #1...*\n{header}\nFrom: `{result.username}`\nFile: `{result.basename}`"),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        task = context.application.create_task(
+            self._do_download(context, chat_id, track, result, status_msg, 0),
+        )
+        self._track_task(chat_id, task)
+        return
+
+    results_text = self._format_results(track, ranked, is_fallback, page=0, page_size=self.config.max_results)
+    await safe_edit(
+        searching_msg,
+        results_text,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=build_results_keyboard(ranked, page=0, page_size=self.config.max_results),
+    )

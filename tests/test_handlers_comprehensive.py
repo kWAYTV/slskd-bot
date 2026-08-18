@@ -359,6 +359,8 @@ class TestMusicBotCommands:
         update.message.reply_text.assert_called_once()
         call_args = update.message.reply_text.call_args
         assert "Send me a song name" in call_args[0][0]
+        assert "/import" in call_args[0][0]
+        assert "/cancel" in call_args[0][0]
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -427,6 +429,29 @@ class TestMusicBotCommands:
         await bot.cmd_status(update, context)
         call_args = update.message.reply_text.call_args
         assert "Nancy Sinatra" in call_args[0][0]
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_cmd_status_pending_without_track(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.pending[67890] = PendingSearch(query="artist_with*md", track=None)
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        call_args = update.message.reply_text.call_args
+        assert "artist_with*md" in call_args[0][0]
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_cmd_status_ignores_other_chats(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.pending[11111] = PendingSearch(query="secret", track=_make_track())
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        update.message.reply_text.assert_called_once_with("No active searches or downloads.")
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -616,6 +641,7 @@ class TestMusicBotCallbackHandler:
         context.application.create_task = MagicMock(return_value=MagicMock())
         await bot.handle_callback(update, context)
         context.application.create_task.assert_called_once()
+        update.callback_query.edit_message_reply_markup.assert_awaited()
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -815,6 +841,24 @@ class TestMusicBotHelpers:
         text = MusicBot._format_spotify_results(tracks)
         assert "Multiple matches" in text
         assert "Nancy Sinatra" in text
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    def test_format_spotify_results_escapes_markdown(self, mock_slskd, mock_spotify):
+        tracks = [
+            TrackInfo(
+                artist="AC_DC",
+                title="Hells*Bells",
+                album="Back[in]Black",
+                duration_ms=312_000,
+                spotify_url="https://open.spotify.com/track/xxx",
+                year="1980",
+            )
+        ]
+        text = MusicBot._format_spotify_results(tracks)
+        assert "AC\\_DC" in text
+        assert "Hells\\*Bells" in text
+        assert "Back\\[in\\]Black" in text
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")

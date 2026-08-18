@@ -21,8 +21,8 @@ class SearchResult:
 
     @property
     def basename(self) -> str:
-        """Extract filename from the full remote path."""
-        return self.filename.rsplit("\\", 1)[-1] if "\\" in self.filename else self.filename
+        """Extract filename from the full remote path (Windows or POSIX)."""
+        return self.filename.replace("\\", "/").rsplit("/", 1)[-1]
 
     @property
     def extension(self) -> str:

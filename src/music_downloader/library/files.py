@@ -65,7 +65,7 @@ class FileProcessor:
 
     def find_downloaded_file(self, username: str, remote_filename: str) -> str | None:
         """Find a downloaded file on disk based on the slskd download structure."""
-        basename = remote_filename.rsplit("\\", 1)[-1] if "\\" in remote_filename else remote_filename
+        basename = remote_filename.replace("\\", "/").rsplit("/", 1)[-1]
 
         user_dir = os.path.join(self.download_dir, username)
 

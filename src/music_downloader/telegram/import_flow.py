@@ -14,14 +14,15 @@ from telegram.ext import ContextTypes
 from music_downloader.catalog.playlist import PlaylistResolver
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.playlist_import.job import JobStatus, TrackStatus
+from music_downloader.soulseek.client import SlskdUnavailableError
 from music_downloader.soulseek.query import clean_search_title
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.download_flow import TELEGRAM_FILE_LIMIT
 from music_downloader.telegram.keyboards import (
     build_import_confirm_keyboard,
+    build_import_failure_keyboard,
     build_import_skip_keyboard,
     build_import_track_keyboard,
-    build_retry_keyboard,
 )
 from music_downloader.telegram.messages import escape_md, safe_edit, safe_query_edit
 from music_downloader.telegram.session import PendingDownload, PendingSearch
@@ -253,8 +254,8 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=f"\U0001f4cb *Import [{position}/{total}]*\n"
-        f"\U0001f50d Searching: *{track_info.artist} - {track_info.title}*\n"
-        f"Album: {track_info.album} ({track_info.year})",
+        f"\U0001f50d Searching: *{escape_md(track_info.artist)} - {escape_md(track_info.title)}*\n"
+        f"Album: {escape_md(track_info.album)} ({escape_md(track_info.year)})",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -288,7 +289,7 @@ async def do_import_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                f"\U0001f4cb *Import track:* {track.artist} - {track.title}\n\nNo results found on Soulseek.",
+                f"\U0001f4cb *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n\nNo results found on Soulseek.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_skip_keyboard(job_id, track_id),
             )
@@ -317,7 +318,7 @@ async def do_import_slskd_search(
 
         await safe_edit(
             searching_msg,
-            f"\U0001f4cb *Import track:* {track.artist} - {track.title}\n"
+            f"\U0001f4cb *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n"
             f"⬇️ Downloading: `{best.basename}`\n"
             f"From: `{best.username}` | {best.quality_display}",
             parse_mode=ParseMode.MARKDOWN,
@@ -329,6 +330,15 @@ async def do_import_slskd_search(
         )
         self._track_task(chat_id, task)
 
+    except SlskdUnavailableError:
+        logger.exception("slskd unreachable during import search for: %s - %s", track.artist, track.title)
+        await safe_edit(
+            searching_msg,
+            "Cannot reach slskd. Check `SLSKD_HOST` and the API key.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=build_import_skip_keyboard(job_id, track_id),
+        )
+        await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
     except Exception:
         logger.exception(f"Import search failed for: {track.artist} - {track.title}")
         await safe_edit(searching_msg, f"❌ Search failed for {track.artist} - {track.title}")
@@ -350,7 +360,7 @@ async def do_import_download(
 ):
     """Download a file within an import flow."""
     try:
-        success = self.slskd.enqueue_download(result)
+        success = await asyncio.to_thread(self.slskd.enqueue_download, result)
         if not success:
             await safe_edit(
                 status_msg,
@@ -373,7 +383,7 @@ async def do_import_download(
                 status_msg,
                 f"❌ Download failed: {state}\n`{result.basename}`",
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_retry_keyboard(dl_id),
+                reply_markup=build_import_failure_keyboard(job_id, track_id, dl_id),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
             return

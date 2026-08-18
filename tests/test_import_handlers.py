@@ -598,6 +598,11 @@ class TestDoImportDownload:
         )
         mock_edit.assert_awaited()
         assert "Download failed" in mock_edit.call_args[0][1]
+        markup = mock_edit.call_args.kwargs.get("reply_markup") or mock_edit.call_args[1].get("reply_markup")
+        callbacks = [btn.callback_data for row in markup.inline_keyboard for btn in row]
+        assert "retry:dl_2" in callbacks
+        assert "is:1:5" in callbacks
+        assert "ir:1:5" in callbacks
         bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.awaiting_approval)
 
     @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)

@@ -44,6 +44,16 @@ class TestFileProcessor:
         assert result is not None
         assert result.endswith("song.flac")
 
+    def test_find_downloaded_file_posix_path(self, processor, tmp_path):
+        user_dir = tmp_path / "downloads" / "someuser"
+        user_dir.mkdir()
+        fake_file = user_dir / "song.flac"
+        fake_file.write_text("fake flac data")
+
+        result = processor.find_downloaded_file("someuser", "/Music/Artist/song.flac")
+        assert result is not None
+        assert result.endswith("song.flac")
+
     def test_find_downloaded_file_not_found(self, processor):
         """Test that None is returned when file doesn't exist."""
         result = processor.find_downloaded_file("nobody", "\\Music\\nonexistent.flac")
