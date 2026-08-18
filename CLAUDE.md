@@ -10,7 +10,7 @@ Telegram bot that automates music discovery and download. Resolves track metadat
 - slskd-api (Soulseek/slskd REST API)
 - FastAPI + uvicorn (health check endpoint)
 - mutagen (audio metadata)
-- Docker (image: `drumsergio/telegram-slskd-local-bot`)
+- Docker (image: `ghcr.io/kwaytv/slskd-bot`)
 - Published on PyPI
 - pytest + pytest-asyncio for testing
 - uv for dependency management
@@ -89,11 +89,9 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 
 ### Release Steps
 
-1. Commit to `main`, create a **new** semver tag (e.g. `git tag v0.3.1`), push with `--tags`
-2. GHA `docker-publish.yml` builds and pushes `drumsergio/telegram-slskd-local-bot:<tag>` to Docker Hub
-3. Update `gitea/watchtower/slskd-importer/docker-compose.yml` with the new tag, commit and push to Gitea
-4. Redeploy via Portainer API on **watchtower** (stack ID `195`, endpoint `2`)
-5. Verify with `docker ps --filter name=slskd_importer` on watchtower
+1. Push to `main` — GHA `docker-publish.yml` builds and pushes `ghcr.io/kwaytv/slskd-bot:latest` (also `main-<sha>`)
+2. Optional: create a **new** semver tag (e.g. `git tag v0.3.1`) and push with `--tags` for a versioned image
+3. Pull with `docker pull ghcr.io/kwaytv/slskd-bot:latest`
 
 ### Versioning Rules
 
@@ -102,7 +100,6 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Minor** (`v0.3.x` -> `v0.4.0`): New features, significant behavior changes
 - **Major** (`v0.x.y` -> `v1.0.0`): Breaking changes
 - Check the latest tag before tagging: `git describe --tags --abbrev=0`
-- Also update the image tag in `gitea/watchtower/slskd-importer/docker-compose.yml` to match
 
 ## External Dependencies
 
@@ -119,7 +116,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 ## Key Rules
 - Never hardcode API keys (Telegram, Spotify, slskd); use environment variables
 - Allowed Telegram users must be explicitly configured
-- Docker images use semver tags, never `:latest`
+- Docker images: `latest` on `main` pushes; semver tags on version releases
 - License is GPL-3.0
 - Follow PEP 8, use type hints, prefer f-strings
 - Telegram bot: [@slskdimporterbot](https://t.me/slskdimporterbot)
