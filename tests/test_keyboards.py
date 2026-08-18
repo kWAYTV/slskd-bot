@@ -6,6 +6,7 @@ from music_downloader.telegram.keyboards import (
     build_approve_keyboard,
     build_auto_mode_keyboard,
     build_duplicate_keyboard,
+    build_import_failure_keyboard,
     build_results_keyboard,
     build_spotify_keyboard,
 )
@@ -101,6 +102,11 @@ class TestBuildApproveKeyboard:
         assert buttons[0].callback_data == "approve:42"
         assert buttons[1].callback_data == "reject:42"
 
+    def test_has_next_result_row(self):
+        kb = build_approve_keyboard("42", has_next=True)
+        assert len(kb.inline_keyboard) == 2
+        assert kb.inline_keyboard[1][0].callback_data == "next:42"
+
 
 class TestBuildDuplicateKeyboard:
     def test_has_continue_and_cancel(self):
@@ -151,6 +157,16 @@ class TestBuildSpotifyKeyboard:
         kb = build_spotify_keyboard([track])
         label = kb.inline_keyboard[0][0].text
         assert len(label) <= 64
+
+
+class TestBuildImportFailureKeyboard:
+    def test_has_retry_skip_and_fail(self):
+        kb = build_import_failure_keyboard(7, 3, "dl9")
+        rows = kb.inline_keyboard
+        callbacks = [btn.callback_data for row in rows for btn in row]
+        assert "iy:7:3:dl9" in callbacks
+        assert "is:7:3" in callbacks
+        assert "ir:7:3" in callbacks
 
 
 class TestBuildAutoModeKeyboard:

@@ -33,6 +33,7 @@ def _make_config():
     config.filename_template = "{artist} - {title}"
     config.search_timeout_secs = 30
     config.download_timeout_secs = 600
+    config.telegram_library_users = set()
     return config
 
 
@@ -189,6 +190,60 @@ class TestDoSlskdSearch:
         context = _make_context()
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
         # Should not raise
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_auto_mode_downloads_best_match(self, mock_slskd_cls, mock_spotify):
+        config = _make_config()
+        config.auto_mode = True
+        bot = MusicBot(config)
+        bot.auto_mode = True
+        bot.slskd = AsyncMock()
+        bot.slskd.search = AsyncMock(return_value=[{"responses": []}])
+        results = [_make_result(0), _make_result(1)]
+        bot.slskd.parse_results = MagicMock(return_value=results)
+        bot.scorer = MagicMock()
+        bot.scorer.score_results = MagicMock(return_value=results)
+        bot._chat_generation[123] = 0
+        bot._do_download = AsyncMock()
+
+        msg = AsyncMock()
+        msg.edit_text = AsyncMock()
+        msg.message_id = 1
+
+        context = _make_context()
+
+        def _close_coro(coro, **kwargs):
+            coro.close()
+            return MagicMock()
+
+        context.application.create_task = MagicMock(side_effect=_close_coro)
+        await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
+        assert 123 in bot.pending
+        context.application.create_task.assert_called_once()
+        edited = " ".join(str(c) for c in msg.edit_text.call_args_list)
+        assert "Auto-download" in edited
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_slskd_unavailable_message(self, mock_slskd_cls, mock_spotify):
+        from music_downloader.soulseek.client import SlskdUnavailableError
+
+        bot = MusicBot(_make_config())
+        bot.slskd = AsyncMock()
+        bot.slskd.search = AsyncMock(side_effect=SlskdUnavailableError("down"))
+        bot._chat_generation[123] = 0
+
+        msg = AsyncMock()
+        msg.edit_text = AsyncMock()
+        msg.message_id = 1
+
+        context = _make_context()
+        await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
+        edited = " ".join(str(c) for c in msg.edit_text.call_args_list)
+        assert "Cannot reach slskd" in edited
 
 
 class TestDoDownload:
@@ -648,6 +703,7 @@ class TestCreateBot:
             mock_builder = MagicMock()
             mock_app = MagicMock()
             mock_builder.token.return_value = mock_builder
+            mock_builder.post_init.return_value = mock_builder
             mock_builder.build.return_value = mock_app
             mock_app_cls.builder.return_value = mock_builder
 

@@ -48,6 +48,8 @@ class TestAdd:
         assert rec.status == "completed"
         assert rec.duration_secs == 240
         assert rec.file_size == 10_000_000
+        assert rec.chat_id is None
+        assert rec.spotify_url == ""
 
 
 class TestGetRecent:
@@ -88,3 +90,50 @@ class TestCount:
 
     def test_count_empty_database(self, repo):
         assert repo.count() == 0
+
+
+class TestChatScopedHistory:
+    def test_get_recent_filters_chat_id(self, repo):
+        repo.add(artist="A", title="T1", filename="f1", source_user="u", status="success", chat_id=10)
+        repo.add(artist="B", title="T2", filename="f2", source_user="u", status="success", chat_id=20)
+        records = repo.get_recent(chat_id=10)
+        assert len(records) == 1
+        assert records[0].filename == "f1"
+
+    def test_count_filters_chat_id(self, repo):
+        repo.add(artist="A", title="T1", filename="f1", source_user="u", status="success", chat_id=10)
+        repo.add(artist="B", title="T2", filename="f2", source_user="u", status="success", chat_id=20)
+        assert repo.count(chat_id=10) == 1
+        assert repo.count() == 2
+
+
+class TestFindSuccess:
+    def test_finds_by_artist_title(self, repo):
+        repo.add(artist="Artist", title="Song", filename="a.flac", source_user="u", status="failed")
+        repo.add(artist="Artist", title="Song", filename="b.flac", source_user="u", status="success")
+        hit = repo.find_success("artist", "song")
+        assert hit is not None
+        assert hit.filename == "b.flac"
+
+    def test_finds_by_spotify_url(self, repo):
+        repo.add(
+            artist="Other",
+            title="Name",
+            filename="x.flac",
+            source_user="u",
+            status="success",
+            spotify_url="https://open.spotify.com/track/abc",
+        )
+        hit = repo.find_success("ignored", "ignored", spotify_url="https://open.spotify.com/track/abc")
+        assert hit is not None
+        assert hit.filename == "x.flac"
+
+    def test_url_falls_back_to_artist_title_for_legacy_rows(self, repo):
+        # Row written before the spotify_url column existed (empty URL)
+        repo.add(artist="Artist", title="Song", filename="legacy.flac", source_user="u", status="success")
+        hit = repo.find_success("Artist", "Song", spotify_url="https://open.spotify.com/track/new")
+        assert hit is not None
+        assert hit.filename == "legacy.flac"
+
+    def test_returns_none_when_missing(self, repo):
+        assert repo.find_success("Nope", "Missing") is None

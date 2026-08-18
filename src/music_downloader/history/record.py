@@ -16,3 +16,5 @@ class HistoryRecord:
     duration_secs: int
     file_size: int
     created_at: str
+    chat_id: int | None = None
+    spotify_url: str = ""

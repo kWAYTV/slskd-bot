@@ -14,14 +14,15 @@ from telegram.ext import ContextTypes
 from music_downloader.catalog.playlist import PlaylistResolver
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.playlist_import.job import JobStatus, TrackStatus
+from music_downloader.soulseek.client import SlskdUnavailableError
 from music_downloader.soulseek.query import clean_search_title
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.download_flow import TELEGRAM_FILE_LIMIT
 from music_downloader.telegram.keyboards import (
     build_import_confirm_keyboard,
+    build_import_failure_keyboard,
     build_import_skip_keyboard,
     build_import_track_keyboard,
-    build_retry_keyboard,
 )
 from music_downloader.telegram.messages import escape_md, safe_edit, safe_query_edit
 from music_downloader.telegram.session import PendingDownload, PendingSearch
@@ -31,20 +32,34 @@ logger = logging.getLogger(__name__)
 
 async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /import <spotify_url> — import playlist or album."""
-    if not await self._check_auth(update):
+    if not await self._check_library_auth(update):
         return
 
     chat_id = update.effective_chat.id
     args = update.message.text.split(maxsplit=1)
+    extra = args[1].strip() if len(args) >= 2 else ""
 
-    if len(args) < 2:
+    if extra.lower() == "resume":
+        await resume_import_job(self, context, chat_id, notify=True)
+        return
+
+    if not extra:
+        active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
+        if active:
+            await update.message.reply_text(
+                f"You have an unfinished import: *{escape_md(active.name)}* "
+                f"({active.completed_tracks}/{active.total_tracks}).\n"
+                f"Send `/import resume` to continue, or /cancel to stop it.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
         await update.message.reply_text(
-            "Usage: `/import <spotify_playlist_or_album_url>`",
+            "Usage: `/import <spotify_playlist_or_album_url>` or `/import resume`",
             parse_mode=ParseMode.MARKDOWN,
         )
         return
 
-    url = args[1].strip()
+    url = extra
 
     if not PlaylistResolver.is_spotify_url(url):
         await update.message.reply_text(
@@ -56,7 +71,7 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if active:
         await update.message.reply_text(
             f"You already have an active import: *{escape_md(active.name)}* ({active.completed_tracks}/{active.total_tracks})\n"
-            f"Use /cancel to stop it first.",
+            f"Send `/import resume` to continue, or /cancel to stop it first.",
             parse_mode=ParseMode.MARKDOWN,
         )
         return
@@ -112,11 +127,18 @@ async def cmd_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     job_id = self._active_import.pop(chat_id, None)
     if job_id:
         await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
-        self._cancel_chat_operations(chat_id)
+        await self._cancel_chat_operations(chat_id)
         await update.message.reply_text("❌ Import cancelled.")
         return
 
-    had_work = self._cancel_chat_operations(chat_id)
+    active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
+    if active:
+        await asyncio.to_thread(self.import_repo.update_job_status, active.id, JobStatus.cancelled)
+        await self._cancel_chat_operations(chat_id)
+        await update.message.reply_text("❌ Import cancelled.")
+        return
+
+    had_work = await self._cancel_chat_operations(chat_id)
     if had_work:
         await update.message.reply_text("❌ Cancelled.")
     else:
@@ -162,6 +184,9 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
 
     elif prefix == "ir":
         track_id = int(parts[1])
+        stale = [k for k, v in self.downloads.items() if v.chat_id == chat_id]
+        for stale_id in stale:
+            await self._cleanup_download_artifacts(self.downloads.pop(stale_id))
         await asyncio.to_thread(
             self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Rejected by user"
         )
@@ -176,10 +201,53 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
         generation = self._chat_generation.get(chat_id, 0)
         await self._process_next_import_track(context, chat_id, job_id, generation)
 
+    elif prefix == "iy":
+        track_id = int(parts[1])
+        dl_id = parts[2]
+        await self._handle_import_retry(update, context, chat_id, job_id, track_id, dl_id)
+
+
+async def handle_import_retry(self, update, context, chat_id: int, job_id: int, track_id: int, dl_id: str):
+    """Retry a failed import download inside the import flow (keeps job tracking)."""
+    query = update.callback_query
+    pending_dl = self.downloads.get(dl_id)
+
+    if not pending_dl:
+        await safe_query_edit(query, "⏹ Download expired. Use Skip or Mark failed to continue the import.")
+        return
+
+    result = pending_dl.result
+    track = pending_dl.track
+
+    await safe_query_edit(
+        query,
+        f"\U0001f504 Retrying: `{result.basename}`...",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    status_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"⬇️ Re-downloading from `{result.username}`...",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.searching)
+    generation = self._chat_generation.get(chat_id, 0)
+    task = context.application.create_task(
+        self._do_import_download(context, chat_id, track, result, status_msg, generation, job_id, track_id, dl_id),
+        update=update,
+    )
+    self._track_task(chat_id, task)
+
 
 async def handle_import_approve(self, update, context, chat_id: int, job_id: int, track_id: int, dl_id: str):
     """Approve a download within an import flow."""
     query = update.callback_query
+
+    if not self._can_save_library(query.from_user.id):
+        await self._edit_approval_message(query, "🚫 You are not allowed to save to the library.")
+        return
+
     pending_dl = self.downloads.pop(dl_id, None)
 
     if not pending_dl:
@@ -200,7 +268,7 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
         await self._embed_spotify_artwork(target_path, track)
         target_name = os.path.basename(target_path)
         await self._edit_approval_message(query, f"✅ Saved: `{target_name}`")
-        await self._add_history(track, result, "success")
+        await self._add_history(track, result, "success", chat_id=chat_id)
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.completed)
     else:
         await self._edit_approval_message(query, "❌ Failed to save file.")
@@ -253,8 +321,8 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=f"\U0001f4cb *Import [{position}/{total}]*\n"
-        f"\U0001f50d Searching: *{track_info.artist} - {track_info.title}*\n"
-        f"Album: {track_info.album} ({track_info.year})",
+        f"\U0001f50d Searching: *{escape_md(track_info.artist)} - {escape_md(track_info.title)}*\n"
+        f"Album: {escape_md(track_info.album)} ({escape_md(track_info.year)})",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -264,31 +332,17 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
 async def do_import_slskd_search(
     self, context, chat_id: int, track: TrackInfo, searching_msg, generation: int, job_id: int, track_id: int
 ):
-    """Search slskd for an import track."""
+    """Search slskd for an import track using the same four-tier fallbacks as manual search."""
     try:
-        clean_title = clean_search_title(track.title)
-        search_query = f"{track.artist} {clean_title}"
-        raw_responses = await self.slskd.search(search_query, timeout_secs=self.config.search_timeout_secs)
-        if self._is_stale(chat_id, generation):
-            return
-
-        ranked, is_fallback = self._rank_responses(raw_responses, track)
-
-        if not ranked:
-            if self._is_stale(chat_id, generation):
-                return
-            raw_responses = await self.slskd.search(clean_title, timeout_secs=self.config.search_timeout_secs)
-            if self._is_stale(chat_id, generation):
-                return
-            ranked, is_fallback = self._rank_responses(raw_responses, track)
-
-        if self._is_stale(chat_id, generation):
+        search_query = f"{track.artist} {clean_search_title(track.title)}"
+        ranked, is_fallback, stale = await self._search_with_fallbacks(track, chat_id, generation)
+        if stale:
             return
 
         if not ranked:
             await safe_edit(
                 searching_msg,
-                f"\U0001f4cb *Import track:* {track.artist} - {track.title}\n\nNo results found on Soulseek.",
+                f"\U0001f4cb *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n\nNo results found on Soulseek.",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_skip_keyboard(job_id, track_id),
             )
@@ -317,7 +371,7 @@ async def do_import_slskd_search(
 
         await safe_edit(
             searching_msg,
-            f"\U0001f4cb *Import track:* {track.artist} - {track.title}\n"
+            f"\U0001f4cb *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n"
             f"⬇️ Downloading: `{best.basename}`\n"
             f"From: `{best.username}` | {best.quality_display}",
             parse_mode=ParseMode.MARKDOWN,
@@ -329,6 +383,15 @@ async def do_import_slskd_search(
         )
         self._track_task(chat_id, task)
 
+    except SlskdUnavailableError:
+        logger.exception("slskd unreachable during import search for: %s - %s", track.artist, track.title)
+        await safe_edit(
+            searching_msg,
+            "Cannot reach slskd. Check `SLSKD_HOST` and the API key.",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=build_import_skip_keyboard(job_id, track_id),
+        )
+        await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
     except Exception:
         logger.exception(f"Import search failed for: {track.artist} - {track.title}")
         await safe_edit(searching_msg, f"❌ Search failed for {track.artist} - {track.title}")
@@ -350,7 +413,7 @@ async def do_import_download(
 ):
     """Download a file within an import flow."""
     try:
-        success = self.slskd.enqueue_download(result)
+        success = await asyncio.to_thread(self.slskd.enqueue_download, result)
         if not success:
             await safe_edit(
                 status_msg,
@@ -366,6 +429,9 @@ async def do_import_download(
             filename=result.filename,
             timeout_secs=self.config.download_timeout_secs,
         )
+        transfer_id = status.transfer_id if status else None
+        if dl_id in self.downloads:
+            self.downloads[dl_id].transfer_id = transfer_id
 
         if status is None or status.is_failed:
             state = status.state if status else "Timeout"
@@ -373,7 +439,7 @@ async def do_import_download(
                 status_msg,
                 f"❌ Download failed: {state}\n`{result.basename}`",
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_retry_keyboard(dl_id),
+                reply_markup=build_import_failure_keyboard(job_id, track_id, dl_id),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
             return
@@ -430,10 +496,81 @@ async def do_import_download(
                     )
 
     except asyncio.CancelledError:
-        self.downloads.pop(dl_id, None)
+        pending_dl = self.downloads.pop(dl_id, None)
+        if pending_dl:
+            await self._cleanup_download_artifacts(pending_dl)
+        else:
+            await asyncio.to_thread(self.slskd.cancel_transfer, result.username, result.filename, None)
         raise
     except Exception:
         logger.exception(f"Import download failed for {result.basename}")
         await safe_edit(status_msg, f"❌ Error downloading `{result.basename}`", parse_mode=ParseMode.MARKDOWN)
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")
         await self._process_next_import_track(context, chat_id, job_id, generation)
+
+
+class _ResumeContext:
+    """Minimal context so import resume can use Application.bot / create_task."""
+
+    def __init__(self, application):
+        self.application = application
+        self.bot = application.bot
+
+
+async def resume_stale_imports(self, application) -> None:
+    """Reset in-flight tracks and continue active import jobs after restart."""
+    jobs = await asyncio.to_thread(self.import_repo.list_resumable_jobs)
+    active_jobs = [job for job in jobs if job.status in (JobStatus.active, JobStatus.active.value)]
+    if not active_jobs:
+        return
+    logger.info("Resuming %d import job(s)", len(active_jobs))
+    ctx = _ResumeContext(application)
+    for job in active_jobs:
+        await resume_import_job(self, ctx, job.chat_id, notify=True, job=job)
+
+
+async def resume_import_job(self, context, chat_id: int, notify: bool = False, job=None) -> None:
+    """Continue a persisted import job in its original chat."""
+    if job is None:
+        job = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
+    if not job:
+        if notify:
+            await context.bot.send_message(chat_id=chat_id, text="Nothing to resume.")
+        return
+
+    if self._active_import.get(chat_id) == job.id:
+        if notify:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"Import of *{escape_md(job.name)}* is already running.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        return
+
+    reset = await asyncio.to_thread(self.import_repo.reset_in_flight_tracks, job.id)
+    if reset:
+        logger.info("Reset %d in-flight track(s) for job %s", reset, job.id)
+
+    if job.status in (JobStatus.pending, JobStatus.pending.value):
+        await asyncio.to_thread(self.import_repo.update_job_status, job.id, JobStatus.active)
+
+    self._active_import[chat_id] = job.id
+    generation = self._chat_generation.get(chat_id, 0)
+    remaining = job.total_tracks - job.completed_tracks - job.skipped_tracks - job.failed_tracks
+    if notify:
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    f"Resuming import of *{escape_md(job.name)}* ({remaining} remaining, {job.completed_tracks} done)."
+                ),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            logger.warning("Could not notify chat %s about import resume", chat_id)
+
+    app = getattr(context, "application", context)
+    task = app.create_task(
+        self._process_next_import_track(context, chat_id, job.id, generation),
+    )
+    self._track_task(chat_id, task)

@@ -24,6 +24,17 @@ class TestFileProcessor:
         result = processor.build_filename("Nancy Sinatra", "Bang Bang (My Baby Shot Me Down)")
         assert result == "Nancy Sinatra - Bang Bang (My Baby Shot Me Down).flac"
 
+    def test_find_exact(self, processor, tmp_path):
+        output = tmp_path / "output"
+        (output / "Nancy Sinatra - Bang Bang.flac").write_text("x")
+        (output / "Nancy Sinatra - Bang Bang.mp3").write_text("x")
+        (output / "Other - Track.flac").write_text("x")
+        matches = processor.find_exact("Nancy Sinatra", "Bang Bang")
+        assert set(matches) == {"Nancy Sinatra - Bang Bang.flac", "Nancy Sinatra - Bang Bang.mp3"}
+
+    def test_find_exact_empty_dir(self, processor):
+        assert processor.find_exact("Nobody", "Missing") == []
+
     def test_build_filename_sanitizes(self, processor):
         """Test that invalid characters are removed."""
         result = processor.build_filename('Artist: "Test"', "Song?Name*Here")
@@ -41,6 +52,16 @@ class TestFileProcessor:
         fake_file.write_text("fake flac data")
 
         result = processor.find_downloaded_file("someuser", "\\Music\\Artist\\song.flac")
+        assert result is not None
+        assert result.endswith("song.flac")
+
+    def test_find_downloaded_file_posix_path(self, processor, tmp_path):
+        user_dir = tmp_path / "downloads" / "someuser"
+        user_dir.mkdir()
+        fake_file = user_dir / "song.flac"
+        fake_file.write_text("fake flac data")
+
+        result = processor.find_downloaded_file("someuser", "/Music/Artist/song.flac")
         assert result is not None
         assert result.endswith("song.flac")
 

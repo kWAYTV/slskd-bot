@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Auto-mode actually downloads the best match after a successful search
+- Import download failures now offer Retry, Skip, and Mark failed (no longer stall)
+- `/import` and `/cancel` documented in `/help` and README
+- `/import resume` continues a persisted playlist import after a bot restart; active jobs auto-resume on startup
+- `TELEGRAM_LIBRARY_USERS` restricts who can save into the music library or run `/import`. Other allowed users still receive the file via Telegram; the local copy is then deleted
+- `/health` reports slskd reachability (`healthy` / `degraded`); `/ready` returns 503 when slskd is unreachable
+- Approve keyboard offers "Try next result" when more Soulseek matches remain
+- Exact duplicate check (library filename + successful history / Spotify URL) before searching Soulseek
+
+### Fixed
+
+- `/status` no longer crashes when a pending search has no resolved track
+- `/status` is scoped to the current chat instead of leaking other users' activity
+- Results keyboard is locked after picking a download (prevents duplicate parallel picks)
+- Hard slskd search timeout now collects partial results instead of always returning empty
+- Soulseek paths using `/` (not just `\\`) resolve to the correct basename
+- Download enqueue and status polling no longer block the Telegram event loop
+- Markdown-special characters in artist/title/album no longer break Telegram messages
+- Empty `TELEGRAM_ALLOWED_USERS` documented as deny-all (matches runtime behavior)
+- `MAX_RESULTS` default aligned to 5 across config, `.env.example`, and README
+- Search cleanup no longer deletes in-flight slskd searches
+- `/cancel` and generation bumps abort the slskd transfer (`cancel_download(..., remove=True)`) and delete partial files
+- Import search uses the same four-tier fallbacks as manual search
+- `/history` is scoped to the current chat
+- Corrupt SQLite databases are renamed to `*.bak.<timestamp>` before recreate
+- Schema v2 adds `chat_id` and `spotify_url` on `download_history`
+
 ## [0.7.0] - 2026-02-23
 
 ### Added

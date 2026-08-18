@@ -98,13 +98,15 @@ python -m music_downloader run
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | — | Telegram bot token from @BotFather |
-| `TELEGRAM_ALLOWED_USERS` | No | *(open)* | Comma-separated Telegram user IDs allowed to use the bot |
+| `TELEGRAM_ALLOWED_USERS` | Yes | — | Comma-separated Telegram user IDs allowed to use the bot. Empty denies everyone. |
+| `TELEGRAM_LIBRARY_USERS` | No | — | Comma-separated Telegram user IDs allowed to save into the music library and run `/import`. Empty means all allowed users can save. Other allowed users still get the file via Telegram; the local copy is then deleted. |
 | `SPOTIFY_CLIENT_ID` | Yes | — | Spotify Developer app Client ID |
 | `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app Client Secret |
 | `SLSKD_HOST` | Yes | — | slskd instance URL (e.g., `http://192.168.1.100:5030`) |
 | `SLSKD_API_KEY` | Yes | — | slskd API key (Settings > Security > API Keys) |
 | `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads (container path) |
 | `OUTPUT_DIR` | No | `/music` | Where to place renamed FLAC files (container path) |
+| `DATA_DIR` | No | `/data` | SQLite directory for history and playlist imports |
 | `AUTO_MODE` | No | `false` | Auto-download best match without asking |
 | `MAX_RESULTS` | No | `5` | Maximum search results shown to user |
 | `DURATION_TOLERANCE_SECS` | No | `5` | Duration match tolerance in seconds |
@@ -121,8 +123,11 @@ python -m music_downloader run
 |---------|-------------|
 | *(any text)* | Search for a song and show download options |
 | `/auto` | Toggle auto-download mode on/off |
-| `/status` | Show active searches and downloads |
-| `/history` | Show recent download history |
+| `/import <url>` | Import a Spotify playlist or album (library users only) |
+| `/import resume` | Continue a paused import after a bot restart |
+| `/status` | Show active searches and downloads for this chat |
+| `/history` | Show recent download history for this chat |
+| `/cancel` | Cancel the current search, download, or import |
 | `/help` | Show help message |
 
 ## Scoring Algorithm
@@ -130,7 +135,7 @@ python -m music_downloader run
 Search results are ranked by:
 
 1. **Duration match** (40 pts): Compared to Spotify duration. Within ±5s = perfect, ±10s = acceptable, >30s = excluded
-2. **Audio quality** (25 pts): Prefers 16-bit/44.1kHz (CD quality) for consistency
+2. **Audio quality** (25 pts): Higher bit depth and sample rate score more (24-bit / 96 kHz beats CD 16/44.1)
 3. **Source reliability** (20 pts): Free upload slots, fast upload speed, short queue
 4. **Filename relevance** (15 pts): Artist and title words found in the filename
 

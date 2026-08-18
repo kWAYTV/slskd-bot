@@ -203,3 +203,31 @@ class TestGetActiveJob:
         repo.create_job(chat_id=1, spotify_url="url", name="PL", total_tracks=5)
         active = repo.get_active_job(chat_id=999)
         assert active is None
+
+
+class TestResumableJobs:
+    def test_list_resumable_jobs(self, repo):
+        pending_id = repo.create_job(chat_id=1, spotify_url="url", name="P", total_tracks=2)
+        active_id = repo.create_job(chat_id=2, spotify_url="url", name="A", total_tracks=2)
+        done_id = repo.create_job(chat_id=3, spotify_url="url", name="D", total_tracks=2)
+        repo.update_job_status(active_id, JobStatus.active)
+        repo.update_job_status(done_id, JobStatus.completed)
+        jobs = repo.list_resumable_jobs()
+        ids = {job.id for job in jobs}
+        assert pending_id in ids
+        assert active_id in ids
+        assert done_id not in ids
+
+    def test_reset_in_flight_tracks(self, repo):
+        job_id = repo.create_job(chat_id=1, spotify_url="url", name="PL", total_tracks=3)
+        repo.add_tracks(job_id, _make_tracks(3))
+        tracks = repo.get_tracks_by_job(job_id)
+        repo.update_track_status(tracks[0].id, TrackStatus.searching)
+        repo.update_track_status(tracks[1].id, TrackStatus.awaiting_approval)
+        repo.complete_track(job_id, tracks[2].id, TrackStatus.completed)
+        reset = repo.reset_in_flight_tracks(job_id)
+        assert reset == 2
+        statuses = {t.id: t.status for t in repo.get_tracks_by_job(job_id)}
+        assert statuses[tracks[0].id] == "pending"
+        assert statuses[tracks[1].id] == "pending"
+        assert statuses[tracks[2].id] == "completed"

@@ -101,6 +101,33 @@ class TestSearchInner:
         assert client.client.searches.delete.call_count >= 2
 
     @pytest.mark.asyncio
+    async def test_cleanup_skips_in_flight_ids(self, client):
+        client._active_search_ids.add("keep-me")
+        client.client.searches.get_all = MagicMock(
+            return_value=[
+                {"id": "keep-me"},
+                {"id": "old-1"},
+            ]
+        )
+        deleted = []
+
+        def _delete(*, id):
+            deleted.append(id)
+
+        client.client.searches.delete = MagicMock(side_effect=_delete)
+        client.client.searches.search_text = MagicMock(return_value={"id": "new-1"})
+
+        def state_side_effect(id, includeResponses=False):
+            if includeResponses:
+                return {"responses": [], "responseCount": 0}
+            return {"fileCount": 0, "responseCount": 0, "isComplete": True}
+
+        client.client.searches.state = MagicMock(side_effect=state_side_effect)
+        await client._search_inner("test", timeout_secs=5, response_limit=100)
+        assert "keep-me" not in deleted
+        assert "old-1" in deleted
+
+    @pytest.mark.asyncio
     async def test_cleanup_stale_exception_ignored(self, client):
         """Exceptions during cleanup are silently ignored."""
         client.client.searches.get_all = MagicMock(side_effect=Exception("network"))

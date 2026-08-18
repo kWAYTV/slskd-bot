@@ -44,6 +44,7 @@ def _make_config():
     config.filename_template = "{artist} - {title}"
     config.search_timeout_secs = 30
     config.download_timeout_secs = 600
+    config.telegram_library_users = set()
     return config
 
 
@@ -294,23 +295,26 @@ class TestMusicBotAuthorization:
 class TestMusicBotCancellation:
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
-    def test_cancel_chat_operations_empty(self, mock_slskd, mock_spotify):
+    @pytest.mark.asyncio
+    async def test_cancel_chat_operations_empty(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        had_work = bot._cancel_chat_operations(12345)
+        had_work = await bot._cancel_chat_operations(12345)
         assert had_work is False
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
-    def test_cancel_chat_operations_with_pending(self, mock_slskd, mock_spotify):
+    @pytest.mark.asyncio
+    async def test_cancel_chat_operations_with_pending(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot.pending[12345] = PendingSearch(query="test")
-        had_work = bot._cancel_chat_operations(12345)
+        had_work = await bot._cancel_chat_operations(12345)
         assert had_work is True
         assert 12345 not in bot.pending
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
-    def test_cancel_removes_downloads_for_chat(self, mock_slskd, mock_spotify):
+    @pytest.mark.asyncio
+    async def test_cancel_removes_downloads_for_chat(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot.downloads["1"] = PendingDownload(
             track=_make_track(),
@@ -322,7 +326,7 @@ class TestMusicBotCancellation:
             result=_make_search_result(),
             chat_id=99999,
         )
-        bot._cancel_chat_operations(12345)
+        await bot._cancel_chat_operations(12345)
         assert "1" not in bot.downloads
         assert "2" in bot.downloads
 
@@ -359,6 +363,8 @@ class TestMusicBotCommands:
         update.message.reply_text.assert_called_once()
         call_args = update.message.reply_text.call_args
         assert "Send me a song name" in call_args[0][0]
+        assert "/import" in call_args[0][0]
+        assert "/cancel" in call_args[0][0]
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -431,6 +437,29 @@ class TestMusicBotCommands:
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
+    async def test_cmd_status_pending_without_track(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.pending[67890] = PendingSearch(query="artist_with*md", track=None)
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        call_args = update.message.reply_text.call_args
+        assert "artist_with*md" in call_args[0][0]
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_cmd_status_ignores_other_chats(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.pending[11111] = PendingSearch(query="secret", track=_make_track())
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        update.message.reply_text.assert_called_once_with("No active searches or downloads.")
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
     async def test_cmd_status_with_downloads(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot.downloads["1"] = PendingDownload(
@@ -461,13 +490,28 @@ class TestMusicBotCommands:
         bot = MusicBot(_make_config())
         # Add entries via the DB-backed history repo
         bot.history_repo.add(
-            artist="Artist", title="Song", filename="Artist - Song.flac", source_user="user1", status="success"
+            artist="Artist",
+            title="Song",
+            filename="Artist - Song.flac",
+            source_user="user1",
+            status="success",
+            chat_id=67890,
         )
         bot.history_repo.add(
-            artist="Artist", title="Song2", filename="Artist - Song2.flac", source_user="user1", status="rejected"
+            artist="Artist",
+            title="Song2",
+            filename="Artist - Song2.flac",
+            source_user="user1",
+            status="rejected",
+            chat_id=67890,
         )
         bot.history_repo.add(
-            artist="Artist", title="Song3", filename="Artist - Song3.flac", source_user="user1", status="failed"
+            artist="Artist",
+            title="Song3",
+            filename="Artist - Song3.flac",
+            source_user="user1",
+            status="failed",
+            chat_id=67890,
         )
         update = _make_update()
         context = _make_context()
@@ -616,6 +660,7 @@ class TestMusicBotCallbackHandler:
         context.application.create_task = MagicMock(return_value=MagicMock())
         await bot.handle_callback(update, context)
         context.application.create_task.assert_called_once()
+        update.callback_query.edit_message_reply_markup.assert_awaited()
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -815,6 +860,24 @@ class TestMusicBotHelpers:
         text = MusicBot._format_spotify_results(tracks)
         assert "Multiple matches" in text
         assert "Nancy Sinatra" in text
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    def test_format_spotify_results_escapes_markdown(self, mock_slskd, mock_spotify):
+        tracks = [
+            TrackInfo(
+                artist="AC_DC",
+                title="Hells*Bells",
+                album="Back[in]Black",
+                duration_ms=312_000,
+                spotify_url="https://open.spotify.com/track/xxx",
+                year="1980",
+            )
+        ]
+        text = MusicBot._format_spotify_results(tracks)
+        assert "AC\\_DC" in text
+        assert "Hells\\*Bells" in text
+        assert "Back\\[in\\]Black" in text
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -1250,13 +1313,14 @@ class TestImportPendingSeparation:
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
-    def test_cancel_clears_import_pending(self, mock_slskd, mock_spotify):
+    @pytest.mark.asyncio
+    async def test_cancel_clears_import_pending(self, mock_slskd, mock_spotify):
         """Cancellation should clear both pending dicts."""
         bot = MusicBot(_make_config())
         track = _make_track()
         bot.pending[67890] = PendingSearch(query="q", track=track, results=[])
         bot._import_pending[67890] = PendingSearch(query="i", track=track, results=[])
-        bot._cancel_chat_operations(67890)
+        await bot._cancel_chat_operations(67890)
         assert 67890 not in bot.pending
         assert 67890 not in bot._import_pending
 

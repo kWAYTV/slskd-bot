@@ -39,7 +39,7 @@ class TestConfig:
 
             config = Config()
             assert config.auto_mode is False
-            assert config.max_results == 10
+            assert config.max_results == 5
             assert config.duration_tolerance_secs == 5
             assert config.search_timeout_secs == 30
             assert config.download_timeout_secs == 600
@@ -65,12 +65,27 @@ class TestConfig:
             assert config.telegram_allowed_users == {123, 456, 789}
 
     def test_allowed_users_empty(self, env_vars):
-        """Config handles empty allowed users (open to all)."""
+        """Config treats empty allowed users as deny-all."""
         with patch.dict(os.environ, env_vars, clear=False):
             from music_downloader.settings import Config
 
             config = Config()
             assert config.telegram_allowed_users == set()
+
+    def test_library_users_parsing(self, env_vars):
+        env_vars["TELEGRAM_LIBRARY_USERS"] = "123,456"
+        with patch.dict(os.environ, env_vars, clear=False):
+            from music_downloader.settings import Config
+
+            config = Config()
+            assert config.telegram_library_users == {123, 456}
+
+    def test_library_users_empty(self, env_vars):
+        with patch.dict(os.environ, env_vars, clear=False):
+            from music_downloader.settings import Config
+
+            config = Config()
+            assert config.telegram_library_users == set()
 
     def test_missing_required_var_raises(self):
         """Config raises ValueError for missing required variables."""

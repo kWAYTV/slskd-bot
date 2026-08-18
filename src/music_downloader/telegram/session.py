@@ -19,6 +19,8 @@ class PendingSearch:
     message_id: int | None = None
     is_fallback: bool = False
     page: int = 0
+    user_id: int | None = None
+    skip_library_check: bool = False
 
 
 @dataclass
@@ -32,6 +34,8 @@ class PendingDownload:
     status_message_id: int | None = None
     approval_message_id: int | None = None
     result_index: int = 0
+    user_id: int | None = None
+    transfer_id: str | None = None
 
 
 class ChatSession:
@@ -53,11 +57,11 @@ class ChatSession:
         self._dl_counter += 1
         return str(self._dl_counter)
 
-    def cancel_chat_operations(self, chat_id: int) -> bool:
+    def cancel_chat_operations(self, chat_id: int) -> tuple[bool, list[PendingDownload]]:
         """Cancel all active operations for a chat.
 
         Bumps the generation counter and cancels tracked background tasks.
-        Returns True if something was actually cancelled.
+        Returns (had_work, downloads that need slskd/disk cleanup).
         """
         had_work = bool(
             self.pending.get(chat_id) or self._spotify_candidates.get(chat_id) or self._active_tasks.get(chat_id)
@@ -74,11 +78,14 @@ class ChatSession:
         self._spotify_page.pop(chat_id, None)
         self._awaiting_direct_metadata.pop(chat_id, None)
 
+        stale = [v for k, v in list(self.downloads.items()) if v.chat_id == chat_id]
+        if stale:
+            had_work = True
         stale_ids = [k for k, v in self.downloads.items() if v.chat_id == chat_id]
         for dl_id in stale_ids:
             del self.downloads[dl_id]
 
-        return had_work
+        return had_work, stale
 
     def is_stale(self, chat_id: int, generation: int) -> bool:
         return self._chat_generation.get(chat_id, 0) != generation

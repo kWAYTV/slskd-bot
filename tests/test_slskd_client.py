@@ -19,6 +19,14 @@ class TestSearchResult:
         r = SearchResult(username="u", filename="Song.flac", size=100)
         assert r.basename == "Song.flac"
 
+    def test_basename_posix_path(self):
+        r = SearchResult(username="u", filename="/Music/Artist/Song.flac", size=100)
+        assert r.basename == "Song.flac"
+
+    def test_basename_mixed_separators(self):
+        r = SearchResult(username="u", filename="\\Music/Artist\\Song.flac", size=100)
+        assert r.basename == "Song.flac"
+
     def test_extension(self):
         r = SearchResult(username="u", filename="\\Music\\Song.flac", size=100)
         assert r.extension == "flac"
@@ -320,6 +328,68 @@ class TestSlskdClientGetDownloadStatus:
         status = client.get_download_status("user1", "\\Music\\Song.flac")
         assert status is None
 
+    def test_status_includes_transfer_id(self, client):
+        client.client.transfers.get_downloads = MagicMock(
+            return_value={
+                "directories": [
+                    {
+                        "files": [
+                            {
+                                "id": "xfer-9",
+                                "filename": "\\Music\\Song.flac",
+                                "state": "InProgress",
+                                "percentComplete": 10,
+                                "bytesTransferred": 1,
+                                "size": 10,
+                                "averageSpeed": 1,
+                            }
+                        ]
+                    }
+                ]
+            }
+        )
+        status = client.get_download_status("user1", "\\Music\\Song.flac")
+        assert status is not None
+        assert status.transfer_id == "xfer-9"
+
+
+class TestSlskdClientCancelAndPing:
+    @pytest.fixture
+    def client(self):
+        with patch("slskd_api.SlskdClient") as mock_cls:
+            c = SlskdClient("http://localhost:5030", "test-key")
+            c.client = mock_cls.return_value
+            return c
+
+    def test_cancel_transfer_with_id(self, client):
+        client.client.transfers.cancel_download = MagicMock()
+        assert client.cancel_transfer("user1", "\\Music\\Song.flac", transfer_id="abc") is True
+        client.client.transfers.cancel_download.assert_called_once_with(username="user1", id="abc", remove=True)
+
+    def test_cancel_transfer_looks_up_status(self, client):
+        client.get_download_status = MagicMock(
+            return_value=DownloadStatus(username="u", filename="f", state="InProgress", transfer_id="looked-up")
+        )
+        client.client.transfers.cancel_download = MagicMock()
+        assert client.cancel_transfer("user1", "\\Music\\Song.flac") is True
+        client.client.transfers.cancel_download.assert_called_once_with(username="user1", id="looked-up", remove=True)
+
+    def test_cancel_transfer_missing_id(self, client):
+        client.get_download_status = MagicMock(return_value=None)
+        assert client.cancel_transfer("user1", "\\Music\\Song.flac") is False
+
+    def test_cancel_transfer_exception(self, client):
+        client.client.transfers.cancel_download = MagicMock(side_effect=Exception("boom"))
+        assert client.cancel_transfer("user1", "f", transfer_id="x") is False
+
+    def test_ping_ok(self, client):
+        client.client.application.state = MagicMock(return_value={"state": "Connected"})
+        assert client.ping() is True
+
+    def test_ping_fail(self, client):
+        client.client.application.state = MagicMock(side_effect=Exception("down"))
+        assert client.ping() is False
+
 
 class TestSlskdClientSearch:
     """Test SlskdClient.search async method."""
@@ -337,6 +407,32 @@ class TestSlskdClientSearch:
         client.client.searches.get_all = MagicMock(side_effect=Exception("fail"))
         client.client.searches.search_text = MagicMock(side_effect=Exception("fail"))
         results = await client.search("test query", timeout_secs=2)
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_search_hard_timeout_collects_partial(self, client):
+        """Hard timeout should stop this call's own search and return partial results."""
+        from unittest.mock import AsyncMock
+
+        async def fake_inner(query, timeout_secs, response_limit, search_id_holder):
+            search_id_holder.append("search-123")
+            raise TimeoutError()
+
+        client._search_inner = fake_inner
+        client._stop_and_collect = AsyncMock(return_value=[{"username": "u"}])
+        results = await client.search("query", timeout_secs=1)
+
+        client._stop_and_collect.assert_awaited_once_with("search-123")
+        assert results == [{"username": "u"}]
+
+    @pytest.mark.asyncio
+    async def test_search_hard_timeout_without_id_returns_empty(self, client):
+        async def fake_inner(query, timeout_secs, response_limit, search_id_holder):
+            raise TimeoutError()
+
+        client._search_inner = fake_inner
+        results = await client.search("query", timeout_secs=1)
+
         assert results == []
 
 

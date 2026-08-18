@@ -39,16 +39,17 @@ def build_results_keyboard(
     return InlineKeyboardMarkup(buttons)
 
 
-def build_approve_keyboard(download_id: str) -> InlineKeyboardMarkup:
+def build_approve_keyboard(download_id: str, has_next: bool = False) -> InlineKeyboardMarkup:
     """Build approve/reject keyboard for a downloaded file."""
-    return InlineKeyboardMarkup(
+    rows = [
         [
-            [
-                InlineKeyboardButton("✅ Save to library", callback_data=f"approve:{download_id}"),
-                InlineKeyboardButton("🚫 Reject", callback_data=f"reject:{download_id}"),
-            ]
+            InlineKeyboardButton("✅ Save to library", callback_data=f"approve:{download_id}"),
+            InlineKeyboardButton("🚫 Reject", callback_data=f"reject:{download_id}"),
         ]
-    )
+    ]
+    if has_next:
+        rows.append([InlineKeyboardButton("⏭ Try next result", callback_data=f"next:{download_id}")])
+    return InlineKeyboardMarkup(rows)
 
 
 def build_duplicate_keyboard() -> InlineKeyboardMarkup:
@@ -139,6 +140,19 @@ def build_import_skip_keyboard(job_id: int, track_id: int) -> InlineKeyboardMark
     """Reject/skip keyboard for import tracks with no download available."""
     return InlineKeyboardMarkup(
         [
+            [
+                InlineKeyboardButton("\U0001f6ab Mark failed", callback_data=f"ir:{job_id}:{track_id}"),
+                InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),
+            ],
+        ]
+    )
+
+
+def build_import_failure_keyboard(job_id: int, track_id: int, dl_id: str) -> InlineKeyboardMarkup:
+    """Retry / skip / fail keyboard when an import download fails."""
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("\U0001f504 Retry", callback_data=f"iy:{job_id}:{track_id}:{dl_id}")],
             [
                 InlineKeyboardButton("\U0001f6ab Mark failed", callback_data=f"ir:{job_id}:{track_id}"),
                 InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),

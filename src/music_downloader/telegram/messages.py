@@ -68,8 +68,8 @@ def format_spotify_results(tracks: list[TrackInfo], page: int = 0, page_size: in
     for i in range(start, end):
         t = tracks[i]
         lines.append(
-            f"*#{i + 1} {t.artist} - {t.title}*\n"
-            f"    Album: {t.album} ({t.year}) | {t.duration_display}\n"
+            f"*#{i + 1} {escape_md(t.artist)} - {escape_md(t.title)}*\n"
+            f"    Album: {escape_md(t.album)} ({escape_md(t.year)}) | {t.duration_display}\n"
             f"    [Listen on Spotify]({t.spotify_url})"
         )
     lines.append("\nPick the correct version:")
@@ -89,11 +89,14 @@ def format_search_results(
     end = min(start + page_size, total)
     total_pages = (total + page_size - 1) // page_size
 
+    artist = escape_md(track.artist)
+    title = escape_md(track.title)
+    album = escape_md(track.album)
     is_direct = track.duration_ms == 0
     if is_direct:
         if track.artist:
             header = [
-                f"🎵 *{track.artist} - {track.title}*\n",
+                f"🎵 *{artist} - {title}*\n",
                 f"Found {total} FLAC matches:\n",
             ]
         else:
@@ -103,14 +106,14 @@ def format_search_results(
             ]
     elif is_fallback:
         header = [
-            f"🎵 *{track.artist} - {track.title}*",
-            f"Duration: {track.duration_display} | Album: {track.album}\n",
+            f"🎵 *{artist} - {title}*",
+            f"Duration: {track.duration_display} | Album: {album}\n",
             f"⚠️ No FLAC found — showing all formats ({total} matches):\n",
         ]
     else:
         header = [
-            f"🎵 *{track.artist} - {track.title}*",
-            f"Duration: {track.duration_display} | Album: {track.album}\n",
+            f"🎵 *{artist} - {title}*",
+            f"Duration: {track.duration_display} | Album: {album}\n",
             f"Found {total} FLAC matches:\n",
         ]
 

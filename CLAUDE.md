@@ -8,7 +8,7 @@ Telegram bot that automates music discovery and download. Resolves track metadat
 - python-telegram-bot (Telegram Bot API)
 - spotipy (Spotify Web API, Client Credentials flow)
 - slskd-api (Soulseek/slskd REST API)
-- FastAPI + uvicorn (health check endpoint)
+- stdlib `HTTPServer` (health check endpoint)
 - mutagen (audio metadata)
 - Docker (image: `ghcr.io/kwaytv/slskd-bot`)
 - Published on PyPI
@@ -64,7 +64,7 @@ Telegram is a delivery mechanism, not the domain. `telegram/app.py` composes `Mu
 
 Search results are ranked by 4 factors (total 100 points):
 1. **Duration match** (40 pts): Compared to Spotify reference duration
-2. **Audio quality** (25 pts): Prefers 16-bit/44.1kHz CD quality
+2. **Audio quality** (25 pts): Higher bit depth and sample rate score more (24/96 over CD 16/44.1)
 3. **Source reliability** (20 pts): Free slots, upload speed, queue
 4. **Filename relevance** (15 pts): Artist/title word matching
 
@@ -76,6 +76,9 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Search lifecycle**: `search_text()` -> poll `state()` -> `stop()` on timeout -> grab partial results from `search_responses()` -> `delete()` cleanup
 - **Async wrapping**: All synchronous `slskd-api` calls must be wrapped with `asyncio.to_thread()` to avoid blocking the Telegram bot event loop
 - **Timeouts**: Hard timeout via `asyncio.wait_for()` around the entire search+poll loop; `searches.stop()` actively cancels the server-side search on timeout
+- **Cleanup**: Stale slskd searches are deleted only when their IDs are not in `_active_search_ids` (serialized with search start)
+- **Import search**: Playlist import uses the same four-tier fallbacks as manual search (`search_with_fallbacks`)
+- **Import resume**: Active jobs auto-resume on startup; `/import resume` continues the chat's pending/active job after resetting `searching` / `awaiting_approval` tracks
 
 ## Telegram UX Patterns
 
@@ -105,7 +108,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 
 - **Spotify API**: Client Credentials flow (no user login). Used only for metadata resolution.
 - **slskd API**: REST API with API key auth. Used for search, download, and file management.
-- **Telegram Bot API**: Long-polling mode. Restricted to allowed user IDs via `TELEGRAM_ALLOWED_USERS`.
+- **Telegram Bot API**: Long-polling mode. Restricted to allowed user IDs via `TELEGRAM_ALLOWED_USERS`. Library writes (save + `/import`) can be further restricted with `TELEGRAM_LIBRARY_USERS`.
 
 ## Testing Strategy
 

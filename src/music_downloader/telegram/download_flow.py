@@ -21,7 +21,7 @@ from music_downloader.telegram.keyboards import (
     build_retry_keyboard,
     build_retry_next_keyboard,
 )
-from music_downloader.telegram.messages import safe_query_edit
+from music_downloader.telegram.messages import escape_md, safe_query_edit
 from music_downloader.telegram.session import PendingDownload
 
 logger = logging.getLogger(__name__)
@@ -57,12 +57,16 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
 
     result = pending.results[index]
     track = pending.track
+    user_id = pending.user_id or query.from_user.id
+
+    with contextlib.suppress(BadRequest):
+        await query.edit_message_reply_markup(reply_markup=None)
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=(
             f"⬇️ *Downloading #{index + 1}...*\n"
-            f"{track.artist} - {track.title}\n"
+            f"{escape_md(track.artist)} - {escape_md(track.title)}\n"
             f"From: `{result.username}`\n"
             f"File: `{result.basename}`"
         ),
@@ -70,7 +74,7 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     )
 
     task = context.application.create_task(
-        self._do_download(context, chat_id, track, result, status_msg, index),
+        self._do_download(context, chat_id, track, result, status_msg, index, user_id=user_id),
         update=update,
     )
     self._track_task(chat_id, task)
@@ -82,14 +86,23 @@ def has_next_result(self, chat_id: int, current_index: int) -> bool:
 
 
 async def do_download(
-    self, context, chat_id: int, track: TrackInfo, result: SearchResult, status_msg, result_index: int = 0
+    self,
+    context,
+    chat_id: int,
+    track: TrackInfo,
+    result: SearchResult,
+    status_msg,
+    result_index: int = 0,
+    user_id: int | None = None,
 ):
     """Download a file, send it to Telegram for preview, and ask for approval."""
     dl_id = self._next_dl_id()
     label = f"#{result_index + 1}"
+    can_save = self._can_save_library(user_id)
+    transfer_id = None
 
     try:
-        success = self.slskd.enqueue_download(result)
+        success = await asyncio.to_thread(self.slskd.enqueue_download, result)
         if not success:
             pending_dl = PendingDownload(
                 track=track,
@@ -97,6 +110,7 @@ async def do_download(
                 chat_id=chat_id,
                 status_message_id=status_msg.message_id,
                 result_index=result_index,
+                user_id=user_id,
             )
             self.downloads[dl_id] = pending_dl
             has_next = self._has_next_result(chat_id, result_index)
@@ -112,6 +126,7 @@ async def do_download(
             filename=result.filename,
             timeout_secs=self.config.download_timeout_secs,
         )
+        transfer_id = status.transfer_id if status else None
 
         if status is None or status.is_failed:
             state = status.state if status else "Timeout"
@@ -121,6 +136,8 @@ async def do_download(
                 chat_id=chat_id,
                 status_message_id=status_msg.message_id,
                 result_index=result_index,
+                user_id=user_id,
+                transfer_id=transfer_id,
             )
             self.downloads[dl_id] = pending_dl
             has_next = self._has_next_result(chat_id, result_index)
@@ -129,7 +146,7 @@ async def do_download(
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_retry_next_keyboard(dl_id) if has_next else build_retry_keyboard(dl_id),
             )
-            await self._add_history(track, result, "failed")
+            await self._add_history(track, result, "failed", chat_id=chat_id)
             return
 
         source_path = self.processor.find_downloaded_file(result.username, result.filename)
@@ -137,7 +154,7 @@ async def do_download(
             await status_msg.edit_text(
                 "❌ Downloaded file not found on disk.\nCheck DOWNLOAD_DIR configuration.",
             )
-            await self._add_history(track, result, "file_not_found")
+            await self._add_history(track, result, "file_not_found", chat_id=chat_id)
             return
 
         flac_verdict = await self._analyze_flac(source_path) if result.extension == "flac" else None
@@ -149,6 +166,8 @@ async def do_download(
             source_path=source_path,
             status_message_id=status_msg.message_id,
             result_index=result_index,
+            user_id=user_id,
+            transfer_id=transfer_id,
         )
         self.downloads[dl_id] = pending_dl
 
@@ -162,10 +181,18 @@ async def do_download(
         )
 
         file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
-        caption = f"{label} {quality_line}\nSave to library?"
+        caption = (
+            f"{label} {quality_line}\nSave to library?"
+            if can_save
+            else f"{label} {quality_line}\nSent to you — not saved to the library."
+        )
+        markup = (
+            build_approve_keyboard(dl_id, has_next=self._has_next_result(chat_id, result_index)) if can_save else None
+        )
 
+        delivered = True
         if file_size > TELEGRAM_FILE_LIMIT:
-            await self._send_large_file(
+            delivered = await self._send_large_file(
                 context,
                 chat_id,
                 track,
@@ -175,6 +202,8 @@ async def do_download(
                 quality_line,
                 label,
                 dl_id,
+                reply_markup=markup,
+                can_save=can_save,
             )
         else:
             target_name = self.processor.build_filename(track.artist, track.title, result.extension)
@@ -188,7 +217,7 @@ async def do_download(
                         performer=track.artist,
                         duration=track.duration_secs,
                         caption=caption,
-                        reply_markup=build_approve_keyboard(dl_id),
+                        reply_markup=markup,
                     )
             except BadRequest:
                 logger.info("send_audio failed, falling back to send_document for %s", result.basename)
@@ -198,14 +227,23 @@ async def do_download(
                         document=f,
                         filename=target_name,
                         caption=caption,
-                        reply_markup=build_approve_keyboard(dl_id),
+                        reply_markup=markup,
                     )
             if dl_id in self.downloads:
                 self.downloads[dl_id].approval_message_id = sent.message_id
 
+        if not can_save:
+            # Only record "delivered" when audio actually reached the user.
+            status = "delivered" if delivered else "failed"
+            await _forget_local_copy(self, pending_dl, track, result, chat_id, status=status)
+
     except asyncio.CancelledError:
         logger.info("Download cancelled for %s", result.basename)
-        self.downloads.pop(dl_id, None)
+        pending_dl = self.downloads.pop(dl_id, None)
+        if pending_dl:
+            await self._cleanup_download_artifacts(pending_dl)
+        else:
+            await asyncio.to_thread(self.slskd.cancel_transfer, result.username, result.filename, transfer_id)
         raise
     except Exception:
         logger.exception(f"Download failed for {result.basename}")
@@ -226,8 +264,13 @@ async def send_large_file(
     quality_line: str,
     label: str,
     dl_id: str,
-):
-    """Convert a >50 MB file to OGG and send. Trim only as last resort."""
+    reply_markup=None,
+    can_save: bool = True,
+) -> bool:
+    """Convert a >50 MB file to OGG and send. Trim only as last resort.
+
+    Returns True when audio (full OGG or preview) was actually sent to the user.
+    """
     ogg_path = await self._convert_to_ogg(source_path)
 
     if ogg_path:
@@ -238,7 +281,8 @@ async def send_large_file(
                 caption = (
                     f"🎧 {label} Converted to OGG "
                     f"(original: {file_size / (1024 * 1024):.0f}MB {result.extension.upper()})\n"
-                    f"{quality_line}\nSave to library?"
+                    f"{quality_line}\n"
+                    + ("Save to library?" if can_save else "Sent to you — not saved to the library.")
                 )
                 with open(ogg_path, "rb") as f:
                     sent = await context.bot.send_audio(
@@ -249,11 +293,11 @@ async def send_large_file(
                         performer=track.artist,
                         duration=track.duration_secs,
                         caption=caption,
-                        reply_markup=build_approve_keyboard(dl_id),
+                        reply_markup=reply_markup,
                     )
                 if dl_id in self.downloads:
                     self.downloads[dl_id].approval_message_id = sent.message_id
-                return
+                return True
             finally:
                 with contextlib.suppress(OSError):
                     os.unlink(ogg_path)
@@ -269,13 +313,13 @@ async def send_large_file(
             text=(
                 f"❌ {label} Could not create preview for "
                 f"{file_size / (1024 * 1024):.0f}MB file.\n"
-                f"{quality_line}\n\nSave to library anyway?"
+                f"{quality_line}\n\n" + ("Save to library anyway?" if can_save else "Could not create a preview.")
             ),
-            reply_markup=build_approve_keyboard(dl_id),
+            reply_markup=reply_markup,
         )
         if dl_id in self.downloads:
             self.downloads[dl_id].approval_message_id = sent.message_id
-        return
+        return False
 
     try:
         preview_ext = os.path.splitext(preview_path)[1].lstrip(".")
@@ -283,8 +327,7 @@ async def send_large_file(
         preview_caption = (
             f"🎧 {label} ~1 min preview "
             f"(full file: {file_size / (1024 * 1024):.0f}MB)\n"
-            f"{quality_line}\n"
-            f"Save to library?"
+            f"{quality_line}\n" + ("Save to library?" if can_save else "Sent to you — not saved to the library.")
         )
         with open(preview_path, "rb") as f:
             sent = await context.bot.send_audio(
@@ -295,10 +338,11 @@ async def send_large_file(
                 performer=track.artist,
                 duration=60,
                 caption=preview_caption,
-                reply_markup=build_approve_keyboard(dl_id),
+                reply_markup=reply_markup,
             )
         if dl_id in self.downloads:
             self.downloads[dl_id].approval_message_id = sent.message_id
+        return True
     finally:
         with contextlib.suppress(OSError):
             os.unlink(preview_path)
@@ -322,6 +366,10 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
     result = pending_dl.result
 
     if action == "approve":
+        if not self._can_save_library(query.from_user.id):
+            self.downloads[dl_id] = pending_dl
+            await self._edit_approval_message(query, "🚫 You are not allowed to save to the library.")
+            return
         if pending_dl.source_path:
             target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
             if target_path:
@@ -329,22 +377,20 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
                 await self._embed_spotify_artwork(target_path, track)
                 target_name = os.path.basename(target_path)
                 await self._edit_approval_message(query, f"✅ Saved: `{target_name}`")
-                await self._add_history(track, result, "success")
+                await self._add_history(track, result, "success", chat_id=chat_id)
                 logger.info(f"Approved and saved: {target_name}")
                 await self._dismiss_other_downloads(context, chat_id)
             else:
                 await self._edit_approval_message(query, "❌ Failed to save file. Check logs.")
-                await self._add_history(track, result, "process_failed")
+                await self._add_history(track, result, "process_failed", chat_id=chat_id)
         else:
             await self._edit_approval_message(query, "❌ Source file not found.")
-            await self._add_history(track, result, "file_not_found")
+            await self._add_history(track, result, "file_not_found", chat_id=chat_id)
 
     elif action == "reject":
-        if pending_dl.source_path and os.path.isfile(pending_dl.source_path):
-            os.remove(pending_dl.source_path)
-            logger.info(f"Deleted rejected file: {pending_dl.source_path}")
-        await self._edit_approval_message(query, f"🚫 Rejected: {track.artist} - {track.title}")
-        await self._add_history(track, result, "rejected")
+        await self._cleanup_download_artifacts(pending_dl)
+        await self._edit_approval_message(query, f"🚫 Rejected: {escape_md(track.artist)} - {escape_md(track.title)}")
+        await self._add_history(track, result, "rejected", chat_id=chat_id)
         logger.info(f"Rejected: {track.artist} - {track.title} ({result.basename})")
 
 
@@ -361,8 +407,7 @@ async def dismiss_other_downloads(self, context, chat_id: int):
     stale = [(k, v) for k, v in self.downloads.items() if v.chat_id == chat_id]
     for dl_id, dl in stale:
         del self.downloads[dl_id]
-        if dl.source_path and os.path.isfile(dl.source_path):
-            os.remove(dl.source_path)
+        await self._cleanup_download_artifacts(dl)
         if dl.approval_message_id:
             try:
                 await context.bot.edit_message_caption(
@@ -422,7 +467,7 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
     )
 
     task = context.application.create_task(
-        self._do_download(context, chat_id, track, result, status_msg, result_index),
+        self._do_download(context, chat_id, track, result, status_msg, result_index, user_id=pending_dl.user_id),
         update=update,
     )
     self._track_task(chat_id, task)
@@ -449,6 +494,9 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
         await safe_query_edit(query, "⏹ No more results to try.")
         return
 
+    if pending_dl.source_path:
+        await self._cleanup_download_artifacts(pending_dl)
+
     next_result = pending.results[next_idx]
     track = pending_dl.track
 
@@ -465,7 +513,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
     )
 
     task = context.application.create_task(
-        self._do_download(context, chat_id, track, next_result, status_msg, next_idx),
+        self._do_download(context, chat_id, track, next_result, status_msg, next_idx, user_id=pending_dl.user_id),
         update=update,
     )
     self._track_task(chat_id, task)
@@ -481,6 +529,23 @@ async def analyze_flac_async(filepath: str) -> FlacVerdict | None:
     except Exception:
         logger.exception("FLAC analysis failed for %s", filepath)
         return None
+
+
+async def _forget_local_copy(
+    self,
+    pending_dl: PendingDownload,
+    track: TrackInfo,
+    result: SearchResult,
+    chat_id: int,
+    status: str = "delivered",
+):
+    """Send-only users: drop the local file and slskd transfer after Telegram delivery."""
+    for key, value in list(self.downloads.items()):
+        if value is pending_dl:
+            del self.downloads[key]
+            break
+    await self._cleanup_download_artifacts(pending_dl)
+    await self._add_history(track, result, status, chat_id=chat_id)
 
 
 async def convert_to_ogg_async(filepath: str) -> str | None:

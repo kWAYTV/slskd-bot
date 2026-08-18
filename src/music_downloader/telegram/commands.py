@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.telegram.keyboards import build_auto_mode_keyboard
+from music_downloader.telegram.messages import escape_md
 
 
 async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -21,8 +22,11 @@ async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         "and I'll find and download it in FLAC.\n\n"
         "Commands:\n"
         "/auto — Toggle auto-download mode\n"
+        "/import <url> — Import a Spotify playlist or album\n"
+        "/import resume — Continue a paused import after restart\n"
         "/status — Show active downloads\n"
         "/history — Recent downloads\n"
+        "/cancel — Cancel the current search, download, or import\n"
         "/help — Show this message",
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -54,17 +58,22 @@ async def cmd_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await self._check_auth(update):
         return
 
+    chat_id = update.effective_chat.id
     lines = []
 
-    if self.pending:
+    pending = self.pending.get(chat_id)
+    if pending:
         lines.append("*Active searches:*\n")
-        for _chat_id, pending in self.pending.items():
-            lines.append(f"• {pending.track.artist} - {pending.track.title}")
+        if pending.track:
+            lines.append(f"• {escape_md(pending.track.artist)} - {escape_md(pending.track.title)}")
+        else:
+            lines.append(f"• `{pending.query}`")
 
-    if self.downloads:
+    chat_downloads = [dl for dl in self.downloads.values() if dl.chat_id == chat_id]
+    if chat_downloads:
         lines.append("\n*Active downloads:*\n")
-        for _dl_id, dl in self.downloads.items():
-            lines.append(f"• {dl.track.artist} - {dl.track.title} ({dl.result.basename})")
+        for dl in chat_downloads:
+            lines.append(f"• {escape_md(dl.track.artist)} - {escape_md(dl.track.title)} (`{dl.result.basename}`)")
 
     if not lines:
         await update.message.reply_text("No active searches or downloads.")
@@ -78,7 +87,7 @@ async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await self._check_auth(update):
         return
 
-    records = await asyncio.to_thread(self.history_repo.get_recent, 10)
+    records = await asyncio.to_thread(self.history_repo.get_recent, 10, update.effective_chat.id)
 
     if not records:
         await update.message.reply_text("No downloads yet.")
@@ -86,7 +95,14 @@ async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     lines = ["*Recent downloads:*\n"]
     for entry in records:
-        icon = {"success": "✅", "rejected": "🚫"}.get(entry.status, "❌")
+        icon = {
+            "success": "✅",
+            "rejected": "🚫",
+            "failed": "❌",
+            "file_not_found": "❓",
+            "process_failed": "⚠️",
+            "delivered": "📲",
+        }.get(entry.status, "❌")
         lines.append(f"{icon} `{entry.filename}`")
 
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)

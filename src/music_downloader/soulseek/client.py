@@ -24,6 +24,8 @@ class SlskdClient:
 
     def __init__(self, host: str, api_key: str):
         self.client = slskd_api.SlskdClient(host, api_key)
+        self._active_search_ids: set[str] = set()
+        self._search_start_lock = asyncio.Lock()
         logger.info(f"slskd client initialized for {host}")
 
     async def search(self, query: str, timeout_secs: int = 30, response_limit: int = 500) -> list[dict]:
@@ -34,17 +36,18 @@ class SlskdClient:
         don't block the event loop.  On timeout the search is explicitly
         stopped and whatever partial results arrived are returned.
         """
-        search_id: str | None = None
+        # Per-call holder so concurrent searches can't clobber each other's id.
+        search_id_holder: list[str] = []
 
         try:
             return await asyncio.wait_for(
-                self._search_inner(query, timeout_secs, response_limit),
+                self._search_inner(query, timeout_secs, response_limit, search_id_holder),
                 timeout=timeout_secs + 10,
             )
         except TimeoutError:
             logger.warning(f"Hard timeout hit for search: {query}")
-            if search_id:
-                return await self._stop_and_collect(search_id)
+            if search_id_holder:
+                return await self._stop_and_collect(search_id_holder[0])
             return []
         except requests.exceptions.RequestException as exc:
             logger.exception(f"slskd search failed for: {query}")
@@ -54,95 +57,104 @@ class SlskdClient:
             return []
 
     async def _cleanup_stale_searches(self):
-        """Delete old searches to prevent API response caching issues."""
+        """Delete old searches that this client is not currently running."""
         try:
             existing = await asyncio.to_thread(self.client.searches.get_all)
             if existing:
-                logger.debug("Cleaning %d stale searches", len(existing))
-                for s in existing:
+                active = set(self._active_search_ids)
+                stale = [s for s in existing if s.get("id") not in active]
+                logger.debug("Cleaning %d stale searches (keeping %d in-flight)", len(stale), len(active))
+                for s in stale:
                     with contextlib.suppress(requests.exceptions.RequestException, KeyError):
                         await asyncio.to_thread(self.client.searches.delete, id=s["id"])
         except Exception:
             logger.warning("Failed to clean stale searches", exc_info=True)
 
-    async def _search_inner(self, query: str, timeout_secs: int, response_limit: int) -> list[dict]:
+    async def _search_inner(
+        self, query: str, timeout_secs: int, response_limit: int, search_id_holder: list[str] | None = None
+    ) -> list[dict]:
         """Core search logic with polling, stop-on-timeout, and partial results."""
-        await self._cleanup_stale_searches()
-
-        search_state = await asyncio.to_thread(
-            self.client.searches.search_text,
-            searchText=query,
-            searchTimeout=timeout_secs * 1000,
-            responseLimit=response_limit,
-        )
-        search_id = search_state["id"]
+        async with self._search_start_lock:
+            await self._cleanup_stale_searches()
+            search_state = await asyncio.to_thread(
+                self.client.searches.search_text,
+                searchText=query,
+                searchTimeout=timeout_secs * 1000,
+                responseLimit=response_limit,
+            )
+            search_id = search_state["id"]
+            if search_id_holder is not None:
+                search_id_holder.append(search_id)
+            self._active_search_ids.add(search_id)
         logger.info(f"Search started: id={search_id}, query='{query}'")
 
         min_wait = 5
         try:
-            start = time.time()
-            last_count = 0
-            stable_since: float | None = None
+            try:
+                start = time.time()
+                last_count = 0
+                stable_since: float | None = None
 
-            while time.time() - start < timeout_secs:
-                await asyncio.sleep(2)
-                state = await asyncio.to_thread(self.client.searches.state, id=search_id)
+                while time.time() - start < timeout_secs:
+                    await asyncio.sleep(2)
+                    state = await asyncio.to_thread(self.client.searches.state, id=search_id)
 
-                current_count = state.get("fileCount", 0)
-                resp_count = state.get("responseCount", 0)
-                is_complete = state.get("isComplete", False)
-                elapsed = time.time() - start
+                    current_count = state.get("fileCount", 0)
+                    resp_count = state.get("responseCount", 0)
+                    is_complete = state.get("isComplete", False)
+                    elapsed = time.time() - start
 
-                if current_count != last_count:
-                    last_count = current_count
-                    stable_since = time.time()
-                    logger.debug(f"Search progress: {current_count} files from {resp_count} peers")
-                elif stable_since and (time.time() - stable_since > 8):
-                    logger.info(f"Search stabilized with {current_count} files from {resp_count} peers")
-                    break
+                    if current_count != last_count:
+                        last_count = current_count
+                        stable_since = time.time()
+                        logger.debug(f"Search progress: {current_count} files from {resp_count} peers")
+                    elif stable_since and (time.time() - stable_since > 8):
+                        logger.info(f"Search stabilized with {current_count} files from {resp_count} peers")
+                        break
 
-                if is_complete and elapsed >= min_wait:
-                    logger.info(f"Search completed with {current_count} files from {resp_count} peers")
-                    break
-            else:
-                logger.info(
-                    f"Search polling timeout ({timeout_secs}s) for '{query}', stopping and grabbing partial results"
-                )
-
-        except Exception:
-            logger.exception(f"Error during search polling for: {query}")
-
-        with contextlib.suppress(requests.exceptions.RequestException):
-            await asyncio.to_thread(self.client.searches.stop, id=search_id)
-
-        final_state = await asyncio.to_thread(
-            self.client.searches.state,
-            id=search_id,
-            includeResponses=True,
-        )
-        responses: list[dict] = final_state.get("responses", [])
-
-        if not responses:
-            resp_count = final_state.get("responseCount", 0)
-            file_count = final_state.get("fileCount", 0)
-            if resp_count > 0 or file_count > 0:
-                logger.info(
-                    "state(includeResponses) empty despite %d peers / %d files — "
-                    "falling back to search_responses endpoint",
-                    resp_count,
-                    file_count,
-                )
-                with contextlib.suppress(requests.exceptions.RequestException):
-                    responses = await asyncio.to_thread(
-                        self.client.searches.search_responses,
-                        id=search_id,
+                    if is_complete and elapsed >= min_wait:
+                        logger.info(f"Search completed with {current_count} files from {resp_count} peers")
+                        break
+                else:
+                    logger.info(
+                        f"Search polling timeout ({timeout_secs}s) for '{query}', stopping and grabbing partial results"
                     )
-                logger.info("search_responses returned %d responses", len(responses))
 
-        with contextlib.suppress(requests.exceptions.RequestException):
-            await asyncio.to_thread(self.client.searches.delete, id=search_id)
+            except Exception:
+                logger.exception(f"Error during search polling for: {query}")
 
-        return responses
+            with contextlib.suppress(requests.exceptions.RequestException):
+                await asyncio.to_thread(self.client.searches.stop, id=search_id)
+
+            final_state = await asyncio.to_thread(
+                self.client.searches.state,
+                id=search_id,
+                includeResponses=True,
+            )
+            responses: list[dict] = final_state.get("responses", [])
+
+            if not responses:
+                resp_count = final_state.get("responseCount", 0)
+                file_count = final_state.get("fileCount", 0)
+                if resp_count > 0 or file_count > 0:
+                    logger.info(
+                        "state(includeResponses) empty despite %d peers / %d files — "
+                        "falling back to search_responses endpoint",
+                        resp_count,
+                        file_count,
+                    )
+                    with contextlib.suppress(requests.exceptions.RequestException):
+                        responses = await asyncio.to_thread(
+                            self.client.searches.search_responses,
+                            id=search_id,
+                        )
+                    logger.info("search_responses returned %d responses", len(responses))
+
+            with contextlib.suppress(requests.exceptions.RequestException):
+                await asyncio.to_thread(self.client.searches.delete, id=search_id)
+            return responses
+        finally:
+            self._active_search_ids.discard(search_id)
 
     async def _stop_and_collect(self, search_id: str) -> list[dict]:
         """Stop a search and return whatever partial results exist."""
@@ -166,6 +178,7 @@ class SlskdClient:
             responses = []
         with contextlib.suppress(requests.exceptions.RequestException):
             await asyncio.to_thread(self.client.searches.delete, id=search_id)
+        self._active_search_ids.discard(search_id)
         return responses
 
     def parse_results(self, responses: list[dict], flac_only: bool = True) -> list[SearchResult]:
@@ -235,6 +248,7 @@ class SlskdClient:
                             bytes_transferred=transfer.get("bytesTransferred", 0),
                             size=transfer.get("size", 0),
                             average_speed=transfer.get("averageSpeed", 0),
+                            transfer_id=str(transfer["id"]) if transfer.get("id") is not None else None,
                         )
 
             return None
@@ -249,7 +263,7 @@ class SlskdClient:
 
         while time.time() - start < timeout_secs:
             await asyncio.sleep(3)
-            status = self.get_download_status(username, filename)
+            status = await asyncio.to_thread(self.get_download_status, username, filename)
 
             if status is None:
                 logger.debug(f"No status yet for {filename}")
@@ -267,6 +281,32 @@ class SlskdClient:
 
         logger.warning(f"Download timed out after {timeout_secs}s: {filename}")
         return None
+
+    def cancel_transfer(self, username: str, filename: str, transfer_id: str | None = None) -> bool:
+        """Cancel an in-flight slskd download and remove it from the transfer list."""
+        try:
+            tid = transfer_id
+            if not tid:
+                status = self.get_download_status(username, filename)
+                tid = status.transfer_id if status else None
+            if not tid:
+                logger.warning("No slskd transfer id to cancel for %s / %s", username, filename)
+                return False
+            self.client.transfers.cancel_download(username=username, id=tid, remove=True)
+            logger.info("Cancelled slskd transfer %s (%s from %s)", tid, filename, username)
+            return True
+        except Exception:
+            logger.exception("Failed to cancel slskd transfer for %s", filename)
+            return False
+
+    def ping(self) -> bool:
+        """Return True if the slskd application API is reachable."""
+        try:
+            self.client.application.state()
+            return True
+        except Exception:
+            logger.debug("slskd ping failed", exc_info=True)
+            return False
 
     def get_downloads_directory(self) -> list[dict]:
         """Get the contents of the slskd downloads directory."""
