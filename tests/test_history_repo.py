@@ -128,5 +128,12 @@ class TestFindSuccess:
         assert hit is not None
         assert hit.filename == "x.flac"
 
+    def test_url_falls_back_to_artist_title_for_legacy_rows(self, repo):
+        # Row written before the spotify_url column existed (empty URL)
+        repo.add(artist="Artist", title="Song", filename="legacy.flac", source_user="u", status="success")
+        hit = repo.find_success("Artist", "Song", spotify_url="https://open.spotify.com/track/new")
+        assert hit is not None
+        assert hit.filename == "legacy.flac"
+
     def test_returns_none_when_missing(self, repo):
         assert repo.find_success("Nope", "Missing") is None

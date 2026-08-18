@@ -24,7 +24,6 @@ class SlskdClient:
 
     def __init__(self, host: str, api_key: str):
         self.client = slskd_api.SlskdClient(host, api_key)
-        self._current_search_id: str | None = None
         self._active_search_ids: set[str] = set()
         self._search_start_lock = asyncio.Lock()
         logger.info(f"slskd client initialized for {host}")
@@ -37,18 +36,18 @@ class SlskdClient:
         don't block the event loop.  On timeout the search is explicitly
         stopped and whatever partial results arrived are returned.
         """
-        self._current_search_id = None
+        # Per-call holder so concurrent searches can't clobber each other's id.
+        search_id_holder: list[str] = []
 
         try:
             return await asyncio.wait_for(
-                self._search_inner(query, timeout_secs, response_limit),
+                self._search_inner(query, timeout_secs, response_limit, search_id_holder),
                 timeout=timeout_secs + 10,
             )
         except TimeoutError:
             logger.warning(f"Hard timeout hit for search: {query}")
-            search_id = self._current_search_id
-            if search_id:
-                return await self._stop_and_collect(search_id)
+            if search_id_holder:
+                return await self._stop_and_collect(search_id_holder[0])
             return []
         except requests.exceptions.RequestException as exc:
             logger.exception(f"slskd search failed for: {query}")
@@ -71,7 +70,9 @@ class SlskdClient:
         except Exception:
             logger.warning("Failed to clean stale searches", exc_info=True)
 
-    async def _search_inner(self, query: str, timeout_secs: int, response_limit: int) -> list[dict]:
+    async def _search_inner(
+        self, query: str, timeout_secs: int, response_limit: int, search_id_holder: list[str] | None = None
+    ) -> list[dict]:
         """Core search logic with polling, stop-on-timeout, and partial results."""
         async with self._search_start_lock:
             await self._cleanup_stale_searches()
@@ -82,7 +83,8 @@ class SlskdClient:
                 responseLimit=response_limit,
             )
             search_id = search_state["id"]
-            self._current_search_id = search_id
+            if search_id_holder is not None:
+                search_id_holder.append(search_id)
             self._active_search_ids.add(search_id)
         logger.info(f"Search started: id={search_id}, query='{query}'")
 

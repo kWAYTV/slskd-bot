@@ -206,6 +206,7 @@ class MusicBot:
             "ia": self._handle_import_callback,
             "ir": self._handle_import_callback,
             "is": self._handle_import_callback,
+            "iy": self._handle_import_callback,
             "retry": self._handle_retry,
             "next": self._handle_next_result,
             "dup": self._handle_duplicate_response,
@@ -265,6 +266,7 @@ class MusicBot:
 
     _handle_import_callback = import_flow.handle_import_callback
     _handle_import_approve = import_flow.handle_import_approve
+    _handle_import_retry = import_flow.handle_import_retry
     _process_next_import_track = import_flow.process_next_import_track
     _do_import_slskd_search = import_flow.do_import_slskd_search
     _do_import_download = import_flow.do_import_download

@@ -84,10 +84,16 @@ class Database:
             self._conn = _open_connection(db_path)
             self._init_schema()
         except sqlite3.DatabaseError:
+            failed_conn = getattr(self, "_conn", None)
+            if failed_conn is not None:
+                with contextlib.suppress(Exception):
+                    failed_conn.close()
             backup = f"{db_path}.bak.{int(time.time())}"
             logger.warning("Database corrupt or unreadable at %s — backing up to %s and recreating", db_path, backup)
-            if os.path.exists(db_path):
-                os.rename(db_path, backup)
+            for suffix in ("", "-wal", "-shm"):
+                src = f"{db_path}{suffix}"
+                if os.path.exists(src):
+                    os.rename(src, f"{backup}{suffix}")
             self._conn = _open_connection(db_path)
             self._init_schema()
         atexit.register(self.close)

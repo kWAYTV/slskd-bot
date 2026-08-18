@@ -11,7 +11,7 @@ import pytest
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.soulseek.result import DownloadStatus, SearchResult
 from music_downloader.telegram.app import MusicBot
-from music_downloader.telegram.session import PendingDownload
+from music_downloader.telegram.session import PendingDownload, PendingSearch
 
 
 def _make_config(*, library_users=None):
@@ -147,3 +147,91 @@ class TestSendThenDelete:
         assert not source.exists()
         records = bot.history_repo.get_recent(1, chat_id=1)
         assert records[0].status == "delivered"
+
+    @pytest.mark.asyncio
+    async def test_failed_large_send_not_recorded_as_delivered(self, mock_slskd, mock_spotify, tmp_path):
+        """>50MB file where OGG+preview both fail: nothing was sent, so no 'delivered' record."""
+        config = _make_config(library_users={12345})
+        bot = MusicBot(config)
+        source = tmp_path / "downloads" / "peer" / "track.flac"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"x" * 100)
+        bot.processor.find_downloaded_file = MagicMock(return_value=str(source))
+        bot.slskd.enqueue_download = MagicMock(return_value=True)
+        bot.slskd.wait_for_download = AsyncMock(
+            return_value=DownloadStatus(
+                username="peer",
+                filename="\\Music\\track.flac",
+                state="Completed",
+                transfer_id="t1",
+            )
+        )
+        bot.slskd.cancel_transfer = MagicMock(return_value=True)
+        bot._send_large_file = AsyncMock(return_value=False)
+        context = MagicMock()
+        status_msg = MagicMock()
+        status_msg.edit_text = AsyncMock()
+        with patch(
+            "music_downloader.telegram.download_flow.os.path.getsize",
+            return_value=100 * 1024 * 1024,
+        ):
+            await bot._do_download(context, 1, _make_track(), _make_result(), status_msg, 0, user_id=99999)
+        records = bot.history_repo.get_recent(1, chat_id=1)
+        assert records[0].status == "failed"
+        assert not source.exists()
+
+
+@patch("music_downloader.telegram.app.SpotifyResolver")
+@patch("music_downloader.telegram.app.SlskdClient")
+class TestUserIdThreading:
+    @pytest.mark.asyncio
+    async def test_single_spotify_match_keeps_user_id(self, mock_slskd, mock_spotify):
+        """Single-match auto path must not lose user_id (library ACL depends on it)."""
+        bot = MusicBot(_make_config(library_users={12345}))
+        bot.spotify.search_multiple = MagicMock(return_value=[_make_track()])
+        bot.slskd.search = AsyncMock(return_value=[])
+        bot.slskd.parse_results = MagicMock(return_value=[])
+
+        update = MagicMock()
+        update.effective_chat.id = 1
+        update.effective_user.id = 12345
+        searching_msg = MagicMock(message_id=7)
+        searching_msg.edit_text = AsyncMock()
+        context = MagicMock()
+        context.bot.send_message = AsyncMock(return_value=searching_msg)
+
+        await bot._do_search(update, context, "Artist Title", generation=0)
+        assert bot.pending[1].user_id == 12345
+
+    @pytest.mark.asyncio
+    async def test_duplicate_continue_keeps_user_id(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config(library_users={12345}))
+        bot._do_slskd_search = AsyncMock()
+        bot.pending[1] = PendingSearch(query="q", track=_make_track(), user_id=None)
+
+        update = MagicMock()
+        update.callback_query.from_user.id = 12345
+        update.callback_query.edit_message_text = AsyncMock()
+        context = MagicMock()
+        context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=7))
+
+        await bot._handle_duplicate_response(update, context, 1, "dup:continue")
+        assert bot.pending[1].user_id == 12345
+        bot._do_slskd_search.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_direct_metadata_search_sets_user_id(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config(library_users={12345}))
+        bot._do_direct_slskd_search = AsyncMock()
+        bot._awaiting_direct_metadata[1] = "some query"
+
+        update = MagicMock()
+        update.effective_chat.id = 1
+        update.effective_user.id = 12345
+        update.message.text = "Artist - Title"
+        context = MagicMock()
+        context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=7))
+
+        await bot.handle_text(update, context)
+        assert bot.pending[1].user_id == 12345
+        bot._do_direct_slskd_search.assert_awaited_once()

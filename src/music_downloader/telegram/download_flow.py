@@ -190,8 +190,9 @@ async def do_download(
             build_approve_keyboard(dl_id, has_next=self._has_next_result(chat_id, result_index)) if can_save else None
         )
 
+        delivered = True
         if file_size > TELEGRAM_FILE_LIMIT:
-            await self._send_large_file(
+            delivered = await self._send_large_file(
                 context,
                 chat_id,
                 track,
@@ -232,7 +233,9 @@ async def do_download(
                 self.downloads[dl_id].approval_message_id = sent.message_id
 
         if not can_save:
-            await _forget_local_copy(self, pending_dl, track, result, chat_id)
+            # Only record "delivered" when audio actually reached the user.
+            status = "delivered" if delivered else "failed"
+            await _forget_local_copy(self, pending_dl, track, result, chat_id, status=status)
 
     except asyncio.CancelledError:
         logger.info("Download cancelled for %s", result.basename)
@@ -263,8 +266,11 @@ async def send_large_file(
     dl_id: str,
     reply_markup=None,
     can_save: bool = True,
-):
-    """Convert a >50 MB file to OGG and send. Trim only as last resort."""
+) -> bool:
+    """Convert a >50 MB file to OGG and send. Trim only as last resort.
+
+    Returns True when audio (full OGG or preview) was actually sent to the user.
+    """
     ogg_path = await self._convert_to_ogg(source_path)
 
     if ogg_path:
@@ -291,7 +297,7 @@ async def send_large_file(
                     )
                 if dl_id in self.downloads:
                     self.downloads[dl_id].approval_message_id = sent.message_id
-                return
+                return True
             finally:
                 with contextlib.suppress(OSError):
                     os.unlink(ogg_path)
@@ -313,7 +319,7 @@ async def send_large_file(
         )
         if dl_id in self.downloads:
             self.downloads[dl_id].approval_message_id = sent.message_id
-        return
+        return False
 
     try:
         preview_ext = os.path.splitext(preview_path)[1].lstrip(".")
@@ -336,6 +342,7 @@ async def send_large_file(
             )
         if dl_id in self.downloads:
             self.downloads[dl_id].approval_message_id = sent.message_id
+        return True
     finally:
         with contextlib.suppress(OSError):
             os.unlink(preview_path)
@@ -524,14 +531,21 @@ async def analyze_flac_async(filepath: str) -> FlacVerdict | None:
         return None
 
 
-async def _forget_local_copy(self, pending_dl: PendingDownload, track: TrackInfo, result: SearchResult, chat_id: int):
+async def _forget_local_copy(
+    self,
+    pending_dl: PendingDownload,
+    track: TrackInfo,
+    result: SearchResult,
+    chat_id: int,
+    status: str = "delivered",
+):
     """Send-only users: drop the local file and slskd transfer after Telegram delivery."""
     for key, value in list(self.downloads.items()):
         if value is pending_dl:
             del self.downloads[key]
             break
     await self._cleanup_download_artifacts(pending_dl)
-    await self._add_history(track, result, "delivered", chat_id=chat_id)
+    await self._add_history(track, result, status, chat_id=chat_id)
 
 
 async def convert_to_ogg_async(filepath: str) -> str | None:

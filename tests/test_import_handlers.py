@@ -680,10 +680,61 @@ class TestDoImportDownload:
         assert "Download failed" in mock_edit.call_args[0][1]
         markup = mock_edit.call_args.kwargs.get("reply_markup") or mock_edit.call_args[1].get("reply_markup")
         callbacks = [btn.callback_data for row in markup.inline_keyboard for btn in row]
-        assert "retry:dl_2" in callbacks
+        assert "iy:1:5:dl_2" in callbacks
         assert "is:1:5" in callbacks
         assert "ir:1:5" in callbacks
         bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.awaiting_approval)
+
+    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    async def test_import_retry_uses_import_flow(self, mock_qedit, mock_thread):
+        bot = _setup_bot()
+        chat_id = 67890
+        job = _make_import_job(job_id=1, chat_id=chat_id)
+        bot.import_repo.get_job_for_chat = MagicMock(return_value=job)
+        bot.import_repo.update_track_status = MagicMock()
+        result = _make_result()
+        bot.downloads["dl_7"] = PendingDownload(track=_make_track(), result=result, chat_id=chat_id)
+        update = _make_update(chat_id=chat_id)
+        context = _make_context()
+
+        def _create_task(coro, **kw):
+            coro.close()
+            return MagicMock()
+
+        context.application.create_task = MagicMock(side_effect=_create_task)
+        await bot._handle_import_callback(update, context, chat_id, "iy:1:5:dl_7")
+        bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.searching)
+        context.application.create_task.assert_called_once()
+        # Download stays registered so _do_import_download can attach source_path
+        assert "dl_7" in bot.downloads
+
+    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    async def test_import_retry_expired_download(self, mock_qedit, mock_thread):
+        bot = _setup_bot()
+        chat_id = 67890
+        job = _make_import_job(job_id=1, chat_id=chat_id)
+        bot.import_repo.get_job_for_chat = MagicMock(return_value=job)
+        update = _make_update(chat_id=chat_id)
+        context = _make_context()
+        await bot._handle_import_callback(update, context, chat_id, "iy:1:5:missing")
+        context.application.create_task.assert_not_called()
+        assert "expired" in mock_qedit.call_args[0][1]
+
+    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    async def test_import_approve_denied_for_non_library_user(self, mock_thread):
+        bot = _setup_bot()
+        bot.config.telegram_library_users = {12345}
+        chat_id = 67890
+        bot.downloads["dl_9"] = PendingDownload(track=_make_track(), result=_make_result(), chat_id=chat_id)
+        bot._edit_approval_message = AsyncMock()
+        update = _make_update(chat_id=chat_id)
+        update.callback_query.from_user.id = 55555  # allowed but not a library user
+        context = _make_context()
+        await bot._handle_import_approve(update, context, chat_id, 1, 5, "dl_9")
+        assert "dl_9" in bot.downloads  # not consumed
+        assert "not allowed" in bot._edit_approval_message.call_args[0][1]
 
     @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
     @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)

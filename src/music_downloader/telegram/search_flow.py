@@ -60,6 +60,12 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
             year="",
         )
 
+        self.pending[chat_id] = PendingSearch(
+            query=search_query,
+            track=None,
+            user_id=update.effective_user.id,
+        )
+
         searching_msg = await context.bot.send_message(
             chat_id=chat_id,
             text=f"\U0001f50d Searching slskd for: `{search_query}`\n"
@@ -150,6 +156,11 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
                     unique_tracks.append(t)
 
         if len(unique_tracks) == 1:
+            self.pending[chat_id] = PendingSearch(
+                query=query,
+                track=unique_tracks[0],
+                user_id=update.effective_user.id,
+            )
             await self._do_slskd_search(context, chat_id, unique_tracks[0], searching_msg, generation)
             return
 
@@ -310,6 +321,9 @@ async def handle_duplicate_response(self, update, context, chat_id: int, data: s
     )
     generation = self._chat_generation.get(chat_id, 0)
     if pending.track:
+        # Keep the pending entry so user_id survives into the results/download flow.
+        pending.user_id = pending.user_id or query.from_user.id
+        self.pending[chat_id] = pending
         searching_msg = await context.bot.send_message(
             chat_id=chat_id,
             text="🔍 Searching slskd for FLAC...",

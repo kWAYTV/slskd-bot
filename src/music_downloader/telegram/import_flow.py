@@ -201,10 +201,53 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
         generation = self._chat_generation.get(chat_id, 0)
         await self._process_next_import_track(context, chat_id, job_id, generation)
 
+    elif prefix == "iy":
+        track_id = int(parts[1])
+        dl_id = parts[2]
+        await self._handle_import_retry(update, context, chat_id, job_id, track_id, dl_id)
+
+
+async def handle_import_retry(self, update, context, chat_id: int, job_id: int, track_id: int, dl_id: str):
+    """Retry a failed import download inside the import flow (keeps job tracking)."""
+    query = update.callback_query
+    pending_dl = self.downloads.get(dl_id)
+
+    if not pending_dl:
+        await safe_query_edit(query, "⏹ Download expired. Use Skip or Mark failed to continue the import.")
+        return
+
+    result = pending_dl.result
+    track = pending_dl.track
+
+    await safe_query_edit(
+        query,
+        f"\U0001f504 Retrying: `{result.basename}`...",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    status_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"⬇️ Re-downloading from `{result.username}`...",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.searching)
+    generation = self._chat_generation.get(chat_id, 0)
+    task = context.application.create_task(
+        self._do_import_download(context, chat_id, track, result, status_msg, generation, job_id, track_id, dl_id),
+        update=update,
+    )
+    self._track_task(chat_id, task)
+
 
 async def handle_import_approve(self, update, context, chat_id: int, job_id: int, track_id: int, dl_id: str):
     """Approve a download within an import flow."""
     query = update.callback_query
+
+    if not self._can_save_library(query.from_user.id):
+        await self._edit_approval_message(query, "🚫 You are not allowed to save to the library.")
+        return
+
     pending_dl = self.downloads.pop(dl_id, None)
 
     if not pending_dl:

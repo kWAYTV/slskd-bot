@@ -67,8 +67,10 @@ class HistoryRepository:
         params: list = []
         clauses = ["status = 'success'"]
         if spotify_url:
-            clauses.append("spotify_url = ?")
-            params.append(spotify_url)
+            # Match by URL when available, but fall back to artist/title so
+            # rows written before the spotify_url column existed still count.
+            clauses.append("(spotify_url = ? OR (lower(artist) = ? AND lower(title) = ?))")
+            params.extend([spotify_url, artist.lower(), title.lower()])
         else:
             clauses.append("lower(artist) = ? AND lower(title) = ?")
             params.extend([artist.lower(), title.lower()])

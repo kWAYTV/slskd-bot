@@ -164,7 +164,7 @@ class TestBuildImportFailureKeyboard:
         kb = build_import_failure_keyboard(7, 3, "dl9")
         rows = kb.inline_keyboard
         callbacks = [btn.callback_data for row in rows for btn in row]
-        assert "retry:dl9" in callbacks
+        assert "iy:7:3:dl9" in callbacks
         assert "is:7:3" in callbacks
         assert "ir:7:3" in callbacks
 

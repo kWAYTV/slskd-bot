@@ -411,29 +411,27 @@ class TestSlskdClientSearch:
 
     @pytest.mark.asyncio
     async def test_search_hard_timeout_collects_partial(self, client):
-        """Hard timeout should stop the in-flight search and return partial results."""
+        """Hard timeout should stop this call's own search and return partial results."""
         from unittest.mock import AsyncMock
 
-        async def fake_wait_for(coro, timeout):
-            client._current_search_id = "search-123"
-            coro.close()
+        async def fake_inner(query, timeout_secs, response_limit, search_id_holder):
+            search_id_holder.append("search-123")
             raise TimeoutError()
 
+        client._search_inner = fake_inner
         client._stop_and_collect = AsyncMock(return_value=[{"username": "u"}])
-        with patch("music_downloader.soulseek.client.asyncio.wait_for", side_effect=fake_wait_for):
-            results = await client.search("query", timeout_secs=1)
+        results = await client.search("query", timeout_secs=1)
 
         client._stop_and_collect.assert_awaited_once_with("search-123")
         assert results == [{"username": "u"}]
 
     @pytest.mark.asyncio
     async def test_search_hard_timeout_without_id_returns_empty(self, client):
-        async def fake_wait_for(coro, timeout):
-            coro.close()
+        async def fake_inner(query, timeout_secs, response_limit, search_id_holder):
             raise TimeoutError()
 
-        with patch("music_downloader.soulseek.client.asyncio.wait_for", side_effect=fake_wait_for):
-            results = await client.search("query", timeout_secs=1)
+        client._search_inner = fake_inner
+        results = await client.search("query", timeout_secs=1)
 
         assert results == []
 
