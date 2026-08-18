@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from src.music_downloader.persistence.database import Database
-from src.music_downloader.persistence.import_repo import (
+from music_downloader.playlist_import.store import (
     ImportRepository,
     JobStatus,
     TrackStatus,
 )
+from music_downloader.records.database import Database
 
 
 @pytest.fixture()

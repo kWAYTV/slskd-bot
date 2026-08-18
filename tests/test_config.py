@@ -23,7 +23,7 @@ class TestConfig:
     def test_loads_required_vars(self, env_vars):
         """Config loads all required environment variables."""
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.config import Config
+            from music_downloader.settings import Config
 
             config = Config()
             assert config.telegram_bot_token == "test-token-123"
@@ -35,7 +35,7 @@ class TestConfig:
     def test_default_values(self, env_vars):
         """Config uses sensible defaults for optional vars."""
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.config import Config
+            from music_downloader.settings import Config
 
             config = Config()
             assert config.auto_mode is False
@@ -50,7 +50,7 @@ class TestConfig:
         """Config parses AUTO_MODE=true correctly."""
         env_vars["AUTO_MODE"] = "true"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.config import Config
+            from music_downloader.settings import Config
 
             config = Config()
             assert config.auto_mode is True
@@ -59,7 +59,7 @@ class TestConfig:
         """Config parses comma-separated user IDs."""
         env_vars["TELEGRAM_ALLOWED_USERS"] = "123,456,789"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.config import Config
+            from music_downloader.settings import Config
 
             config = Config()
             assert config.telegram_allowed_users == {123, 456, 789}
@@ -67,7 +67,7 @@ class TestConfig:
     def test_allowed_users_empty(self, env_vars):
         """Config handles empty allowed users (open to all)."""
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.config import Config
+            from music_downloader.settings import Config
 
             config = Config()
             assert config.telegram_allowed_users == set()
@@ -75,7 +75,7 @@ class TestConfig:
     def test_missing_required_var_raises(self):
         """Config raises ValueError for missing required variables."""
         with patch.dict(os.environ, {}, clear=True):
-            from music_downloader.config import Config
+            from music_downloader.settings import Config
 
             with pytest.raises(ValueError, match="TELEGRAM_BOT_TOKEN"):
                 Config()
@@ -84,7 +84,7 @@ class TestConfig:
         """Config parses exclude keywords correctly."""
         env_vars["EXCLUDE_KEYWORDS"] = "live,remix,demo"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.config import Config
+            from music_downloader.settings import Config
 
             config = Config()
             assert config.exclude_keywords == ["live", "remix", "demo"]
@@ -93,7 +93,7 @@ class TestConfig:
         """Config accepts custom filename template."""
         env_vars["FILENAME_TEMPLATE"] = "{title} by {artist}"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.config import Config
+            from music_downloader.settings import Config
 
             config = Config()
             assert config.filename_template == "{title} by {artist}"

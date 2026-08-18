@@ -1,0 +1,488 @@
+"""Single-track search conversation: catalog lookup, Soulseek search, result pick."""
+
+from __future__ import annotations
+
+import logging
+
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
+
+from music_downloader.catalog.track import TrackInfo
+from music_downloader.soulseek.query import (
+    build_reduced_queries,
+    clean_search_title,
+    extract_latin_keywords,
+    has_non_latin_script,
+    parse_query_artist_title,
+)
+from music_downloader.telegram.keyboards import (
+    build_direct_search_keyboard,
+    build_duplicate_keyboard,
+    build_results_keyboard,
+    build_spotify_keyboard,
+)
+from music_downloader.telegram.messages import safe_edit
+from music_downloader.telegram.session import PendingSearch
+
+logger = logging.getLogger(__name__)
+
+
+async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle free-text messages — treat as song search queries."""
+    if not await self._check_auth(update):
+        return
+
+    query = update.message.text.strip()
+    if not query:
+        return
+
+    chat_id = update.effective_chat.id
+
+    if chat_id in self._awaiting_direct_metadata:
+        search_query = self._awaiting_direct_metadata.pop(chat_id)
+        generation = self._chat_generation.get(chat_id, 0)
+
+        if " - " in query:
+            artist, title = query.split(" - ", 1)
+        else:
+            artist, title = query, search_query
+
+        synthetic_track = TrackInfo(
+            artist=artist.strip(),
+            title=title.strip(),
+            album="",
+            duration_ms=0,
+            spotify_url="",
+            year="",
+        )
+
+        searching_msg = await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"\U0001f50d Searching slskd for: `{search_query}`\n"
+            f"Saving as: *{synthetic_track.artist} - {synthetic_track.title}*",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+        await self._do_direct_slskd_search(
+            context, chat_id, search_query, searching_msg, generation, display_track=synthetic_track
+        )
+        return
+
+    self._cancel_chat_operations(chat_id)
+    generation = self._chat_generation[chat_id]
+
+    similar = self.processor.find_similar(query)
+    if similar:
+        existing_list = "\n".join(f"• `{f}`" for f in similar[:5])
+        await update.message.reply_text(
+            f"⚠️ *Similar files already in library:*\n\n{existing_list}\n\nContinue searching anyway?",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=build_duplicate_keyboard(),
+        )
+        self.pending[chat_id] = PendingSearch(query=query, track=None)
+        return
+
+    await self._do_search(update, context, query, generation)
+
+
+async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, generation: int):
+    """Resolve metadata via Spotify, then proceed to slskd search."""
+    chat_id = update.effective_chat.id
+
+    searching_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"🔍 Looking up: `{query}`",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    try:
+        tracks = self.spotify.search_multiple(query, limit=50)
+        if self._is_stale(chat_id, generation):
+            return
+
+        if not tracks:
+            await safe_edit(
+                searching_msg,
+                f"Could not find `{query}` on Spotify.\nYou can search Soulseek directly instead.",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=build_direct_search_keyboard(),
+            )
+            self.pending[chat_id] = PendingSearch(query=query, track=None)
+            return
+
+        query_lower = query.lower()
+        query_words = set(query_lower.split())
+        query_artist = ""
+        if " - " in query:
+            query_artist = query.split(" - ", 1)[0].strip().lower()
+
+        seen = set()
+        unique_tracks = []
+        artist_match_tracks = []
+        other_tracks = []
+        for t in tracks:
+            key = (t.artist.lower(), t.title.lower(), t.album.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            artist_lower = t.artist.lower()
+            if query_artist and query_artist not in artist_lower:
+                continue
+            artist_words = set(artist_lower.split())
+            if (len(artist_words) >= 2 and artist_lower in query_lower) or artist_words.issubset(query_words):
+                artist_match_tracks.append(t)
+            else:
+                other_tracks.append(t)
+
+        artist_match_tracks.sort(key=lambda t: len(t.artist), reverse=True)
+        unique_tracks = artist_match_tracks + other_tracks
+
+        if not unique_tracks:
+            seen = set()
+            for t in tracks:
+                key = (t.artist.lower(), t.title.lower(), t.album.lower())
+                if key not in seen:
+                    seen.add(key)
+                    unique_tracks.append(t)
+
+        if len(unique_tracks) == 1:
+            await self._do_slskd_search(context, chat_id, unique_tracks[0], searching_msg, generation)
+            return
+
+        self._spotify_candidates[chat_id] = unique_tracks
+        self._spotify_page[chat_id] = 0
+        self.pending[chat_id] = PendingSearch(query=query, track=None)
+        await safe_edit(
+            searching_msg,
+            self._format_spotify_results(unique_tracks, page=0),
+            parse_mode=ParseMode.MARKDOWN,
+            disable_web_page_preview=True,
+            reply_markup=build_spotify_keyboard(unique_tracks, page=0),
+        )
+
+    except Exception:
+        logger.exception(f"Unexpected error in _do_search for: {query}")
+        self._spotify_candidates.pop(chat_id, None)
+        self._spotify_page.pop(chat_id, None)
+        await safe_edit(searching_msg, "Something went wrong. Please try again.")
+
+
+async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searching_msg, generation: int):
+    """Search slskd for a resolved Spotify track."""
+    try:
+        await safe_edit(
+            searching_msg,
+            f"🎵 *{track.artist} - {track.title}*\n"
+            f"Album: {track.album} ({track.year})\n"
+            f"Duration: {track.duration_display}\n\n"
+            f"Searching slskd...",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+        clean_title = clean_search_title(track.title)
+        search_query = f"{track.artist} {clean_title}"
+        raw_responses = await self.slskd.search(search_query, timeout_secs=self.config.search_timeout_secs)
+        if self._is_stale(chat_id, generation):
+            return
+
+        ranked, is_fallback = self._rank_responses(raw_responses, track)
+
+        if not ranked:
+            if self._is_stale(chat_id, generation):
+                return
+            logger.info(
+                "No results for '%s', retrying with title-only: '%s'",
+                search_query,
+                clean_title,
+            )
+            await safe_edit(
+                searching_msg,
+                f"🎵 *{track.artist} - {track.title}*\n\nNo results with full query — retrying with song title only…",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            raw_responses = await self.slskd.search(clean_title, timeout_secs=self.config.search_timeout_secs)
+            if self._is_stale(chat_id, generation):
+                return
+
+            ranked, is_fallback = self._rank_responses(raw_responses, track)
+
+        if not ranked and not has_non_latin_script(clean_title):
+            reduced_queries = build_reduced_queries(clean_title, track.year)
+            if reduced_queries:
+                if self._is_stale(chat_id, generation):
+                    return
+                logger.info(
+                    "No results for title-only '%s', trying keyword reduction + year",
+                    clean_title,
+                )
+                await safe_edit(
+                    searching_msg,
+                    f"🎵 *{track.artist} - {track.title}*\n\nStill no results — trying keyword variations with year…",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+                for fallback_query in reduced_queries:
+                    if self._is_stale(chat_id, generation):
+                        return
+                    raw_responses = await self.slskd.search(
+                        fallback_query, timeout_secs=self.config.search_timeout_secs
+                    )
+                    ranked, is_fallback = self._rank_responses(raw_responses, track)
+                    if ranked:
+                        logger.info("Keyword-reduction fallback hit: '%s'", fallback_query)
+                        break
+
+        if not ranked:
+            if self._is_stale(chat_id, generation):
+                return
+            latin_kw = extract_latin_keywords(clean_title)
+            if latin_kw:
+                fb4_query = f"{track.artist} {' '.join(latin_kw)}"
+            else:
+                fb4_query = track.artist
+            logger.info(
+                "Trying artist + Latin keywords fallback: '%s'",
+                fb4_query,
+            )
+            await safe_edit(
+                searching_msg,
+                f"🎵 *{track.artist} - {track.title}*\n\nStill no results — trying artist + keyword search…",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            raw_responses = await self.slskd.search(
+                fb4_query,
+                timeout_secs=self.config.search_timeout_secs,
+                response_limit=150,
+            )
+            if self._is_stale(chat_id, generation):
+                return
+
+            ranked, is_fallback = self._rank_responses(raw_responses, track, max_duration_diff=120)
+            if ranked:
+                logger.info("Artist-keyword fallback hit: '%s'", fb4_query)
+
+        if self._is_stale(chat_id, generation):
+            return
+
+        if not ranked:
+            await safe_edit(
+                searching_msg,
+                f"🎵 *{track.artist} - {track.title}* ({track.duration_display})\n\n"
+                f"No results found on Soulseek matching this track.\n"
+                f"Try a different search query.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        self.pending[chat_id] = PendingSearch(
+            query=f"{track.artist} {track.title}",
+            track=track,
+            results=ranked,
+            message_id=searching_msg.message_id,
+            is_fallback=is_fallback,
+        )
+
+        results_text = self._format_results(track, ranked, is_fallback, page=0, page_size=self.config.max_results)
+        await safe_edit(
+            searching_msg,
+            results_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=build_results_keyboard(ranked, page=0, page_size=self.config.max_results),
+        )
+
+    except Exception:
+        logger.exception(f"Unexpected error in _do_slskd_search for: {track.artist} - {track.title}")
+        self.pending.pop(chat_id, None)
+        await safe_edit(
+            searching_msg,
+            "Something went wrong during the search. Please try again.",
+        )
+
+
+async def handle_duplicate_response(self, update, context, chat_id: int, data: str):
+    """Handle Continue/Cancel response to duplicate detection."""
+    query = update.callback_query
+    action = data.split(":", 1)[1]
+
+    pending = self.pending.pop(chat_id, None)
+
+    if action == "cancel" or not pending:
+        await query.edit_message_text("Cancelled.")
+        return
+
+    await query.edit_message_text(
+        f"Continuing with search: `{pending.query}`",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    generation = self._chat_generation.get(chat_id, 0)
+    await self._do_search(update, context, pending.query, generation)
+
+
+async def handle_spotify_page(self, update, context, chat_id: int, data: str):
+    """Handle Spotify page navigation (◀️ / ▶️)."""
+    query = update.callback_query
+    candidates = self._spotify_candidates.get(chat_id)
+    if not candidates:
+        await query.edit_message_text("Search expired. Send a new query.")
+        return
+
+    try:
+        page = int(data.split(":", 1)[1])
+    except ValueError:
+        return
+
+    self._spotify_page[chat_id] = page
+    await query.edit_message_text(
+        self._format_spotify_results(candidates, page=page),
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True,
+        reply_markup=build_spotify_keyboard(candidates, page=page),
+    )
+
+
+async def handle_spotify_selection(self, update, context, chat_id: int, data: str):
+    """Handle Spotify track selection from multiple results."""
+    query = update.callback_query
+    action = data.split(":", 1)[1]
+
+    candidates = self._spotify_candidates.pop(chat_id, None)
+    self._spotify_page.pop(chat_id, None)
+
+    if action == "cancel" or not candidates:
+        await query.edit_message_text("Cancelled.")
+        return
+
+    try:
+        index = int(action)
+    except ValueError:
+        return
+
+    if index >= len(candidates):
+        return
+
+    track = candidates[index]
+    await query.edit_message_text(
+        f"Selected: *{track.artist} - {track.title}* ({track.duration_display})",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    searching_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text="🔍 Searching slskd for FLAC...",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    generation = self._chat_generation.get(chat_id, 0)
+    await self._do_slskd_search(context, chat_id, track, searching_msg, generation)
+
+
+async def handle_results_page(self, update, context, chat_id: int, data: str):
+    """Handle slskd results page navigation (◀️ / ▶️)."""
+    query = update.callback_query
+    pending = self.pending.get(chat_id)
+    if not pending or not pending.track:
+        await query.edit_message_text("Search expired. Send a new query.")
+        return
+
+    try:
+        page = int(data.split(":", 1)[1])
+    except ValueError:
+        return
+
+    pending.page = page
+    results_text = self._format_results(
+        pending.track,
+        pending.results,
+        pending.is_fallback,
+        page=page,
+        page_size=self.config.max_results,
+    )
+    await query.edit_message_text(
+        results_text,
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=build_results_keyboard(pending.results, page=page, page_size=self.config.max_results),
+    )
+
+
+async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
+    """Handle 'Search Soulseek directly' button — asks for Artist - Title, then searches slskd."""
+    query = update.callback_query
+
+    pending = self.pending.get(chat_id)
+    if not pending:
+        await query.edit_message_text("Search expired. Send a new query.")
+        return
+
+    search_query = pending.query
+    self._awaiting_direct_metadata[chat_id] = search_query
+
+    await query.edit_message_text(
+        "\U0001f3b5 How should this track be saved?\n\n"
+        "Send the name as: `Artist - Title`\n"
+        "(This will be used for the filename and tags)",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+async def do_direct_slskd_search(
+    self, context, chat_id: int, query: str, searching_msg, generation: int, display_track: TrackInfo | None = None
+):
+    """Search slskd without Spotify metadata. Duration scoring gives flat 15 points."""
+    try:
+        raw_responses = await self.slskd.search(query, timeout_secs=self.config.search_timeout_secs)
+        if self._is_stale(chat_id, generation):
+            return
+
+        if display_track:
+            synthetic_track = TrackInfo(
+                artist=display_track.artist,
+                title=display_track.title,
+                album=display_track.album,
+                duration_ms=0,
+                spotify_url="",
+                year=display_track.year,
+            )
+        else:
+            artist, title = parse_query_artist_title(query)
+            synthetic_track = TrackInfo(
+                artist=artist,
+                title=title,
+                album="",
+                duration_ms=0,
+                spotify_url="",
+                year="",
+            )
+
+        ranked, is_fallback = self._rank_responses(raw_responses, synthetic_track)
+
+        if self._is_stale(chat_id, generation):
+            return
+
+        if not ranked:
+            await safe_edit(
+                searching_msg,
+                f"\U0001f50e Direct search: `{query}`\n\nNo results found on Soulseek.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        self.pending[chat_id] = PendingSearch(
+            query=query,
+            track=synthetic_track,
+            results=ranked,
+            message_id=searching_msg.message_id,
+            is_fallback=is_fallback,
+        )
+
+        results_text = self._format_results(
+            synthetic_track, ranked, is_fallback, page=0, page_size=self.config.max_results
+        )
+        await safe_edit(
+            searching_msg,
+            results_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=build_results_keyboard(ranked, page=0, page_size=self.config.max_results),
+        )
+
+    except Exception:
+        logger.exception(f"Direct search failed for: {query}")
+        await safe_edit(searching_msg, "Something went wrong. Please try again.")

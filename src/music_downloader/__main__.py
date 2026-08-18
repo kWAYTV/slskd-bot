@@ -6,35 +6,18 @@ Can be run as: python -m music_downloader
 import argparse
 import logging
 import sys
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from music_downloader import __version__
-from music_downloader.bot.handlers import create_bot
-from music_downloader.config import Config, setup_logging
+from music_downloader.health.server import HealthHandler, start_health_server
+from music_downloader.settings import Config, setup_logging
+from music_downloader.telegram.app import create_bot
 
 logger = logging.getLogger(__name__)
 
+# Re-exported for tests and the CLI health endpoint.
+_start_health_server = start_health_server
 
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == "/health":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"status":"healthy"}')
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-    def log_message(self, format, *args):
-        pass  # Suppress access logs
-
-
-def _start_health_server(port: int):
-    server = HTTPServer(("127.0.0.1", port), HealthHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+__all__ = ["HealthHandler", "cmd_run", "main"]
 
 
 def cmd_run(args):
@@ -44,11 +27,9 @@ def cmd_run(args):
 
     logger.info(f"Music Downloader v{__version__} starting...")
 
-    # Start health check server in background
-    _start_health_server(config.health_port)
+    start_health_server(config.health_port)
     logger.info(f"Health check endpoint running on port {config.health_port}")
 
-    # Start the Telegram bot (blocking)
     bot_app = create_bot(config)
     logger.info("Starting Telegram bot polling...")
     bot_app.run_polling(drop_pending_updates=True)
@@ -63,14 +44,11 @@ def main():
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-
-    # 'run' command (default)
     subparsers.add_parser("run", help="Start the bot and health server")
 
     args = parser.parse_args()
 
     if args.command is None:
-        # Default to 'run'
         args.command = "run"
 
     if args.command == "run":

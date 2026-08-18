@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.music_downloader.persistence.database import Database
-from src.music_downloader.persistence.history_repo import HistoryRepository
+from music_downloader.history.store import HistoryRepository
+from music_downloader.records.database import Database
 
 
 @pytest.fixture()

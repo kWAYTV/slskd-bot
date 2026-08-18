@@ -6,7 +6,8 @@ import tempfile
 import numpy as np
 import soundfile as sf
 
-from music_downloader.processor.flac_analyzer import FlacVerdict, analyze_flac, convert_to_ogg, create_preview_clip
+from music_downloader.library.flac import FlacVerdict, analyze_flac
+from music_downloader.library.preview import convert_to_ogg, create_preview_clip
 
 
 class TestFlacVerdict:

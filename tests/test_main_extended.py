@@ -9,8 +9,8 @@ from music_downloader.__main__ import _start_health_server, cmd_run
 class TestStartHealthServer:
     def test_creates_and_starts_server(self):
         with (
-            patch("music_downloader.__main__.HTTPServer") as mock_server_cls,
-            patch("music_downloader.__main__.threading.Thread") as mock_thread,
+            patch("music_downloader.health.server.HTTPServer") as mock_server_cls,
+            patch("music_downloader.health.server.threading.Thread") as mock_thread,
         ):
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance
@@ -32,7 +32,7 @@ class TestCmdRun:
         with (
             patch.dict(os.environ, env, clear=False),
             patch("music_downloader.__main__.create_bot") as mock_create,
-            patch("music_downloader.__main__._start_health_server") as mock_health,
+            patch("music_downloader.__main__.start_health_server") as mock_health,
         ):
             mock_app = MagicMock()
             mock_create.return_value = mock_app

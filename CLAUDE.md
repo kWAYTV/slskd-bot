@@ -24,8 +24,8 @@ pip install -e ".[dev]"
 uv sync
 
 # Lint and format (always run before committing)
-ruff check src/
-ruff format src/
+ruff check src/ tests/
+ruff format src/ tests/
 
 # Test
 pytest
@@ -36,10 +36,24 @@ uv run pytest
 Configuration via `.env` (see `.env.example`).
 
 ## Architecture
-- `src/music_downloader/` — main application package
-  - `config.py` — all environment variables and their handling
-  - `bot/handlers.py` — Telegram bot logic and conversation flow
-  - `search/scorer.py` — search result scoring algorithm
+
+The package is organized by **what the app does** (Screaming Architecture), not by technical layers.
+
+```
+src/music_downloader/
+  catalog/           # Track identity — Spotify lookup, playlists, TrackInfo
+  soulseek/          # Find and fetch files — search, scoring, slskd client
+  library/           # Organize the collection — rename, artwork, FLAC, previews
+  history/           # Download history records
+  playlist_import/   # Playlist/album import jobs
+  records/           # Shared SQLite connection used by history + import
+  telegram/          # Conversation delivery — commands, search, download, import
+  settings/          # Environment configuration and logging
+  health/            # Process health-check endpoint
+```
+
+Telegram is a delivery mechanism, not the domain. `telegram/app.py` composes `MusicBot` from focused conversation modules (`commands`, `search_flow`, `download_flow`, `import_flow`). Domain packages do not import Telegram.
+
 - `scripts/` — utility scripts
 - `tests/` — test suite
 - `docker-compose.yml` — full stack deployment

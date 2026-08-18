@@ -13,18 +13,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_downloader.bot.handlers import (
-    MusicBot,
-    PendingDownload,
-    PendingSearch,
-    _clean_search_title,
-    _escape_md,
-    _extract_latin_keywords,
-    _has_non_latin_script,
-    _safe_edit,
-)
-from music_downloader.metadata.spotify import TrackInfo
-from music_downloader.search.slskd_client import SearchResult
+from music_downloader.catalog.track import TrackInfo
+from music_downloader.soulseek.query import clean_search_title as _clean_search_title
+from music_downloader.soulseek.query import extract_latin_keywords as _extract_latin_keywords
+from music_downloader.soulseek.query import has_non_latin_script as _has_non_latin_script
+from music_downloader.soulseek.result import SearchResult
+from music_downloader.telegram.app import MusicBot
+from music_downloader.telegram.messages import escape_md as _escape_md
+from music_downloader.telegram.messages import safe_edit as _safe_edit
+from music_downloader.telegram.session import PendingDownload, PendingSearch
 
 
 def _make_config():
@@ -241,8 +238,8 @@ class TestCleanSearchTitleExtended:
 
 
 class TestMusicBotInit:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_init(self, mock_slskd, mock_spotify):
         config = _make_config()
         bot = MusicBot(config)
@@ -253,16 +250,16 @@ class TestMusicBotInit:
 
 
 class TestMusicBotAuthorization:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_is_authorized_empty_denies_all(self, mock_slskd, mock_spotify):
         config = _make_config()
         config.telegram_allowed_users = set()
         bot = MusicBot(config)
         assert bot._is_authorized(99999) is False
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_is_authorized_allowed(self, mock_slskd, mock_spotify):
         config = _make_config()
         config.telegram_allowed_users = {12345, 67890}
@@ -270,8 +267,8 @@ class TestMusicBotAuthorization:
         assert bot._is_authorized(12345) is True
         assert bot._is_authorized(99999) is False
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_check_auth_denied(self, mock_slskd, mock_spotify):
         config = _make_config()
@@ -282,8 +279,8 @@ class TestMusicBotAuthorization:
         assert result is False
         update.message.reply_text.assert_called_once_with("You are not authorized to use this bot.")
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_check_auth_allowed(self, mock_slskd, mock_spotify):
         config = _make_config()
@@ -295,15 +292,15 @@ class TestMusicBotAuthorization:
 
 
 class TestMusicBotCancellation:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_cancel_chat_operations_empty(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         had_work = bot._cancel_chat_operations(12345)
         assert had_work is False
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_cancel_chat_operations_with_pending(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot.pending[12345] = PendingSearch(query="test")
@@ -311,8 +308,8 @@ class TestMusicBotCancellation:
         assert had_work is True
         assert 12345 not in bot.pending
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_cancel_removes_downloads_for_chat(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot.downloads["1"] = PendingDownload(
@@ -329,8 +326,8 @@ class TestMusicBotCancellation:
         assert "1" not in bot.downloads
         assert "2" in bot.downloads
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_is_stale(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot._chat_generation[123] = 5
@@ -338,8 +335,8 @@ class TestMusicBotCancellation:
         assert bot._is_stale(123, 4) is True
         assert bot._is_stale(123, 6) is True
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_track_task(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         loop = asyncio.new_event_loop()
@@ -351,8 +348,8 @@ class TestMusicBotCancellation:
 
 
 class TestMusicBotCommands:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_start(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -363,8 +360,8 @@ class TestMusicBotCommands:
         call_args = update.message.reply_text.call_args
         assert "Send me a song name" in call_args[0][0]
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_start_unauthorized(self, mock_slskd, mock_spotify):
         config = _make_config()
@@ -375,8 +372,8 @@ class TestMusicBotCommands:
         await bot.cmd_start(update, context)
         update.message.reply_text.assert_called_once_with("You are not authorized to use this bot.")
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_help(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -385,8 +382,8 @@ class TestMusicBotCommands:
         await bot.cmd_help(update, context)
         update.message.reply_text.assert_called()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_auto(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -396,8 +393,8 @@ class TestMusicBotCommands:
         call_args = update.message.reply_text.call_args
         assert "OFF" in call_args[0][0]
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_auto_on(self, mock_slskd, mock_spotify):
         config = _make_config()
@@ -409,8 +406,8 @@ class TestMusicBotCommands:
         call_args = update.message.reply_text.call_args
         assert "ON" in call_args[0][0]
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_status_empty(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -419,8 +416,8 @@ class TestMusicBotCommands:
         await bot.cmd_status(update, context)
         update.message.reply_text.assert_called_once_with("No active searches or downloads.")
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_status_with_pending(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -431,8 +428,8 @@ class TestMusicBotCommands:
         call_args = update.message.reply_text.call_args
         assert "Nancy Sinatra" in call_args[0][0]
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_status_with_downloads(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -447,8 +444,8 @@ class TestMusicBotCommands:
         call_args = update.message.reply_text.call_args
         assert "Active downloads" in call_args[0][0]
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_history_empty(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -457,8 +454,8 @@ class TestMusicBotCommands:
         await bot.cmd_history(update, context)
         update.message.reply_text.assert_called_once_with("No downloads yet.")
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_history_with_entries(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -481,8 +478,8 @@ class TestMusicBotCommands:
 
 
 class TestMusicBotCallbackHandler:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_auto_toggle_on(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -491,8 +488,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         assert bot.auto_mode is True
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_auto_toggle_off(self, mock_slskd, mock_spotify):
         config = _make_config()
@@ -503,8 +500,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         assert bot.auto_mode is False
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_duplicate_cancel(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -514,8 +511,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         assert 67890 not in bot.pending
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_duplicate_continue(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -527,8 +524,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         bot._do_search.assert_called_once()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_spotify_cancel(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -538,8 +535,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         assert 67890 not in bot._spotify_candidates
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_spotify_select(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -550,8 +547,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         bot._do_slskd_search.assert_called_once()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_spotify_select_invalid_index(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -560,8 +557,8 @@ class TestMusicBotCallbackHandler:
         context = _make_context()
         await bot.handle_callback(update, context)
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_spotify_page(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -572,8 +569,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         assert bot._spotify_page[67890] == 1
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_spotify_page_expired(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -582,8 +579,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_spotify_page_invalid(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -593,8 +590,8 @@ class TestMusicBotCallbackHandler:
         # Should not raise
         await bot.handle_callback(update, context)
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_download_cancel(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -604,8 +601,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         assert 67890 not in bot.pending
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_download_select(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -620,8 +617,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         context.application.create_task.assert_called_once()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_download_auto_pick(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -635,8 +632,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         context.application.create_task.assert_called_once()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_download_select_expired(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -645,8 +642,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_download_select_invalid_index(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -655,8 +652,8 @@ class TestMusicBotCallbackHandler:
         context = _make_context()
         await bot.handle_callback(update, context)
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_results_page(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -668,8 +665,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         assert bot.pending[67890].page == 1
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_results_page_expired(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -678,8 +675,8 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_approve_download(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -701,8 +698,8 @@ class TestMusicBotCallbackHandler:
         assert "1" not in bot.downloads
         assert bot.history_repo.count() == 1
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_approve_process_fails(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -720,8 +717,8 @@ class TestMusicBotCallbackHandler:
         context = _make_context()
         await bot.handle_callback(update, context)
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_approve_no_source_path(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -737,8 +734,8 @@ class TestMusicBotCallbackHandler:
         context = _make_context()
         await bot.handle_callback(update, context)
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_reject_download(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -757,8 +754,8 @@ class TestMusicBotCallbackHandler:
         records = bot.history_repo.get_recent(1)
         assert records[0].status == "rejected"
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_approve_expired(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -766,8 +763,8 @@ class TestMusicBotCallbackHandler:
         context = _make_context()
         await bot.handle_callback(update, context)
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_unauthorized_callback(self, mock_slskd, mock_spotify):
         config = _make_config()
@@ -781,8 +778,8 @@ class TestMusicBotCallbackHandler:
 
 
 class TestMusicBotHelpers:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_format_results(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         track = _make_track()
@@ -793,8 +790,8 @@ class TestMusicBotHelpers:
         assert "#1" in text
         assert "#3" in text
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_format_results_fallback(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         track = _make_track()
@@ -802,8 +799,8 @@ class TestMusicBotHelpers:
         text = bot._format_results(track, results, is_fallback=True)
         assert "No FLAC found" in text
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_format_results_pagination(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         track = _make_track()
@@ -811,23 +808,23 @@ class TestMusicBotHelpers:
         text = bot._format_results(track, results, page=0, page_size=5)
         assert "Page 1/" in text
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_format_spotify_results(self, mock_slskd, mock_spotify):
         tracks = [_make_track() for _ in range(3)]
         text = MusicBot._format_spotify_results(tracks)
         assert "Multiple matches" in text
         assert "Nancy Sinatra" in text
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_format_spotify_results_pagination(self, mock_slskd, mock_spotify):
         tracks = [_make_track() for _ in range(12)]
         text = MusicBot._format_spotify_results(tracks, page=0, page_size=5)
         assert "page 1/" in text
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_add_history(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -838,8 +835,8 @@ class TestMusicBotHelpers:
         records = bot.history_repo.get_recent(1)
         assert records[0].status == "success"
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_add_history_persists_multiple(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -849,8 +846,8 @@ class TestMusicBotHelpers:
             await bot._add_history(track, result, "success")
         assert bot.history_repo.count() == 55
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_next_dl_id(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         id1 = bot._next_dl_id()
@@ -861,8 +858,8 @@ class TestMusicBotHelpers:
 
 
 class TestMusicBotHandleText:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_empty_text_ignored(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -871,8 +868,8 @@ class TestMusicBotHandleText:
         await bot.handle_text(update, context)
         # Should not proceed to search
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_similar_files_found(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -886,8 +883,8 @@ class TestMusicBotHandleText:
         call_text = update.message.reply_text.call_args[0][0]
         assert "Similar files" in call_text
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_unauthorized_text(self, mock_slskd, mock_spotify):
         config = _make_config()
@@ -900,8 +897,8 @@ class TestMusicBotHandleText:
 
 
 class TestMusicBotDoSearch:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_no_spotify_results(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -915,8 +912,8 @@ class TestMusicBotDoSearch:
         bot._chat_generation[67890] = 0
         await bot._do_search(update, context, "nonexistent song", 0)
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_single_spotify_result(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -932,8 +929,8 @@ class TestMusicBotDoSearch:
         await bot._do_search(update, context, "Nancy Sinatra Bang Bang", 0)
         bot._do_slskd_search.assert_called_once()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_multiple_spotify_results(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -950,8 +947,8 @@ class TestMusicBotDoSearch:
         await bot._do_search(update, context, "Nancy Sinatra Bang Bang", 0)
         assert 67890 in bot._spotify_candidates
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_stale_search_aborted(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -967,8 +964,8 @@ class TestMusicBotDoSearch:
         await bot._do_search(update, context, "test", 0)  # generation 0 is stale
         bot._do_slskd_search.assert_not_called()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_exception_handled(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -983,8 +980,8 @@ class TestMusicBotDoSearch:
         await bot._do_search(update, context, "test", 0)
         # Should not raise
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_artist_filter(self, mock_slskd, mock_spotify):
         """When query has 'Artist - Title', filter by artist."""
@@ -1008,8 +1005,8 @@ class TestMusicBotDoSearch:
 
 
 class TestMusicBotDismissOtherDownloads:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_dismiss(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -1049,8 +1046,8 @@ class TestMusicBotEditApprovalMessage:
 
 
 class TestIDORProtection:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_approval_idor_blocked(self, mock_slskd, mock_spotify):
         """Approval from a different chat_id should be silently rejected."""
@@ -1064,8 +1061,8 @@ class TestIDORProtection:
         # Download should still be in the dict (not popped by wrong chat)
         assert "1" in bot.downloads
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_retry_idor_blocked(self, mock_slskd, mock_spotify):
         """Retry from a different chat_id should be silently rejected."""
@@ -1078,8 +1075,8 @@ class TestIDORProtection:
         await bot.handle_callback(update, context)
         assert "1" in bot.downloads
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_next_result_idor_blocked(self, mock_slskd, mock_spotify):
         """Next-result from a different chat should be silently rejected."""
@@ -1100,8 +1097,8 @@ class TestIDORProtection:
 
 
 class TestRetryResultIndex:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_retry_preserves_result_index(self, mock_slskd, mock_spotify):
         """Retry should pass the stored result_index, not hardcoded 0."""
@@ -1118,8 +1115,8 @@ class TestRetryResultIndex:
             # result_index is the last positional arg
             assert mock_dl.call_args[0][-1] == 3
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_retry_pops_old_entry(self, mock_slskd, mock_spotify):
         """Retry should remove the old download entry to prevent leaks."""
@@ -1134,8 +1131,8 @@ class TestRetryResultIndex:
             await bot.handle_callback(update, context)
             assert "1" not in bot.downloads
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_next_result_uses_stored_index(self, mock_slskd, mock_spotify):
         """Next-result should use stored result_index + 1."""
@@ -1155,8 +1152,8 @@ class TestRetryResultIndex:
             assert call_args[3] == results[3]  # next_result
             assert call_args[-1] == 3  # next_idx
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_next_result_exhausted(self, mock_slskd, mock_spotify):
         """Next-result on last result should show 'no more results'."""
@@ -1178,8 +1175,8 @@ class TestRetryResultIndex:
 
 
 class TestRankResponses:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_flac_found(self, mock_slskd, mock_spotify):
         """When FLAC results exist, returns them with is_fallback=False."""
         bot = MusicBot(_make_config())
@@ -1191,8 +1188,8 @@ class TestRankResponses:
         assert len(ranked) == 1
         assert is_fallback is False
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_non_flac_fallback(self, mock_slskd, mock_spotify):
         """When only non-FLAC exists, returns with is_fallback=True."""
         bot = MusicBot(_make_config())
@@ -1205,8 +1202,8 @@ class TestRankResponses:
         assert len(ranked) == 1
         assert is_fallback is True
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_no_results(self, mock_slskd, mock_spotify):
         """When no results match, returns empty list."""
         bot = MusicBot(_make_config())
@@ -1217,8 +1214,8 @@ class TestRankResponses:
         assert ranked == []
         assert is_fallback is False
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_max_duration_diff_passed(self, mock_slskd, mock_spotify):
         """max_duration_diff should be forwarded to score_results."""
         bot = MusicBot(_make_config())
@@ -1236,8 +1233,8 @@ class TestRankResponses:
 
 
 class TestImportPendingSeparation:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_import_pending_does_not_clobber_regular(self, mock_slskd, mock_spotify):
         """Import flow should use _import_pending, not overwrite self.pending."""
         bot = MusicBot(_make_config())
@@ -1251,8 +1248,8 @@ class TestImportPendingSeparation:
         assert bot.pending[67890].query == "regular"
         assert bot._import_pending[67890].query == "import"
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     def test_cancel_clears_import_pending(self, mock_slskd, mock_spotify):
         """Cancellation should clear both pending dicts."""
         bot = MusicBot(_make_config())
@@ -1270,8 +1267,8 @@ class TestImportPendingSeparation:
 
 
 class TestImportCallbackRouting:
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_import_cancel_prefix(self, mock_slskd, mock_spotify):
         """ix: prefix should cancel the import job."""
@@ -1284,8 +1281,8 @@ class TestImportCallbackRouting:
         edit_text = update.callback_query.edit_message_text
         assert "cancelled" in edit_text.call_args[0][0].lower()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_import_idor_wrong_chat(self, mock_slskd, mock_spotify):
         """Import callback from wrong chat should be rejected."""
@@ -1297,8 +1294,8 @@ class TestImportCallbackRouting:
         edit_text = update.callback_query.edit_message_text
         assert "not found" in edit_text.call_args[0][0].lower()
 
-    @patch("music_downloader.bot.handlers.SpotifyResolver")
-    @patch("music_downloader.bot.handlers.SlskdClient")
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_import_skip_uses_complete_track(self, mock_slskd, mock_spotify):
         """is: prefix should atomically complete the track as skipped."""
