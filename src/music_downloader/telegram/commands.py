@@ -23,6 +23,7 @@ async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Commands:\n"
         "/auto — Toggle auto-download mode\n"
         "/import <url> — Import a Spotify playlist or album\n"
+        "/import resume — Continue a paused import after restart\n"
         "/status — Show active downloads\n"
         "/history — Recent downloads\n"
         "/cancel — Cancel the current search, download, or import\n"
@@ -86,7 +87,7 @@ async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await self._check_auth(update):
         return
 
-    records = await asyncio.to_thread(self.history_repo.get_recent, 10)
+    records = await asyncio.to_thread(self.history_repo.get_recent, 10, update.effective_chat.id)
 
     if not records:
         await update.message.reply_text("No downloads yet.")
@@ -100,6 +101,7 @@ async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
             "failed": "❌",
             "file_not_found": "❓",
             "process_failed": "⚠️",
+            "delivered": "📲",
         }.get(entry.status, "❌")
         lines.append(f"{icon} `{entry.filename}`")
 

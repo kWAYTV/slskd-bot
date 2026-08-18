@@ -72,6 +72,21 @@ class TestConfig:
             config = Config()
             assert config.telegram_allowed_users == set()
 
+    def test_library_users_parsing(self, env_vars):
+        env_vars["TELEGRAM_LIBRARY_USERS"] = "123,456"
+        with patch.dict(os.environ, env_vars, clear=False):
+            from music_downloader.settings import Config
+
+            config = Config()
+            assert config.telegram_library_users == {123, 456}
+
+    def test_library_users_empty(self, env_vars):
+        with patch.dict(os.environ, env_vars, clear=False):
+            from music_downloader.settings import Config
+
+            config = Config()
+            assert config.telegram_library_users == set()
+
     def test_missing_required_var_raises(self):
         """Config raises ValueError for missing required variables."""
         with patch.dict(os.environ, {}, clear=True):

@@ -9,6 +9,7 @@ services:
       # Telegram Bot (required)
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS:-}
+      TELEGRAM_LIBRARY_USERS: ${TELEGRAM_LIBRARY_USERS:-}
 
       # Spotify API (required)
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}

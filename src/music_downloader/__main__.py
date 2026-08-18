@@ -27,10 +27,12 @@ def cmd_run(args):
 
     logger.info(f"Music Downloader v{__version__} starting...")
 
-    start_health_server(config.health_port)
+    bot_app = create_bot(config)
+    bot = bot_app.bot_data.get("music_bot")
+    checker = bot.slskd.ping if bot is not None else None
+    start_health_server(config.health_port, checker=checker)
     logger.info(f"Health check endpoint running on port {config.health_port}")
 
-    bot_app = create_bot(config)
     logger.info("Starting Telegram bot polling...")
     bot_app.run_polling(drop_pending_updates=True)
 

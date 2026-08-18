@@ -35,8 +35,11 @@ class TestCmdRun:
             patch("music_downloader.__main__.start_health_server") as mock_health,
         ):
             mock_app = MagicMock()
+            mock_bot = MagicMock()
+            mock_app.bot_data = {"music_bot": mock_bot}
             mock_create.return_value = mock_app
             args = MagicMock()
             cmd_run(args)
             mock_health.assert_called_once()
+            assert mock_health.call_args.kwargs.get("checker") is mock_bot.slskd.ping
             mock_app.run_polling.assert_called_once()

@@ -49,6 +49,7 @@ def _make_config():
     config.filename_template = "{artist} - {title}"
     config.search_timeout_secs = 30
     config.download_timeout_secs = 600
+    config.telegram_library_users = set()
     return config
 
 
@@ -115,6 +116,7 @@ def _setup_bot(mock_slskd_cls, mock_spotify_cls):
     bot.slskd.enqueue_download = MagicMock(return_value=True)
     bot.slskd.wait_for_download = AsyncMock()
     bot.import_repo = MagicMock()
+    bot.import_repo.get_active_job = MagicMock(return_value=None)
     bot.playlist_resolver = MagicMock()
     return bot
 
@@ -264,6 +266,83 @@ class TestCmdImport:
         assert len(call_args[1]) == 3
         mock_edit.assert_awaited()
         assert "My Playlist" in mock_edit.call_args[0][1]
+
+    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    async def test_cmd_import_resume(self, mock_thread):
+        bot = _setup_bot()
+        job = _make_import_job()
+        bot.import_repo.get_active_job = MagicMock(return_value=job)
+        bot.import_repo.reset_in_flight_tracks = MagicMock(return_value=2)
+        bot.import_repo.update_job_status = MagicMock()
+        bot._process_next_import_track = AsyncMock()
+        update = _make_update(text="/import resume")
+        context = _make_context()
+
+        def _create_task(coro, **kw):
+            if hasattr(coro, "close"):
+                coro.close()
+            return MagicMock()
+
+        context.application.create_task = _create_task
+        await bot.cmd_import(update, context)
+        bot.import_repo.reset_in_flight_tracks.assert_called_once_with(job.id)
+        assert bot._active_import[67890] == job.id
+        context.bot.send_message.assert_awaited()
+        assert "Resuming import" in context.bot.send_message.call_args.kwargs["text"]
+
+    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    async def test_cmd_import_resume_nothing(self, mock_thread):
+        bot = _setup_bot()
+        update = _make_update(text="/import resume")
+        context = _make_context()
+        await bot.cmd_import(update, context)
+        context.bot.send_message.assert_awaited_once()
+        assert "Nothing to resume" in context.bot.send_message.call_args.kwargs["text"]
+
+    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    async def test_cmd_import_no_args_with_active_job(self, mock_thread):
+        bot = _setup_bot()
+        bot.import_repo.get_active_job = MagicMock(return_value=_make_import_job())
+        update = _make_update(text="/import")
+        context = _make_context()
+        await bot.cmd_import(update, context)
+        text = update.message.reply_text.call_args[0][0]
+        assert "unfinished import" in text
+        assert "/import resume" in text
+
+
+class TestResumeStaleImports:
+    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    async def test_skips_pending_confirmation_jobs(self, mock_thread):
+        bot = _setup_bot()
+        pending = _make_import_job(status="pending")
+        bot.import_repo.list_resumable_jobs = MagicMock(return_value=[pending])
+        application = MagicMock()
+        application.bot = AsyncMock()
+        application.create_task = MagicMock()
+        await bot.resume_stale_imports(application)
+        application.create_task.assert_not_called()
+        assert pending.chat_id not in bot._active_import
+
+    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    async def test_resumes_active_jobs(self, mock_thread):
+        bot = _setup_bot()
+        job = _make_import_job(status="active")
+        bot.import_repo.list_resumable_jobs = MagicMock(return_value=[job])
+        bot.import_repo.reset_in_flight_tracks = MagicMock(return_value=1)
+        bot._process_next_import_track = AsyncMock()
+        application = MagicMock()
+        application.bot = AsyncMock()
+
+        def _create_task(coro, **kw):
+            if hasattr(coro, "close"):
+                coro.close()
+            return MagicMock()
+
+        application.create_task = _create_task
+        await bot.resume_stale_imports(application)
+        assert bot._active_import[job.chat_id] == job.id
+        application.bot.send_message.assert_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -498,6 +577,7 @@ class TestDoImportSlskdSearch:
         mock_edit.assert_awaited()
         assert "No results" in mock_edit.call_args[0][1]
         bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.awaiting_approval)
+        assert bot.slskd.search.await_count >= 1
 
     @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
     @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)

@@ -20,6 +20,9 @@ class Config:
         allowed_users_str = os.getenv("TELEGRAM_ALLOWED_USERS", "")
         self.telegram_allowed_users = self._parse_id_set(allowed_users_str)
 
+        library_users_str = os.getenv("TELEGRAM_LIBRARY_USERS", "")
+        self.telegram_library_users = self._parse_id_set(library_users_str)
+
         self.spotify_client_id = self._get_required_env("SPOTIFY_CLIENT_ID")
         self.spotify_client_secret = self._get_required_env("SPOTIFY_CLIENT_SECRET")
 
@@ -58,6 +61,10 @@ class Config:
             logger.info(f"Bot restricted to {len(self.telegram_allowed_users)} allowed user(s)")
         else:
             logger.warning("TELEGRAM_ALLOWED_USERS is empty — bot will deny all commands until configured")
+        if self.telegram_library_users:
+            logger.info(f"Library save restricted to {len(self.telegram_library_users)} user(s)")
+        else:
+            logger.info("TELEGRAM_LIBRARY_USERS is empty — all allowed users can save to the library")
 
     def _get_required_env(self, key: str) -> str:
         """Get a required environment variable."""

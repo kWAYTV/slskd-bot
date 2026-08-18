@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 
 from telegram import Update
 from telegram.error import BadRequest
@@ -77,14 +78,55 @@ class MusicBot:
             return False
         return user_id in self.config.telegram_allowed_users
 
+    def _can_save_library(self, user_id: int | None) -> bool:
+        """Library save is allowed for all authorized users unless TELEGRAM_LIBRARY_USERS is set."""
+        library_users = getattr(self.config, "telegram_library_users", None)
+        if not isinstance(library_users, (set, frozenset)):
+            return True
+        if not library_users:
+            return True
+        if user_id is None:
+            return False
+        return user_id in library_users
+
     async def _check_auth(self, update: Update) -> bool:
         if not self._is_authorized(update.effective_user.id):
             await update.message.reply_text("You are not authorized to use this bot.")
             return False
         return True
 
-    def _cancel_chat_operations(self, chat_id: int) -> bool:
-        return self._session.cancel_chat_operations(chat_id)
+    async def _check_library_auth(self, update: Update) -> bool:
+        if not await self._check_auth(update):
+            return False
+        if not self._can_save_library(update.effective_user.id):
+            await update.message.reply_text(
+                "You can search and download files, but only library users can save to the music library or import playlists."
+            )
+            return False
+        return True
+
+    async def _cancel_chat_operations(self, chat_id: int) -> bool:
+        had_work, stale = self._session.cancel_chat_operations(chat_id)
+        for dl in stale:
+            await self._cleanup_download_artifacts(dl)
+        return had_work
+
+    async def _cleanup_download_artifacts(self, dl) -> None:
+        """Cancel the slskd transfer and delete any local file for a pending download."""
+        result = dl.result
+        try:
+            await asyncio.to_thread(
+                self.slskd.cancel_transfer,
+                result.username,
+                result.filename,
+                dl.transfer_id,
+            )
+        except Exception:
+            logger.debug("slskd transfer cancel failed for %s", result.basename, exc_info=True)
+        if dl.source_path and os.path.isfile(dl.source_path):
+            with contextlib.suppress(OSError):
+                os.remove(dl.source_path)
+                logger.info("Deleted cancelled download: %s", dl.source_path)
 
     def _is_stale(self, chat_id: int, generation: int) -> bool:
         return self._session.is_stale(chat_id, generation)
@@ -128,7 +170,7 @@ class MusicBot:
     def _parse_query_artist_title(query: str) -> tuple[str, str]:
         return parse_query_artist_title(query)
 
-    async def _add_history(self, track: TrackInfo, result: SearchResult, status: str):
+    async def _add_history(self, track: TrackInfo, result: SearchResult, status: str, chat_id: int | None = None):
         await asyncio.to_thread(
             self.history_repo.add,
             artist=track.artist,
@@ -140,6 +182,8 @@ class MusicBot:
             status=status,
             duration_secs=track.duration_secs,
             file_size=result.size,
+            chat_id=chat_id,
+            spotify_url=track.spotify_url,
         )
 
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -197,6 +241,7 @@ class MusicBot:
     handle_text = search_flow.handle_text
     _do_search = search_flow.do_search
     _do_slskd_search = search_flow.do_slskd_search
+    _search_with_fallbacks = search_flow.search_with_fallbacks
     _handle_duplicate_response = search_flow.handle_duplicate_response
     _handle_spotify_page = search_flow.handle_spotify_page
     _handle_spotify_selection = search_flow.handle_spotify_selection
@@ -223,13 +268,20 @@ class MusicBot:
     _process_next_import_track = import_flow.process_next_import_track
     _do_import_slskd_search = import_flow.do_import_slskd_search
     _do_import_download = import_flow.do_import_download
+    resume_stale_imports = import_flow.resume_stale_imports
+    _resume_import_job = import_flow.resume_import_job
 
 
 def create_bot(config: Config) -> Application:
     """Create and configure the Telegram bot application."""
     bot = MusicBot(config)
 
-    app = Application.builder().token(config.telegram_bot_token).build()
+    async def _post_init(application: Application) -> None:
+        application.bot_data["music_bot"] = bot
+        await bot.resume_stale_imports(application)
+
+    app = Application.builder().token(config.telegram_bot_token).post_init(_post_init).build()
+    app.bot_data["music_bot"] = bot
 
     app.add_handler(CommandHandler("start", bot.cmd_start))
     app.add_handler(CommandHandler("help", bot.cmd_help))

@@ -76,6 +76,9 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Search lifecycle**: `search_text()` -> poll `state()` -> `stop()` on timeout -> grab partial results from `search_responses()` -> `delete()` cleanup
 - **Async wrapping**: All synchronous `slskd-api` calls must be wrapped with `asyncio.to_thread()` to avoid blocking the Telegram bot event loop
 - **Timeouts**: Hard timeout via `asyncio.wait_for()` around the entire search+poll loop; `searches.stop()` actively cancels the server-side search on timeout
+- **Cleanup**: Stale slskd searches are deleted only when their IDs are not in `_active_search_ids` (serialized with search start)
+- **Import search**: Playlist import uses the same four-tier fallbacks as manual search (`search_with_fallbacks`)
+- **Import resume**: Active jobs auto-resume on startup; `/import resume` continues the chat's pending/active job after resetting `searching` / `awaiting_approval` tracks
 
 ## Telegram UX Patterns
 
@@ -105,7 +108,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 
 - **Spotify API**: Client Credentials flow (no user login). Used only for metadata resolution.
 - **slskd API**: REST API with API key auth. Used for search, download, and file management.
-- **Telegram Bot API**: Long-polling mode. Restricted to allowed user IDs via `TELEGRAM_ALLOWED_USERS`.
+- **Telegram Bot API**: Long-polling mode. Restricted to allowed user IDs via `TELEGRAM_ALLOWED_USERS`. Library writes (save + `/import`) can be further restricted with `TELEGRAM_LIBRARY_USERS`.
 
 ## Testing Strategy
 

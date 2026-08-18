@@ -10,35 +10,67 @@ from music_downloader.__main__ import HealthHandler, main
 
 
 class TestHealthHandler:
-    def test_health_endpoint(self):
-        """HealthHandler responds 200 on /health."""
+    def _handler(self, path: str):
         from unittest.mock import MagicMock
 
         handler = MagicMock(spec=HealthHandler)
-        handler.path = "/health"
+        handler.path = path
         handler.wfile = BytesIO()
         handler.send_response = MagicMock()
         handler.send_header = MagicMock()
         handler.end_headers = MagicMock()
+        handler._json_response = lambda code, payload: HealthHandler._json_response(handler, code, payload)
+        return handler
 
+    def test_health_endpoint(self):
+        """HealthHandler responds 200 on /health."""
+        from music_downloader.health.server import set_health_checker
+
+        set_health_checker(None)
+        handler = self._handler("/health")
         HealthHandler.do_GET(handler)
 
         handler.send_response.assert_called_once_with(200)
         handler.wfile.seek(0)
-        assert b'{"status":"healthy"}' in handler.wfile.read()
+        body = handler.wfile.read()
+        assert b'"status": "healthy"' in body
+        assert b'"slskd": "ok"' in body
+
+    def test_ready_endpoint(self):
+        from music_downloader.health.server import set_health_checker
+
+        set_health_checker(None)
+        handler = self._handler("/ready")
+        HealthHandler.do_GET(handler)
+        handler.send_response.assert_called_once_with(200)
+        handler.wfile.seek(0)
+        assert b'"status": "ready"' in handler.wfile.read()
+
+    def test_health_degraded(self):
+        from music_downloader.health.server import set_health_checker
+
+        set_health_checker(lambda: False)
+        handler = self._handler("/health")
+        HealthHandler.do_GET(handler)
+        handler.send_response.assert_called_once_with(200)
+        handler.wfile.seek(0)
+        body = handler.wfile.read()
+        assert b'"status": "degraded"' in body
+        set_health_checker(None)
+
+    def test_ready_unavailable(self):
+        from music_downloader.health.server import set_health_checker
+
+        set_health_checker(lambda: False)
+        handler = self._handler("/ready")
+        HealthHandler.do_GET(handler)
+        handler.send_response.assert_called_once_with(503)
+        set_health_checker(None)
 
     def test_not_found(self):
         """HealthHandler responds 404 on unknown paths."""
-        from unittest.mock import MagicMock
-
-        handler = MagicMock(spec=HealthHandler)
-        handler.path = "/unknown"
-        handler.wfile = BytesIO()
-        handler.send_response = MagicMock()
-        handler.end_headers = MagicMock()
-
+        handler = self._handler("/unknown")
         HealthHandler.do_GET(handler)
-
         handler.send_response.assert_called_once_with(404)
 
 

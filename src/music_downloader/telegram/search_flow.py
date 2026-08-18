@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from telegram import Update
@@ -71,7 +72,7 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    self._cancel_chat_operations(chat_id)
+    await self._cancel_chat_operations(chat_id)
     generation = self._chat_generation[chat_id]
 
     similar = self.processor.find_similar(query)
@@ -82,7 +83,7 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=build_duplicate_keyboard(),
         )
-        self.pending[chat_id] = PendingSearch(query=query, track=None)
+        self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
         return
 
     await self._do_search(update, context, query, generation)
@@ -110,7 +111,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_direct_search_keyboard(),
             )
-            self.pending[chat_id] = PendingSearch(query=query, track=None)
+            self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
             return
 
         query_lower = query.lower()
@@ -154,7 +155,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
 
         self._spotify_candidates[chat_id] = unique_tracks
         self._spotify_page[chat_id] = 0
-        self.pending[chat_id] = PendingSearch(query=query, track=None)
+        self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
         await safe_edit(
             searching_msg,
             self._format_spotify_results(unique_tracks, page=0),
@@ -170,10 +171,69 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         await safe_edit(searching_msg, "Something went wrong. Please try again.")
 
 
-async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searching_msg, generation: int):
+async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation: int, on_tier=None):
+    """Four-tier slskd search: full query, title-only, keyword+year, artist+latin keywords."""
+    clean_title = clean_search_title(track.title)
+    search_query = f"{track.artist} {clean_title}"
+    timeout = self.config.search_timeout_secs
+
+    raw_responses = await self.slskd.search(search_query, timeout_secs=timeout)
+    if self._is_stale(chat_id, generation):
+        return [], False, True
+    ranked, is_fallback = self._rank_responses(raw_responses, track)
+    if ranked:
+        return ranked, is_fallback, False
+
+    if on_tier:
+        await on_tier("title-only")
+    logger.info("No results for '%s', retrying with title-only: '%s'", search_query, clean_title)
+    raw_responses = await self.slskd.search(clean_title, timeout_secs=timeout)
+    if self._is_stale(chat_id, generation):
+        return [], False, True
+    ranked, is_fallback = self._rank_responses(raw_responses, track)
+    if ranked:
+        return ranked, is_fallback, False
+
+    if not has_non_latin_script(clean_title):
+        reduced_queries = build_reduced_queries(clean_title, track.year)
+        if reduced_queries:
+            if on_tier:
+                await on_tier("keywords")
+            logger.info("No results for title-only '%s', trying keyword reduction + year", clean_title)
+            for fallback_query in reduced_queries:
+                if self._is_stale(chat_id, generation):
+                    return [], False, True
+                raw_responses = await self.slskd.search(fallback_query, timeout_secs=timeout)
+                ranked, is_fallback = self._rank_responses(raw_responses, track)
+                if ranked:
+                    logger.info("Keyword-reduction fallback hit: '%s'", fallback_query)
+                    return ranked, is_fallback, False
+
+    latin_kw = extract_latin_keywords(clean_title)
+    fb4_query = f"{track.artist} {' '.join(latin_kw)}" if latin_kw else track.artist
+    if on_tier:
+        await on_tier("artist-keywords")
+    logger.info("Trying artist + Latin keywords fallback: '%s'", fb4_query)
+    raw_responses = await self.slskd.search(fb4_query, timeout_secs=timeout, response_limit=150)
+    if self._is_stale(chat_id, generation):
+        return [], False, True
+    ranked, is_fallback = self._rank_responses(raw_responses, track, max_duration_diff=120)
+    if ranked:
+        logger.info("Artist-keyword fallback hit: '%s'", fb4_query)
+    return ranked, is_fallback, False
+
+
+async def do_slskd_search(
+    self, context, chat_id: int, track: TrackInfo, searching_msg, generation: int, skip_library_check: bool = False
+):
     """Search slskd for a resolved Spotify track."""
     try:
         header = _track_md(track)
+        if not skip_library_check:
+            blocked = await _prompt_if_already_owned(self, context, chat_id, track, searching_msg)
+            if blocked:
+                return
+
         await safe_edit(
             searching_msg,
             f"🎵 {header}\n"
@@ -183,88 +243,16 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
             parse_mode=ParseMode.MARKDOWN,
         )
 
-        clean_title = clean_search_title(track.title)
-        search_query = f"{track.artist} {clean_title}"
-        raw_responses = await self.slskd.search(search_query, timeout_secs=self.config.search_timeout_secs)
-        if self._is_stale(chat_id, generation):
-            return
+        async def on_tier(kind: str):
+            messages = {
+                "title-only": f"🎵 {header}\n\nNo results with full query — retrying with song title only…",
+                "keywords": f"🎵 {header}\n\nStill no results — trying keyword variations with year…",
+                "artist-keywords": f"🎵 {header}\n\nStill no results — trying artist + keyword search…",
+            }
+            await safe_edit(searching_msg, messages[kind], parse_mode=ParseMode.MARKDOWN)
 
-        ranked, is_fallback = self._rank_responses(raw_responses, track)
-
-        if not ranked:
-            if self._is_stale(chat_id, generation):
-                return
-            logger.info(
-                "No results for '%s', retrying with title-only: '%s'",
-                search_query,
-                clean_title,
-            )
-            await safe_edit(
-                searching_msg,
-                f"🎵 {header}\n\nNo results with full query — retrying with song title only…",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            raw_responses = await self.slskd.search(clean_title, timeout_secs=self.config.search_timeout_secs)
-            if self._is_stale(chat_id, generation):
-                return
-
-            ranked, is_fallback = self._rank_responses(raw_responses, track)
-
-        if not ranked and not has_non_latin_script(clean_title):
-            reduced_queries = build_reduced_queries(clean_title, track.year)
-            if reduced_queries:
-                if self._is_stale(chat_id, generation):
-                    return
-                logger.info(
-                    "No results for title-only '%s', trying keyword reduction + year",
-                    clean_title,
-                )
-                await safe_edit(
-                    searching_msg,
-                    f"🎵 {header}\n\nStill no results — trying keyword variations with year…",
-                    parse_mode=ParseMode.MARKDOWN,
-                )
-                for fallback_query in reduced_queries:
-                    if self._is_stale(chat_id, generation):
-                        return
-                    raw_responses = await self.slskd.search(
-                        fallback_query, timeout_secs=self.config.search_timeout_secs
-                    )
-                    ranked, is_fallback = self._rank_responses(raw_responses, track)
-                    if ranked:
-                        logger.info("Keyword-reduction fallback hit: '%s'", fallback_query)
-                        break
-
-        if not ranked:
-            if self._is_stale(chat_id, generation):
-                return
-            latin_kw = extract_latin_keywords(clean_title)
-            if latin_kw:
-                fb4_query = f"{track.artist} {' '.join(latin_kw)}"
-            else:
-                fb4_query = track.artist
-            logger.info(
-                "Trying artist + Latin keywords fallback: '%s'",
-                fb4_query,
-            )
-            await safe_edit(
-                searching_msg,
-                f"🎵 {header}\n\nStill no results — trying artist + keyword search…",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            raw_responses = await self.slskd.search(
-                fb4_query,
-                timeout_secs=self.config.search_timeout_secs,
-                response_limit=150,
-            )
-            if self._is_stale(chat_id, generation):
-                return
-
-            ranked, is_fallback = self._rank_responses(raw_responses, track, max_duration_diff=120)
-            if ranked:
-                logger.info("Artist-keyword fallback hit: '%s'", fb4_query)
-
-        if self._is_stale(chat_id, generation):
+        ranked, is_fallback, stale = await search_with_fallbacks(self, track, chat_id, generation, on_tier=on_tier)
+        if stale:
             return
 
         if not ranked:
@@ -321,6 +309,14 @@ async def handle_duplicate_response(self, update, context, chat_id: int, data: s
         parse_mode=ParseMode.MARKDOWN,
     )
     generation = self._chat_generation.get(chat_id, 0)
+    if pending.track:
+        searching_msg = await context.bot.send_message(
+            chat_id=chat_id,
+            text="🔍 Searching slskd for FLAC...",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        await self._do_slskd_search(context, chat_id, pending.track, searching_msg, generation, skip_library_check=True)
+        return
     await self._do_search(update, context, pending.query, generation)
 
 
@@ -491,6 +487,43 @@ def _track_md(track: TrackInfo) -> str:
     return f"*{escape_md(track.artist)} - {escape_md(track.title)}*"
 
 
+async def _prompt_if_already_owned(self, context, chat_id: int, track: TrackInfo, searching_msg) -> bool:
+    """Return True if we paused for a duplicate confirmation."""
+    exact = self.processor.find_exact(track.artist, track.title)
+    history_hit = await asyncio.to_thread(
+        self.history_repo.find_success,
+        track.artist,
+        track.title,
+        track.spotify_url,
+    )
+    if not exact and not history_hit:
+        return False
+
+    lines = [f"⚠️ *Already in the library:* {_track_md(track)}\n"]
+    if exact:
+        lines.append("On disk:\n" + "\n".join(f"• `{f}`" for f in exact[:5]))
+    if history_hit:
+        lines.append(f"Previously saved as `{history_hit.filename}`")
+    lines.append("\nSearch Soulseek anyway?")
+    user_id = None
+    existing = self.pending.get(chat_id)
+    if existing:
+        user_id = existing.user_id
+    self.pending[chat_id] = PendingSearch(
+        query=f"{track.artist} {track.title}",
+        track=track,
+        user_id=user_id,
+        skip_library_check=True,
+    )
+    await safe_edit(
+        searching_msg,
+        "\n".join(lines),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=build_duplicate_keyboard(),
+    )
+    return True
+
+
 async def present_search_results(
     self,
     context,
@@ -502,12 +535,14 @@ async def present_search_results(
     query: str,
 ):
     """Store ranked results and either auto-download or show the pick keyboard."""
+    existing = self.pending.get(chat_id)
     self.pending[chat_id] = PendingSearch(
         query=query,
         track=track,
         results=ranked,
         message_id=searching_msg.message_id,
         is_fallback=is_fallback,
+        user_id=existing.user_id if existing else None,
     )
 
     if self.auto_mode:
@@ -523,8 +558,9 @@ async def present_search_results(
             text=(f"⬇️ *Downloading #1...*\n{header}\nFrom: `{result.username}`\nFile: `{result.basename}`"),
             parse_mode=ParseMode.MARKDOWN,
         )
+        user_id = self.pending[chat_id].user_id if chat_id in self.pending else None
         task = context.application.create_task(
-            self._do_download(context, chat_id, track, result, status_msg, 0),
+            self._do_download(context, chat_id, track, result, status_msg, 0, user_id=user_id),
         )
         self._track_task(chat_id, task)
         return

@@ -99,6 +99,7 @@ python -m music_downloader run
 |----------|----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | — | Telegram bot token from @BotFather |
 | `TELEGRAM_ALLOWED_USERS` | Yes | — | Comma-separated Telegram user IDs allowed to use the bot. Empty denies everyone. |
+| `TELEGRAM_LIBRARY_USERS` | No | — | Comma-separated Telegram user IDs allowed to save into the music library and run `/import`. Empty means all allowed users can save. Other allowed users still get the file via Telegram; the local copy is then deleted. |
 | `SPOTIFY_CLIENT_ID` | Yes | — | Spotify Developer app Client ID |
 | `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app Client Secret |
 | `SLSKD_HOST` | Yes | — | slskd instance URL (e.g., `http://192.168.1.100:5030`) |
@@ -122,9 +123,10 @@ python -m music_downloader run
 |---------|-------------|
 | *(any text)* | Search for a song and show download options |
 | `/auto` | Toggle auto-download mode on/off |
-| `/import <url>` | Import a Spotify playlist or album |
+| `/import <url>` | Import a Spotify playlist or album (library users only) |
+| `/import resume` | Continue a paused import after a bot restart |
 | `/status` | Show active searches and downloads for this chat |
-| `/history` | Show recent download history |
+| `/history` | Show recent download history for this chat |
 | `/cancel` | Cancel the current search, download, or import |
 | `/help` | Show help message |
 

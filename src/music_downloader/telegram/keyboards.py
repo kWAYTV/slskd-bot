@@ -39,16 +39,17 @@ def build_results_keyboard(
     return InlineKeyboardMarkup(buttons)
 
 
-def build_approve_keyboard(download_id: str) -> InlineKeyboardMarkup:
+def build_approve_keyboard(download_id: str, has_next: bool = False) -> InlineKeyboardMarkup:
     """Build approve/reject keyboard for a downloaded file."""
-    return InlineKeyboardMarkup(
+    rows = [
         [
-            [
-                InlineKeyboardButton("✅ Save to library", callback_data=f"approve:{download_id}"),
-                InlineKeyboardButton("🚫 Reject", callback_data=f"reject:{download_id}"),
-            ]
+            InlineKeyboardButton("✅ Save to library", callback_data=f"approve:{download_id}"),
+            InlineKeyboardButton("🚫 Reject", callback_data=f"reject:{download_id}"),
         ]
-    )
+    ]
+    if has_next:
+        rows.append([InlineKeyboardButton("⏭ Try next result", callback_data=f"next:{download_id}")])
+    return InlineKeyboardMarkup(rows)
 
 
 def build_duplicate_keyboard() -> InlineKeyboardMarkup:

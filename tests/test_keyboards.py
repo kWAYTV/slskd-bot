@@ -102,6 +102,11 @@ class TestBuildApproveKeyboard:
         assert buttons[0].callback_data == "approve:42"
         assert buttons[1].callback_data == "reject:42"
 
+    def test_has_next_result_row(self):
+        kb = build_approve_keyboard("42", has_next=True)
+        assert len(kb.inline_keyboard) == 2
+        assert kb.inline_keyboard[1][0].callback_data == "next:42"
+
 
 class TestBuildDuplicateKeyboard:
     def test_has_continue_and_cancel(self):

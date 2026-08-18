@@ -57,6 +57,20 @@ class FileProcessor:
         matches.sort(key=lambda x: x[1], reverse=True)
         return [m[0] for m in matches]
 
+    def find_exact(self, artist: str, title: str) -> list[str]:
+        """Return library files whose stem matches the configured filename template."""
+        if not os.path.isdir(self.output_dir):
+            return []
+        stem = self._sanitize_filename(self.filename_template.format(artist=artist, title=title)).lower()
+        matches = []
+        for filename in os.listdir(self.output_dir):
+            name, ext = os.path.splitext(filename)
+            if ext.lower() not in _AUDIO_EXTENSIONS:
+                continue
+            if name.lower() == stem:
+                matches.append(filename)
+        return matches
+
     def build_filename(self, artist: str, title: str, extension: str = "flac") -> str:
         """Build the target filename from artist and title."""
         name = self.filename_template.format(artist=artist, title=title)

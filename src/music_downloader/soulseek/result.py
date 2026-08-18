@@ -67,6 +67,7 @@ class DownloadStatus:
     bytes_transferred: int = 0
     size: int = 0
     average_speed: float = 0.0
+    transfer_id: str | None = None
 
     @property
     def is_complete(self) -> bool:

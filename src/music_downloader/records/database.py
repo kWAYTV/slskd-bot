@@ -5,11 +5,12 @@ import contextlib
 import logging
 import os
 import sqlite3
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS download_history (
@@ -23,7 +24,9 @@ CREATE TABLE IF NOT EXISTS download_history (
     status TEXT NOT NULL,
     duration_secs INTEGER DEFAULT 0,
     file_size INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    chat_id INTEGER,
+    spotify_url TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS import_jobs (
@@ -60,28 +63,32 @@ CREATE TABLE IF NOT EXISTS import_tracks (
 CREATE INDEX IF NOT EXISTS idx_import_tracks_job_status ON import_tracks(job_id, status);
 CREATE INDEX IF NOT EXISTS idx_import_jobs_status ON import_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_download_history_created ON download_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_download_history_chat ON download_history(chat_id, created_at);
 """
+
+
+def _open_connection(db_path: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
 
 
 class Database:
     def __init__(self, db_path: str) -> None:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        self._db_path = db_path
         try:
-            self._conn = sqlite3.connect(db_path, check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA busy_timeout=5000")
-            self._conn.execute("PRAGMA foreign_keys=ON")
+            self._conn = _open_connection(db_path)
             self._init_schema()
         except sqlite3.DatabaseError:
-            logger.warning("Database corrupt or unreadable at %s — recreating", db_path)
+            backup = f"{db_path}.bak.{int(time.time())}"
+            logger.warning("Database corrupt or unreadable at %s — backing up to %s and recreating", db_path, backup)
             if os.path.exists(db_path):
-                os.remove(db_path)
-            self._conn = sqlite3.connect(db_path, check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA busy_timeout=5000")
-            self._conn.execute("PRAGMA foreign_keys=ON")
+                os.rename(db_path, backup)
+            self._conn = _open_connection(db_path)
             self._init_schema()
         atexit.register(self.close)
 
@@ -91,7 +98,20 @@ class Database:
 
     def _init_schema(self) -> None:
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+        self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Apply additive migrations for databases created on older schemas."""
+        cols = {row[1] for row in self._conn.execute("PRAGMA table_info(download_history)")}
+        if "chat_id" not in cols:
+            self._conn.execute("ALTER TABLE download_history ADD COLUMN chat_id INTEGER")
+        if "spotify_url" not in cols:
+            self._conn.execute("ALTER TABLE download_history ADD COLUMN spotify_url TEXT DEFAULT ''")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_download_history_chat ON download_history(chat_id, created_at)"
+        )
 
     def close(self) -> None:
         with contextlib.suppress(Exception):
