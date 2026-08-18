@@ -5,8 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/GeiserX/telegram-slskd-local-bot" alt="License"/></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.x-3776AB?logo=python&logoColor=white" alt="Python"/></a>
-  <a href="https://hub.docker.com/r/drumsergio/telegram-slskd-local-bot"><img src="https://img.shields.io/docker/pulls/drumsergio/telegram-slskd-local-bot" alt="Docker Pulls"/></a>
-  <a href="https://hub.docker.com/r/drumsergio/telegram-slskd-local-bot"><img src="https://img.shields.io/docker/image-size/drumsergio/telegram-slskd-local-bot/latest" alt="Docker Image Size"/></a>
+  <a href="https://github.com/kWAYTV/slskd-bot/pkgs/container/slskd-bot"><img src="https://img.shields.io/badge/ghcr.io-kwaytv%2Fslskd--bot-blue?logo=github" alt="GHCR"/></a>
   <a href="https://pypi.org/project/telegram-slskd-local-bot/"><img src="https://img.shields.io/pypi/v/telegram-slskd-local-bot?style=flat-square" alt="PyPI"/></a>
   <a href="https://codecov.io/gh/GeiserX/telegram-slskd-local-bot"><img src="https://codecov.io/gh/GeiserX/telegram-slskd-local-bot/graph/badge.svg" alt="codecov"/></a>
 </p>
@@ -51,7 +50,7 @@ Bot: Downloaded! Nancy Sinatra - Bang Bang (My Baby Shot Me Down).flac -> /music
 ```yaml
 services:
   slskd-importer:
-    image: drumsergio/telegram-slskd-local-bot:0.1.0
+    image: ghcr.io/kwaytv/slskd-bot:latest
     container_name: slskd_importer
     restart: unless-stopped
     environment:

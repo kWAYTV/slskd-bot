@@ -1,5 +1,6 @@
 services:
   slskd-importer:
+    image: ghcr.io/kwaytv/slskd-bot:latest
     build: .
     container_name: slskd_importer
     restart: unless-stopped
