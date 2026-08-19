@@ -124,10 +124,10 @@ The first time an allowed user talks to the bot they pick a language (English, S
 | Command | Description |
 |---------|-------------|
 | *(any text)* | Search for a song and show download options |
-| `/auto` | Toggle auto-download mode on/off |
+| `/auto` | Toggle auto-download mode on/off (per chat) |
 | `/import <url>` | Import a Spotify playlist or album (library users only) |
 | `/import resume` | Continue a paused import after a bot restart |
-| `/status` | Show active searches and downloads for this chat |
+| `/status` | Show active searches, downloads (with progress), and imports for this chat |
 | `/history` | Show recent download history for this chat |
 | `/cancel` | Cancel the current search, download, or import |
 | `/lang` | Choose language (English, Spanish, German, Galician). Also `/language` |
