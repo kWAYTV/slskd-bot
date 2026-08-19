@@ -510,6 +510,52 @@ class TestSlskdClientWaitForDownload:
         assert result is None
 
     @pytest.mark.asyncio
+    async def test_progress_callback_invoked_in_flight_only(self, client):
+        """progress_callback fires for in-flight polls, not for the terminal status."""
+        call_count = 0
+        completed = DownloadStatus(username="u", filename="f.flac", state="Completed, Succeeded", percent_complete=100)
+
+        def mock_status(username, filename):
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 3:
+                return completed
+            return DownloadStatus(username="u", filename="f.flac", state="InProgress", percent_complete=call_count * 25)
+
+        client.get_download_status = mock_status
+        seen: list[float] = []
+
+        async def on_progress(status):
+            seen.append(status.percent_complete)
+
+        result = await client.wait_for_download("u", "f.flac", timeout_secs=30, progress_callback=on_progress)
+        assert result is not None
+        assert result.is_complete
+        assert seen == [25, 50]
+
+    @pytest.mark.asyncio
+    async def test_progress_callback_error_does_not_abort(self, client):
+        """A crashing progress_callback is swallowed and the wait continues."""
+        call_count = 0
+        completed = DownloadStatus(username="u", filename="f.flac", state="Completed, Succeeded")
+
+        def mock_status(username, filename):
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 2:
+                return completed
+            return DownloadStatus(username="u", filename="f.flac", state="InProgress", percent_complete=10)
+
+        client.get_download_status = mock_status
+
+        async def bad_callback(status):
+            raise RuntimeError("boom")
+
+        result = await client.wait_for_download("u", "f.flac", timeout_secs=30, progress_callback=bad_callback)
+        assert result is not None
+        assert result.is_complete
+
+    @pytest.mark.asyncio
     async def test_wait_no_status_yet(self, client):
         """wait_for_download handles None status during polling."""
         call_count = 0
