@@ -26,16 +26,17 @@ class TestDatabaseNormalCreation:
         assert "download_history" in tables
         assert "import_jobs" in tables
         assert "import_tracks" in tables
+        assert "user_locales" in tables
         db.close()
 
     def test_database_schema_version(self, tmp_path):
-        """Verify user_version is set to 2."""
+        """Verify user_version is set to 3."""
         db_path = str(tmp_path / "version.db")
         db = Database(db_path)
 
         cursor = db.connection.execute("PRAGMA user_version")
         version = cursor.fetchone()[0]
-        assert version == 2
+        assert version == 3
         db.close()
 
 
@@ -74,7 +75,7 @@ class TestDatabaseCorruptRecovery:
 
             db = Database(db_path)
             cursor = db.connection.execute("PRAGMA user_version")
-            assert cursor.fetchone()[0] == 2
+            assert cursor.fetchone()[0] == 3
             db.close()
 
 
@@ -137,7 +138,9 @@ class TestDatabaseMigration:
         assert "chat_id" in cols
         assert "spotify_url" in cols
         version = db.connection.execute("PRAGMA user_version").fetchone()[0]
-        assert version == 2
+        assert version == 3
+        tables = {row[0] for row in db.connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "user_locales" in tables
         db.close()
 
 

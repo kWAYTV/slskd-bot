@@ -48,6 +48,7 @@ src/music_downloader/
   playlist_import/   # Playlist/album import jobs
   records/           # Shared SQLite connection used by history + import
   telegram/          # Conversation delivery — commands, search, download, import
+  i18n/              # gettext catalogs + per-user locale (en/es/de/gl)
   settings/          # Environment configuration and logging
   health/            # Process health-check endpoint
 ```
@@ -79,6 +80,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Cleanup**: Stale slskd searches are deleted only when their IDs are not in `_active_search_ids` (serialized with search start)
 - **Import search**: Playlist import uses the same four-tier fallbacks as manual search (`search_with_fallbacks`)
 - **Import resume**: Active jobs auto-resume on startup; `/import resume` continues the chat's pending/active job after resetting `searching` / `awaiting_approval` tracks
+- **i18n**: GNU gettext catalogs in `locales/{lang}/LC_MESSAGES` (Babel extract/update/compile). Never `gettext.install()` — locale is a ContextVar. First authorized update without a stored locale shows the language picker; `/lang` changes it anytime. Update catalogs with `scripts/i18n.sh` then `python scripts/generate_locales.py`
 
 ## Telegram UX Patterns
 

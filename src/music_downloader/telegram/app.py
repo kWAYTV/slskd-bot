@@ -15,6 +15,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 
@@ -22,6 +23,8 @@ from music_downloader.catalog.playlist import PlaylistResolver
 from music_downloader.catalog.spotify import SpotifyResolver
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.history.store import HistoryRepository
+from music_downloader.i18n.catalog import gettext as _
+from music_downloader.i18n.store import LocaleStore
 from music_downloader.library.files import FileProcessor
 from music_downloader.playlist_import.store import ImportRepository
 from music_downloader.records.database import Database
@@ -30,7 +33,7 @@ from music_downloader.soulseek.client import SlskdClient
 from music_downloader.soulseek.query import parse_query_artist_title
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.soulseek.scoring import ResultScorer
-from music_downloader.telegram import commands, download_flow, import_flow, search_flow
+from music_downloader.telegram import commands, download_flow, import_flow, language, search_flow
 from music_downloader.telegram.messages import format_search_results, format_spotify_results
 from music_downloader.telegram.session import ChatSession
 
@@ -71,6 +74,7 @@ class MusicBot:
         self.db = Database(f"{config.data_dir}/importer.db")
         self.history_repo = HistoryRepository(self.db)
         self.import_repo = ImportRepository(self.db)
+        self.locale_store = LocaleStore(self.db)
         self.playlist_resolver = PlaylistResolver(self.spotify)
 
     def _is_authorized(self, user_id: int) -> bool:
@@ -91,7 +95,7 @@ class MusicBot:
 
     async def _check_auth(self, update: Update) -> bool:
         if not self._is_authorized(update.effective_user.id):
-            await update.message.reply_text("You are not authorized to use this bot.")
+            await update.message.reply_text(_("You are not authorized to use this bot."))
             return False
         return True
 
@@ -100,7 +104,9 @@ class MusicBot:
             return False
         if not self._can_save_library(update.effective_user.id):
             await update.message.reply_text(
-                "You can search and download files, but only library users can save to the music library or import playlists."
+                _(
+                    "You can search and download files, but only library users can save to the music library or import playlists."
+                )
             )
             return False
         return True
@@ -224,9 +230,9 @@ class MusicBot:
 
         if data.startswith("auto:"):
             self.auto_mode = data == "auto:on"
-            mode_str = "ON" if self.auto_mode else "OFF"
+            mode_str = _("ON") if self.auto_mode else _("OFF")
             await query.edit_message_text(
-                f"Auto-download mode: *{mode_str}*",
+                _("Auto-download mode: *{mode}*").format(mode=mode_str),
                 parse_mode="Markdown",
             )
             return
@@ -236,8 +242,10 @@ class MusicBot:
     cmd_auto = commands.cmd_auto
     cmd_status = commands.cmd_status
     cmd_history = commands.cmd_history
+    cmd_lang = language.cmd_lang
     cmd_import = import_flow.cmd_import
     cmd_cancel = import_flow.cmd_cancel
+    ensure_locale = language.ensure_locale
 
     handle_text = search_flow.handle_text
     _do_search = search_flow.do_search
@@ -280,16 +288,19 @@ def create_bot(config: Config) -> Application:
 
     async def _post_init(application: Application) -> None:
         application.bot_data["music_bot"] = bot
+        await language.register_bot_commands(application)
         await bot.resume_stale_imports(application)
 
     app = Application.builder().token(config.telegram_bot_token).post_init(_post_init).build()
     app.bot_data["music_bot"] = bot
 
+    app.add_handler(TypeHandler(Update, bot.ensure_locale), group=-1)
     app.add_handler(CommandHandler("start", bot.cmd_start))
     app.add_handler(CommandHandler("help", bot.cmd_help))
     app.add_handler(CommandHandler("auto", bot.cmd_auto))
     app.add_handler(CommandHandler("status", bot.cmd_status))
     app.add_handler(CommandHandler("history", bot.cmd_history))
+    app.add_handler(CommandHandler(["lang", "language"], bot.cmd_lang))
     app.add_handler(CommandHandler("import", bot.cmd_import))
     app.add_handler(CommandHandler("cancel", bot.cmd_cancel))
     app.add_handler(CallbackQueryHandler(bot.handle_callback))

@@ -10,7 +10,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS download_history (
@@ -58,6 +58,12 @@ CREATE TABLE IF NOT EXISTS import_tracks (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(job_id, position)
+);
+
+CREATE TABLE IF NOT EXISTS user_locales (
+    user_id INTEGER PRIMARY KEY,
+    locale TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_import_tracks_job_status ON import_tracks(job_id, status);
@@ -117,6 +123,15 @@ class Database:
             self._conn.execute("ALTER TABLE download_history ADD COLUMN spotify_url TEXT DEFAULT ''")
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_download_history_chat ON download_history(chat_id, created_at)"
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_locales (
+                user_id INTEGER PRIMARY KEY,
+                locale TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
         )
 
     def close(self) -> None:
