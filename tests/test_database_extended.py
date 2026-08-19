@@ -138,7 +138,9 @@ class TestDatabaseMigration:
         assert "chat_id" in cols
         assert "spotify_url" in cols
         version = db.connection.execute("PRAGMA user_version").fetchone()[0]
-        assert version == 2
+        assert version == 3
+        tables = {row[0] for row in db.connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "user_locales" in tables
         db.close()
 
 

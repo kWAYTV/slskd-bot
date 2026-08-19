@@ -163,7 +163,7 @@ async def cmd_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_import_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
     """Route import-related callbacks (ic/ix/ia/ir/is prefixes)."""
     query = update.callback_query
-    prefix, _, payload = data.partition(":")
+    prefix, _sep, payload = data.partition(":")
     parts = payload.split(":")
 
     try:
