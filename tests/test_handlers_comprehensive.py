@@ -14,11 +14,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.playlist_import.job import JobStatus
 from music_downloader.soulseek.query import clean_search_title as _clean_search_title
 from music_downloader.soulseek.query import extract_latin_keywords as _extract_latin_keywords
 from music_downloader.soulseek.query import has_non_latin_script as _has_non_latin_script
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.app import MusicBot
+from music_downloader.telegram.messages import code_span, md_code_safe, progress_bar
 from music_downloader.telegram.messages import escape_md as _escape_md
 from music_downloader.telegram.messages import safe_edit as _safe_edit
 from music_downloader.telegram.session import PendingDownload, PendingSearch
@@ -130,6 +132,38 @@ class TestEscapeMd:
 
     def test_empty_string(self):
         assert _escape_md("") == ""
+
+
+class TestCodeSpan:
+    def test_wraps_in_backticks(self):
+        assert code_span("file.flac") == "`file.flac`"
+
+    def test_neutralizes_inner_backticks(self):
+        span = code_span("evil`name.flac")
+        assert span.startswith("`") and span.endswith("`")
+        assert "`" not in span[1:-1]
+
+    def test_md_code_safe_replaces_backticks(self):
+        assert "`" not in md_code_safe("a`b`c")
+        assert md_code_safe("clean.flac") == "clean.flac"
+
+
+class TestProgressBar:
+    def test_zero_percent(self):
+        assert progress_bar(0) == "▱" * 10
+
+    def test_full(self):
+        assert progress_bar(100) == "▰" * 10
+
+    def test_half(self):
+        assert progress_bar(50) == "▰" * 5 + "▱" * 5
+
+    def test_clamps_out_of_range(self):
+        assert progress_bar(-5) == "▱" * 10
+        assert progress_bar(150) == "▰" * 10
+
+    def test_custom_width(self):
+        assert progress_bar(50, width=4) == "▰▰▱▱"
 
 
 class TestSafeEdit:
@@ -421,7 +455,7 @@ class TestMusicBotCommands:
         update = _make_update()
         context = _make_context()
         await bot.cmd_status(update, context)
-        update.message.reply_text.assert_called_once_with("No active searches or downloads.")
+        update.message.reply_text.assert_called_once_with("No active searches, downloads, or imports.")
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -456,7 +490,7 @@ class TestMusicBotCommands:
         update = _make_update()
         context = _make_context()
         await bot.cmd_status(update, context)
-        update.message.reply_text.assert_called_once_with("No active searches or downloads.")
+        update.message.reply_text.assert_called_once_with("No active searches, downloads, or imports.")
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -531,7 +565,10 @@ class TestMusicBotCallbackHandler:
         update = _make_callback_update(data="auto:on")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert bot.auto_mode is True
+        assert bot.is_auto(update.effective_chat.id) is True
+        # Per-chat toggle: config default and other chats are untouched.
+        assert bot.auto_mode is False
+        assert bot.is_auto(99999) is False
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -543,7 +580,9 @@ class TestMusicBotCallbackHandler:
         update = _make_callback_update(data="auto:off")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert bot.auto_mode is False
+        assert bot.is_auto(update.effective_chat.id) is False
+        # Other chats still follow the config default.
+        assert bot.is_auto(99999) is True
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -819,8 +858,8 @@ class TestMusicBotCallbackHandler:
         update = _make_callback_update(user_id=99999, data="auto:on")
         context = _make_context()
         await bot.handle_callback(update, context)
-        # Should not change auto_mode
-        assert bot.auto_mode is False
+        # Should not change auto mode for the chat
+        assert bot.is_auto(update.effective_chat.id) is False
 
 
 class TestMusicBotHelpers:
@@ -1392,3 +1431,96 @@ class TestImportCallbackRouting:
 
         progress = bot.import_repo.get_job_progress(job_id)
         assert progress[2] == 1  # skipped_tracks == 1
+
+
+class TestPerChatAutoMode:
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    def test_is_auto_defaults_to_config(self, mock_slskd, mock_spotify):
+        config = _make_config()
+        config.auto_mode = True
+        bot = MusicBot(config)
+        assert bot.is_auto(67890) is True
+        assert bot.is_auto(11111) is True
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    def test_override_beats_default(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot._auto_overrides[67890] = True
+        assert bot.is_auto(67890) is True
+        assert bot.is_auto(11111) is False
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_cmd_auto_reflects_chat_override(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot._auto_overrides[67890] = True
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_auto(update, context)
+        assert "ON" in update.message.reply_text.call_args[0][0]
+
+
+class TestCmdStatusDetails:
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_status_shows_download_progress(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.downloads["1"] = PendingDownload(
+            track=_make_track(),
+            result=_make_search_result(),
+            chat_id=67890,
+            progress_percent=42.0,
+        )
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        text = update.message.reply_text.call_args[0][0]
+        assert "42%" in text
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_status_shows_awaiting_approval(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.downloads["1"] = PendingDownload(
+            track=_make_track(),
+            result=_make_search_result(),
+            chat_id=67890,
+            source_path="/tmp/somefile.flac",
+            progress_percent=100.0,
+        )
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        text = update.message.reply_text.call_args[0][0]
+        assert "awaiting approval" in text
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_status_shows_active_import(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        job_id = bot.import_repo.create_job(67890, "https://spotify.com/playlist/x", "My Playlist", 10)
+        bot.import_repo.update_job_status(job_id, JobStatus.active)
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        text = update.message.reply_text.call_args[0][0]
+        assert "Active import" in text
+        assert "My Playlist" in text
+        assert "0/10" in text
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_status_ignores_other_chat_imports(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.import_repo.create_job(11111, "https://spotify.com/playlist/x", "Other", 3)
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        update.message.reply_text.assert_called_once_with("No active searches, downloads, or imports.")

@@ -22,7 +22,14 @@ from music_downloader.telegram.keyboards import (
     build_retry_keyboard,
     build_retry_next_keyboard,
 )
-from music_downloader.telegram.messages import escape_md, format_flac_verdict, safe_query_edit
+from music_downloader.telegram.messages import (
+    escape_md,
+    format_flac_verdict,
+    md_code_safe,
+    progress_bar,
+    safe_edit,
+    safe_query_edit,
+)
 from music_downloader.telegram.session import PendingDownload
 
 logger = logging.getLogger(__name__)
@@ -70,8 +77,8 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
                 n=index + 1,
                 artist=escape_md(track.artist),
                 title=escape_md(track.title),
-                user=result.username,
-                file=result.basename,
+                user=md_code_safe(result.username),
+                file=md_code_safe(result.basename),
             )
         ),
         parse_mode=ParseMode.MARKDOWN,
@@ -105,22 +112,48 @@ async def do_download(
     can_save = self._can_save_library(user_id)
     transfer_id = None
 
+    # Register up front so /status and /cancel see in-flight downloads.
+    pending_dl = PendingDownload(
+        track=track,
+        result=result,
+        chat_id=chat_id,
+        status_message_id=status_msg.message_id,
+        result_index=result_index,
+        user_id=user_id,
+    )
+    self.downloads[dl_id] = pending_dl
+
+    last_edited_pct = -100.0
+
+    async def _on_progress(progress) -> None:
+        nonlocal last_edited_pct
+        pct = progress.percent_complete
+        pending_dl.progress_percent = pct
+        pending_dl.transfer_id = progress.transfer_id or pending_dl.transfer_id
+        if pct - last_edited_pct < 10:
+            return
+        last_edited_pct = pct
+        await safe_edit(
+            status_msg,
+            _("⬇️ *Downloading {label}...* {pct}%\n{bar}\n{artist} - {title}\nFile: `{file}`").format(
+                label=label,
+                pct=f"{pct:.0f}",
+                bar=progress_bar(pct),
+                artist=escape_md(track.artist),
+                title=escape_md(track.title),
+                file=md_code_safe(result.basename),
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
     try:
         success = await asyncio.to_thread(self.slskd.enqueue_download, result)
         if not success:
-            pending_dl = PendingDownload(
-                track=track,
-                result=result,
-                chat_id=chat_id,
-                status_message_id=status_msg.message_id,
-                result_index=result_index,
-                user_id=user_id,
-            )
-            self.downloads[dl_id] = pending_dl
             has_next = self._has_next_result(chat_id, result_index)
-            await status_msg.edit_text(
+            await safe_edit(
+                status_msg,
                 _("❌ Failed to enqueue download from `{user}`.\nThe user might be offline.").format(
-                    user=result.username
+                    user=md_code_safe(result.username)
                 ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_retry_next_keyboard(dl_id) if has_next else build_retry_keyboard(dl_id),
@@ -131,24 +164,19 @@ async def do_download(
             username=result.username,
             filename=result.filename,
             timeout_secs=self.config.download_timeout_secs,
+            progress_callback=_on_progress,
         )
-        transfer_id = status.transfer_id if status else None
+        transfer_id = status.transfer_id if status else pending_dl.transfer_id
+        pending_dl.transfer_id = transfer_id
 
         if status is None or status.is_failed:
             state = status.state if status else _("Timeout")
-            pending_dl = PendingDownload(
-                track=track,
-                result=result,
-                chat_id=chat_id,
-                status_message_id=status_msg.message_id,
-                result_index=result_index,
-                user_id=user_id,
-                transfer_id=transfer_id,
-            )
-            self.downloads[dl_id] = pending_dl
             has_next = self._has_next_result(chat_id, result_index)
-            await status_msg.edit_text(
-                _("❌ Download failed: {state}\nFile: `{file}`").format(state=state, file=result.basename),
+            await safe_edit(
+                status_msg,
+                _("❌ Download failed: {state}\nFile: `{file}`").format(
+                    state=state, file=md_code_safe(result.basename)
+                ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_retry_next_keyboard(dl_id) if has_next else build_retry_keyboard(dl_id),
             )
@@ -157,7 +185,9 @@ async def do_download(
 
         source_path = self.processor.find_downloaded_file(result.username, result.filename)
         if not source_path:
-            await status_msg.edit_text(
+            self.downloads.pop(dl_id, None)
+            await safe_edit(
+                status_msg,
                 _("❌ Downloaded file not found on disk.\nCheck DOWNLOAD_DIR configuration."),
             )
             await self._add_history(track, result, "file_not_found", chat_id=chat_id)
@@ -165,17 +195,8 @@ async def do_download(
 
         flac_verdict = await self._analyze_flac(source_path) if result.extension == "flac" else None
 
-        pending_dl = PendingDownload(
-            track=track,
-            result=result,
-            chat_id=chat_id,
-            source_path=source_path,
-            status_message_id=status_msg.message_id,
-            result_index=result_index,
-            user_id=user_id,
-            transfer_id=transfer_id,
-        )
-        self.downloads[dl_id] = pending_dl
+        pending_dl.source_path = source_path
+        pending_dl.progress_percent = 100.0
 
         quality_line = _("Quality: {quality} | {duration}").format(
             quality=result.quality_display, duration=result.duration_display
@@ -183,9 +204,10 @@ async def do_download(
         if flac_verdict:
             quality_line += f"\n{format_flac_verdict(flac_verdict)}"
 
-        await status_msg.edit_text(
+        await safe_edit(
+            status_msg,
             _("✅ *{label} Downloaded!* Sending preview...\n`{file}`\n{quality}").format(
-                label=label, file=result.basename, quality=quality_line
+                label=label, file=md_code_safe(result.basename), quality=quality_line
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
@@ -259,9 +281,12 @@ async def do_download(
         raise
     except Exception:
         logger.exception(f"Download failed for {result.basename}")
-        await status_msg.edit_text(
-            _("❌ Error downloading `{file}`. Check logs.").format(file=result.basename),
+        has_next = self._has_next_result(chat_id, result_index)
+        await safe_edit(
+            status_msg,
+            _("❌ Error downloading `{file}`. Check logs.").format(file=md_code_safe(result.basename)),
             parse_mode=ParseMode.MARKDOWN,
+            reply_markup=build_retry_next_keyboard(dl_id) if has_next else build_retry_keyboard(dl_id),
         )
 
 
@@ -471,16 +496,17 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
     result = pending_dl.result
     track = pending_dl.track
     result_index = pending_dl.result_index
+    label = f"#{result_index + 1}"
 
     await safe_query_edit(
         query,
-        _("🔄 Retrying: `{file}`...").format(file=result.basename),
+        _("🔄 Retrying {label}: `{file}`...").format(label=label, file=md_code_safe(result.basename)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("⬇️ Re-downloading from `{user}`...").format(user=result.username),
+        text=_("⬇️ Re-downloading {label} from `{user}`...").format(label=label, user=md_code_safe(result.username)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -517,16 +543,17 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
 
     next_result = pending.results[next_idx]
     track = pending_dl.track
+    label = f"#{next_idx + 1}"
 
     await safe_query_edit(
         query,
-        _("⏭ Trying next result: `{file}`").format(file=next_result.basename),
+        _("⏭ Trying next result {label}: `{file}`").format(label=label, file=md_code_safe(next_result.basename)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("⬇️ Downloading from `{user}`...").format(user=next_result.username),
+        text=_("⬇️ Downloading {label} from `{user}`...").format(label=label, user=md_code_safe(next_result.username)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
