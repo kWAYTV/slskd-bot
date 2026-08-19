@@ -117,6 +117,8 @@ python -m music_downloader run
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | `HEALTH_PORT` | No | `8080` | Health check HTTP port |
 
+The first time an allowed user talks to the bot they pick a language (English, Spanish, German, or Galician). Change it later with `/lang`. Strings use GNU gettext catalogs; translators can run `scripts/i18n.sh` then `python scripts/generate_locales.py`.
+
 ## Telegram Bot Commands
 
 | Command | Description |
@@ -128,6 +130,7 @@ python -m music_downloader run
 | `/status` | Show active searches and downloads for this chat |
 | `/history` | Show recent download history for this chat |
 | `/cancel` | Cancel the current search, download, or import |
+| `/lang` | Choose language (English, Spanish, German, Galician). Also `/language` |
 | `/help` | Show help message |
 
 ## Scoring Algorithm

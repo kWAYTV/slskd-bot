@@ -12,6 +12,7 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.i18n.catalog import gettext as _
 from music_downloader.library.artwork import embed_artwork_into_file, fetch_spotify_artwork
 from music_downloader.library.flac import FlacVerdict, analyze_flac
 from music_downloader.library.preview import convert_to_ogg, create_preview_clip
@@ -21,7 +22,7 @@ from music_downloader.telegram.keyboards import (
     build_retry_keyboard,
     build_retry_next_keyboard,
 )
-from music_downloader.telegram.messages import escape_md, safe_query_edit
+from music_downloader.telegram.messages import escape_md, format_flac_verdict, safe_query_edit
 from music_downloader.telegram.session import PendingDownload
 
 logger = logging.getLogger(__name__)
@@ -34,14 +35,14 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     query = update.callback_query
     pending = self.pending.get(chat_id)
     if not pending:
-        await query.edit_message_text("Search expired. Send a new query.")
+        await query.edit_message_text(_("Search expired. Send a new query."))
         return
 
     action = data.split(":", 1)[1]
 
     if action == "cancel":
         del self.pending[chat_id]
-        await query.edit_message_text("Cancelled.")
+        await query.edit_message_text(_("Cancelled."))
         return
 
     if action == "auto":
@@ -65,10 +66,13 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=(
-            f"⬇️ *Downloading #{index + 1}...*\n"
-            f"{escape_md(track.artist)} - {escape_md(track.title)}\n"
-            f"From: `{result.username}`\n"
-            f"File: `{result.basename}`"
+            _("⬇️ *Downloading #{n}...*\n{artist} - {title}\nFrom: `{user}`\nFile: `{file}`").format(
+                n=index + 1,
+                artist=escape_md(track.artist),
+                title=escape_md(track.title),
+                user=result.username,
+                file=result.basename,
+            )
         ),
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -115,7 +119,9 @@ async def do_download(
             self.downloads[dl_id] = pending_dl
             has_next = self._has_next_result(chat_id, result_index)
             await status_msg.edit_text(
-                f"❌ Failed to enqueue download from `{result.username}`.\nThe user might be offline.",
+                _("❌ Failed to enqueue download from `{user}`.\nThe user might be offline.").format(
+                    user=result.username
+                ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_retry_next_keyboard(dl_id) if has_next else build_retry_keyboard(dl_id),
             )
@@ -129,7 +135,7 @@ async def do_download(
         transfer_id = status.transfer_id if status else None
 
         if status is None or status.is_failed:
-            state = status.state if status else "Timeout"
+            state = status.state if status else _("Timeout")
             pending_dl = PendingDownload(
                 track=track,
                 result=result,
@@ -142,7 +148,7 @@ async def do_download(
             self.downloads[dl_id] = pending_dl
             has_next = self._has_next_result(chat_id, result_index)
             await status_msg.edit_text(
-                f"❌ Download failed: {state}\nFile: `{result.basename}`",
+                _("❌ Download failed: {state}\nFile: `{file}`").format(state=state, file=result.basename),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_retry_next_keyboard(dl_id) if has_next else build_retry_keyboard(dl_id),
             )
@@ -152,7 +158,7 @@ async def do_download(
         source_path = self.processor.find_downloaded_file(result.username, result.filename)
         if not source_path:
             await status_msg.edit_text(
-                "❌ Downloaded file not found on disk.\nCheck DOWNLOAD_DIR configuration.",
+                _("❌ Downloaded file not found on disk.\nCheck DOWNLOAD_DIR configuration."),
             )
             await self._add_history(track, result, "file_not_found", chat_id=chat_id)
             return
@@ -171,20 +177,26 @@ async def do_download(
         )
         self.downloads[dl_id] = pending_dl
 
-        quality_line = f"Quality: {result.quality_display} | {result.duration_display}"
+        quality_line = _("Quality: {quality} | {duration}").format(
+            quality=result.quality_display, duration=result.duration_display
+        )
         if flac_verdict:
-            quality_line += f"\n{flac_verdict.display}"
+            quality_line += f"\n{format_flac_verdict(flac_verdict)}"
 
         await status_msg.edit_text(
-            f"✅ *{label} Downloaded!* Sending preview...\n`{result.basename}`\n{quality_line}",
+            _("✅ *{label} Downloaded!* Sending preview...\n`{file}`\n{quality}").format(
+                label=label, file=result.basename, quality=quality_line
+            ),
             parse_mode=ParseMode.MARKDOWN,
         )
 
         file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
         caption = (
-            f"{label} {quality_line}\nSave to library?"
+            _("{label} {quality}\nSave to library?").format(label=label, quality=quality_line)
             if can_save
-            else f"{label} {quality_line}\nSent to you — not saved to the library."
+            else _("{label} {quality}\nSent to you — not saved to the library.").format(
+                label=label, quality=quality_line
+            )
         )
         markup = (
             build_approve_keyboard(dl_id, has_next=self._has_next_result(chat_id, result_index)) if can_save else None
@@ -248,7 +260,7 @@ async def do_download(
     except Exception:
         logger.exception(f"Download failed for {result.basename}")
         await status_msg.edit_text(
-            f"❌ Error downloading `{result.basename}`. Check logs.",
+            _("❌ Error downloading `{file}`. Check logs.").format(file=result.basename),
             parse_mode=ParseMode.MARKDOWN,
         )
 
@@ -278,12 +290,12 @@ async def send_large_file(
         if ogg_size <= TELEGRAM_FILE_LIMIT:
             try:
                 target_name = self.processor.build_filename(track.artist, track.title, "ogg")
-                caption = (
-                    f"🎧 {label} Converted to OGG "
-                    f"(original: {file_size / (1024 * 1024):.0f}MB {result.extension.upper()})\n"
-                    f"{quality_line}\n"
-                    + ("Save to library?" if can_save else "Sent to you — not saved to the library.")
-                )
+                caption = _("🎧 {label} Converted to OGG (original: {size:.0f}MB {fmt})\n{quality}\n").format(
+                    label=label,
+                    size=file_size / (1024 * 1024),
+                    fmt=result.extension.upper(),
+                    quality=quality_line,
+                ) + (_("Save to library?") if can_save else _("Sent to you — not saved to the library."))
                 with open(ogg_path, "rb") as f:
                     sent = await context.bot.send_audio(
                         chat_id=chat_id,
@@ -311,9 +323,12 @@ async def send_large_file(
         sent = await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                f"❌ {label} Could not create preview for "
-                f"{file_size / (1024 * 1024):.0f}MB file.\n"
-                f"{quality_line}\n\n" + ("Save to library anyway?" if can_save else "Could not create a preview.")
+                _("❌ {label} Could not create preview for {size:.0f}MB file.\n{quality}\n\n").format(
+                    label=label,
+                    size=file_size / (1024 * 1024),
+                    quality=quality_line,
+                )
+                + (_("Save to library anyway?") if can_save else _("Could not create a preview."))
             ),
             reply_markup=reply_markup,
         )
@@ -324,11 +339,11 @@ async def send_large_file(
     try:
         preview_ext = os.path.splitext(preview_path)[1].lstrip(".")
         target_name = self.processor.build_filename(track.artist, f"{track.title} (1min preview)", preview_ext)
-        preview_caption = (
-            f"🎧 {label} ~1 min preview "
-            f"(full file: {file_size / (1024 * 1024):.0f}MB)\n"
-            f"{quality_line}\n" + ("Save to library?" if can_save else "Sent to you — not saved to the library.")
-        )
+        preview_caption = _("🎧 {label} ~1 min preview (full file: {size:.0f}MB)\n{quality}\n").format(
+            label=label,
+            size=file_size / (1024 * 1024),
+            quality=quality_line,
+        ) + (_("Save to library?") if can_save else _("Sent to you — not saved to the library."))
         with open(preview_path, "rb") as f:
             sent = await context.bot.send_audio(
                 chat_id=chat_id,
@@ -355,7 +370,7 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
 
     pending_dl = self.downloads.pop(dl_id, None)
     if not pending_dl:
-        await self._edit_approval_message(query, "⏹ Cancelled")
+        await self._edit_approval_message(query, _("⏹ Cancelled"))
         return
 
     if pending_dl.chat_id != chat_id:
@@ -368,7 +383,7 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
     if action == "approve":
         if not self._can_save_library(query.from_user.id):
             self.downloads[dl_id] = pending_dl
-            await self._edit_approval_message(query, "🚫 You are not allowed to save to the library.")
+            await self._edit_approval_message(query, _("🚫 You are not allowed to save to the library."))
             return
         if pending_dl.source_path:
             target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
@@ -376,20 +391,23 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
                 self.processor.cleanup_download(pending_dl.source_path)
                 await self._embed_spotify_artwork(target_path, track)
                 target_name = os.path.basename(target_path)
-                await self._edit_approval_message(query, f"✅ Saved: `{target_name}`")
+                await self._edit_approval_message(query, _("✅ Saved: `{name}`").format(name=target_name))
                 await self._add_history(track, result, "success", chat_id=chat_id)
                 logger.info(f"Approved and saved: {target_name}")
                 await self._dismiss_other_downloads(context, chat_id)
             else:
-                await self._edit_approval_message(query, "❌ Failed to save file. Check logs.")
+                await self._edit_approval_message(query, _("❌ Failed to save file. Check logs."))
                 await self._add_history(track, result, "process_failed", chat_id=chat_id)
         else:
-            await self._edit_approval_message(query, "❌ Source file not found.")
+            await self._edit_approval_message(query, _("❌ Source file not found."))
             await self._add_history(track, result, "file_not_found", chat_id=chat_id)
 
     elif action == "reject":
         await self._cleanup_download_artifacts(pending_dl)
-        await self._edit_approval_message(query, f"🚫 Rejected: {escape_md(track.artist)} - {escape_md(track.title)}")
+        await self._edit_approval_message(
+            query,
+            _("🚫 Rejected: {artist} - {title}").format(artist=escape_md(track.artist), title=escape_md(track.title)),
+        )
         await self._add_history(track, result, "rejected", chat_id=chat_id)
         logger.info(f"Rejected: {track.artist} - {track.title} ({result.basename})")
 
@@ -413,14 +431,14 @@ async def dismiss_other_downloads(self, context, chat_id: int):
                 await context.bot.edit_message_caption(
                     chat_id=chat_id,
                     message_id=dl.approval_message_id,
-                    caption="⏹ Cancelled",
+                    caption=_("⏹ Cancelled"),
                 )
             except Exception:
                 with contextlib.suppress(Exception):
                     await context.bot.edit_message_text(
                         chat_id=chat_id,
                         message_id=dl.approval_message_id,
-                        text="⏹ Cancelled",
+                        text=_("⏹ Cancelled"),
                     )
 
     for task in self._active_tasks.pop(chat_id, set()):
@@ -443,7 +461,7 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
 
     pending_dl = self.downloads.pop(dl_id, None)
     if not pending_dl:
-        await safe_query_edit(query, "⏹ Download expired. Send a new search.")
+        await safe_query_edit(query, _("⏹ Download expired. Send a new search."))
         return
 
     if pending_dl.chat_id != chat_id:
@@ -456,13 +474,13 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
 
     await safe_query_edit(
         query,
-        f"\U0001f504 Retrying: `{result.basename}`...",
+        _("🔄 Retrying: `{file}`...").format(file=result.basename),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"⬇️ Re-downloading from `{result.username}`...",
+        text=_("⬇️ Re-downloading from `{user}`...").format(user=result.username),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -482,7 +500,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
     pending_dl = self.downloads.pop(dl_id, None)
 
     if not pending or not pending.results or not pending_dl:
-        await safe_query_edit(query, "⏹ No more results available. Try a new search.")
+        await safe_query_edit(query, _("⏹ No more results available. Try a new search."))
         return
 
     if pending_dl.chat_id != chat_id:
@@ -491,7 +509,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
 
     next_idx = pending_dl.result_index + 1
     if next_idx >= len(pending.results):
-        await safe_query_edit(query, "⏹ No more results to try.")
+        await safe_query_edit(query, _("⏹ No more results to try."))
         return
 
     if pending_dl.source_path:
@@ -502,13 +520,13 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
 
     await safe_query_edit(
         query,
-        f"⏭ Trying next result: `{next_result.basename}`",
+        _("⏭ Trying next result: `{file}`").format(file=next_result.basename),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"⬇️ Downloading from `{next_result.username}`...",
+        text=_("⬇️ Downloading from `{user}`...").format(user=next_result.username),
         parse_mode=ParseMode.MARKDOWN,
     )
 

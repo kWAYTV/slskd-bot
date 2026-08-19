@@ -365,6 +365,7 @@ class TestMusicBotCommands:
         assert "Send me a song name" in call_args[0][0]
         assert "/import" in call_args[0][0]
         assert "/cancel" in call_args[0][0]
+        assert "/lang" in call_args[0][0]
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")

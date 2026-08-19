@@ -10,6 +10,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.i18n.catalog import gettext as _
 from music_downloader.soulseek.client import SlskdUnavailableError
 from music_downloader.soulseek.query import (
     build_reduced_queries,
@@ -68,8 +69,11 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         searching_msg = await context.bot.send_message(
             chat_id=chat_id,
-            text=f"\U0001f50d Searching slskd for: `{search_query}`\n"
-            f"Saving as: *{escape_md(synthetic_track.artist)} - {escape_md(synthetic_track.title)}*",
+            text=_("🔍 Searching slskd for: `{query}`\nSaving as: *{artist} - {title}*").format(
+                query=search_query,
+                artist=escape_md(synthetic_track.artist),
+                title=escape_md(synthetic_track.title),
+            ),
             parse_mode=ParseMode.MARKDOWN,
         )
 
@@ -85,7 +89,9 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if similar:
         existing_list = "\n".join(f"• `{f}`" for f in similar[:5])
         await update.message.reply_text(
-            f"⚠️ *Similar files already in library:*\n\n{existing_list}\n\nContinue searching anyway?",
+            _("⚠️ *Similar files already in library:*\n\n{files}\n\nContinue searching anyway?").format(
+                files=existing_list
+            ),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=build_duplicate_keyboard(),
         )
@@ -101,7 +107,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"🔍 Looking up: `{query}`",
+        text=_("🔍 Looking up: `{query}`").format(query=query),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -113,7 +119,9 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         if not tracks:
             await safe_edit(
                 searching_msg,
-                f"Could not find `{query}` on Spotify.\nYou can search Soulseek directly instead.",
+                _("Could not find `{query}` on Spotify.\nYou can search Soulseek directly instead.").format(
+                    query=query
+                ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_direct_search_keyboard(),
             )
@@ -179,7 +187,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         logger.exception(f"Unexpected error in _do_search for: {query}")
         self._spotify_candidates.pop(chat_id, None)
         self._spotify_page.pop(chat_id, None)
-        await safe_edit(searching_msg, "Something went wrong. Please try again.")
+        await safe_edit(searching_msg, _("Something went wrong. Please try again."))
 
 
 async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation: int, on_tier=None):
@@ -247,18 +255,26 @@ async def do_slskd_search(
 
         await safe_edit(
             searching_msg,
-            f"🎵 {header}\n"
-            f"Album: {escape_md(track.album)} ({escape_md(track.year)})\n"
-            f"Duration: {track.duration_display}\n\n"
-            f"Searching slskd...",
+            _("🎵 {track}\nAlbum: {album} ({year})\nDuration: {duration}\n\nSearching slskd...").format(
+                track=header,
+                album=escape_md(track.album),
+                year=escape_md(track.year),
+                duration=track.duration_display,
+            ),
             parse_mode=ParseMode.MARKDOWN,
         )
 
         async def on_tier(kind: str):
             messages = {
-                "title-only": f"🎵 {header}\n\nNo results with full query — retrying with song title only…",
-                "keywords": f"🎵 {header}\n\nStill no results — trying keyword variations with year…",
-                "artist-keywords": f"🎵 {header}\n\nStill no results — trying artist + keyword search…",
+                "title-only": _("🎵 {track}\n\nNo results with full query — retrying with song title only…").format(
+                    track=header
+                ),
+                "keywords": _("🎵 {track}\n\nStill no results — trying keyword variations with year…").format(
+                    track=header
+                ),
+                "artist-keywords": _("🎵 {track}\n\nStill no results — trying artist + keyword search…").format(
+                    track=header
+                ),
             }
             await safe_edit(searching_msg, messages[kind], parse_mode=ParseMode.MARKDOWN)
 
@@ -269,9 +285,11 @@ async def do_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                f"🎵 {header} ({track.duration_display})\n\n"
-                f"No results found on Soulseek matching this track.\n"
-                f"Try a different search query.",
+                _(
+                    "🎵 {track} ({duration})\n\n"
+                    "No results found on Soulseek matching this track.\n"
+                    "Try a different search query."
+                ).format(track=header, duration=track.duration_display),
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
@@ -292,7 +310,7 @@ async def do_slskd_search(
         self.pending.pop(chat_id, None)
         await safe_edit(
             searching_msg,
-            "Cannot reach slskd. Check `SLSKD_HOST` and the API key.",
+            _("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
             parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
@@ -300,7 +318,7 @@ async def do_slskd_search(
         self.pending.pop(chat_id, None)
         await safe_edit(
             searching_msg,
-            "Something went wrong during the search. Please try again.",
+            _("Something went wrong during the search. Please try again."),
         )
 
 
@@ -312,11 +330,11 @@ async def handle_duplicate_response(self, update, context, chat_id: int, data: s
     pending = self.pending.pop(chat_id, None)
 
     if action == "cancel" or not pending:
-        await query.edit_message_text("Cancelled.")
+        await query.edit_message_text(_("Cancelled."))
         return
 
     await query.edit_message_text(
-        f"Continuing with search: `{pending.query}`",
+        _("Continuing with search: `{query}`").format(query=pending.query),
         parse_mode=ParseMode.MARKDOWN,
     )
     generation = self._chat_generation.get(chat_id, 0)
@@ -326,7 +344,7 @@ async def handle_duplicate_response(self, update, context, chat_id: int, data: s
         self.pending[chat_id] = pending
         searching_msg = await context.bot.send_message(
             chat_id=chat_id,
-            text="🔍 Searching slskd for FLAC...",
+            text=_("🔍 Searching slskd for FLAC..."),
             parse_mode=ParseMode.MARKDOWN,
         )
         await self._do_slskd_search(context, chat_id, pending.track, searching_msg, generation, skip_library_check=True)
@@ -339,7 +357,7 @@ async def handle_spotify_page(self, update, context, chat_id: int, data: str):
     query = update.callback_query
     candidates = self._spotify_candidates.get(chat_id)
     if not candidates:
-        await query.edit_message_text("Search expired. Send a new query.")
+        await query.edit_message_text(_("Search expired. Send a new query."))
         return
 
     try:
@@ -365,7 +383,7 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
     self._spotify_page.pop(chat_id, None)
 
     if action == "cancel" or not candidates:
-        await query.edit_message_text("Cancelled.")
+        await query.edit_message_text(_("Cancelled."))
         return
 
     try:
@@ -378,13 +396,13 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
 
     track = candidates[index]
     await query.edit_message_text(
-        f"Selected: {_track_md(track)} ({track.duration_display})",
+        _("Selected: {track} ({duration})").format(track=_track_md(track), duration=track.duration_display),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text="🔍 Searching slskd for FLAC...",
+        text=_("🔍 Searching slskd for FLAC..."),
         parse_mode=ParseMode.MARKDOWN,
     )
     generation = self._chat_generation.get(chat_id, 0)
@@ -396,7 +414,7 @@ async def handle_results_page(self, update, context, chat_id: int, data: str):
     query = update.callback_query
     pending = self.pending.get(chat_id)
     if not pending or not pending.track:
-        await query.edit_message_text("Search expired. Send a new query.")
+        await query.edit_message_text(_("Search expired. Send a new query."))
         return
 
     try:
@@ -425,16 +443,18 @@ async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAU
 
     pending = self.pending.get(chat_id)
     if not pending:
-        await query.edit_message_text("Search expired. Send a new query.")
+        await query.edit_message_text(_("Search expired. Send a new query."))
         return
 
     search_query = pending.query
     self._awaiting_direct_metadata[chat_id] = search_query
 
     await query.edit_message_text(
-        "\U0001f3b5 How should this track be saved?\n\n"
-        "Send the name as: `Artist - Title`\n"
-        "(This will be used for the filename and tags)",
+        _(
+            "🎵 How should this track be saved?\n\n"
+            "Send the name as: `Artist - Title`\n"
+            "(This will be used for the filename and tags)"
+        ),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -476,7 +496,7 @@ async def do_direct_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                f"\U0001f50e Direct search: `{query}`\n\nNo results found on Soulseek.",
+                _("🔍 Direct search: `{query}`\n\nNo results found on Soulseek.").format(query=query),
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
@@ -489,12 +509,12 @@ async def do_direct_slskd_search(
         logger.exception("slskd unreachable during direct search for: %s", query)
         await safe_edit(
             searching_msg,
-            "Cannot reach slskd. Check `SLSKD_HOST` and the API key.",
+            _("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
             parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
         logger.exception(f"Direct search failed for: {query}")
-        await safe_edit(searching_msg, "Something went wrong. Please try again.")
+        await safe_edit(searching_msg, _("Something went wrong. Please try again."))
 
 
 def _track_md(track: TrackInfo) -> str:
@@ -513,12 +533,12 @@ async def _prompt_if_already_owned(self, context, chat_id: int, track: TrackInfo
     if not exact and not history_hit:
         return False
 
-    lines = [f"⚠️ *Already in the library:* {_track_md(track)}\n"]
+    lines = [_("⚠️ *Already in the library:* {track}").format(track=_track_md(track)) + "\n"]
     if exact:
-        lines.append("On disk:\n" + "\n".join(f"• `{f}`" for f in exact[:5]))
+        lines.append(_("On disk:") + "\n" + "\n".join(f"• `{f}`" for f in exact[:5]))
     if history_hit:
-        lines.append(f"Previously saved as `{history_hit.filename}`")
-    lines.append("\nSearch Soulseek anyway?")
+        lines.append(_("Previously saved as `{filename}`").format(filename=history_hit.filename))
+    lines.append("\n" + _("Search Soulseek anyway?"))
     user_id = None
     existing = self.pending.get(chat_id)
     if existing:
@@ -563,13 +583,15 @@ async def present_search_results(
         header = _track_md(track)
         await safe_edit(
             searching_msg,
-            f"⚡ Auto-downloading best match for {header}...",
+            _("⚡ Auto-downloading best match for {track}...").format(track=header),
             parse_mode=ParseMode.MARKDOWN,
         )
         result = ranked[0]
         status_msg = await context.bot.send_message(
             chat_id=chat_id,
-            text=(f"⬇️ *Downloading #1...*\n{header}\nFrom: `{result.username}`\nFile: `{result.basename}`"),
+            text=_("⬇️ *Downloading #{n}...*\n{track}\nFrom: `{user}`\nFile: `{file}`").format(
+                n=1, track=header, user=result.username, file=result.basename
+            ),
             parse_mode=ParseMode.MARKDOWN,
         )
         user_id = self.pending[chat_id].user_id if chat_id in self.pending else None

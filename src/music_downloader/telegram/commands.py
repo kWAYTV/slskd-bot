@@ -8,8 +8,9 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.keyboards import build_auto_mode_keyboard
-from music_downloader.telegram.messages import escape_md
+from music_downloader.telegram.messages import escape_md, welcome_text
 
 
 async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -18,16 +19,7 @@ async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        "Send me a song name (e.g., `Nancy Sinatra Bang Bang`) "
-        "and I'll find and download it in FLAC.\n\n"
-        "Commands:\n"
-        "/auto — Toggle auto-download mode\n"
-        "/import <url> — Import a Spotify playlist or album\n"
-        "/import resume — Continue a paused import after restart\n"
-        "/status — Show active downloads\n"
-        "/history — Recent downloads\n"
-        "/cancel — Cancel the current search, download, or import\n"
-        "/help — Show this message",
+        welcome_text(),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -44,10 +36,11 @@ async def cmd_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await self._check_auth(update):
         return
 
-    mode_str = "ON" if self.auto_mode else "OFF"
+    mode_str = _("ON") if self.auto_mode else _("OFF")
     await update.message.reply_text(
-        f"Auto-download mode is currently: *{mode_str}*\n\n"
-        "When ON, the best FLAC match is downloaded automatically without asking you to pick.",
+        _(
+            "Auto-download mode is currently: *{mode}*\n\nWhen ON, the best FLAC match is downloaded automatically without asking you to pick."
+        ).format(mode=mode_str),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=build_auto_mode_keyboard(self.auto_mode),
     )
@@ -63,7 +56,7 @@ async def cmd_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pending = self.pending.get(chat_id)
     if pending:
-        lines.append("*Active searches:*\n")
+        lines.append(_("*Active searches:*") + "\n")
         if pending.track:
             lines.append(f"• {escape_md(pending.track.artist)} - {escape_md(pending.track.title)}")
         else:
@@ -71,12 +64,12 @@ async def cmd_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_downloads = [dl for dl in self.downloads.values() if dl.chat_id == chat_id]
     if chat_downloads:
-        lines.append("\n*Active downloads:*\n")
+        lines.append("\n" + _("*Active downloads:*") + "\n")
         for dl in chat_downloads:
             lines.append(f"• {escape_md(dl.track.artist)} - {escape_md(dl.track.title)} (`{dl.result.basename}`)")
 
     if not lines:
-        await update.message.reply_text("No active searches or downloads.")
+        await update.message.reply_text(_("No active searches or downloads."))
         return
 
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
@@ -90,10 +83,10 @@ async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     records = await asyncio.to_thread(self.history_repo.get_recent, 10, update.effective_chat.id)
 
     if not records:
-        await update.message.reply_text("No downloads yet.")
+        await update.message.reply_text(_("No downloads yet."))
         return
 
-    lines = ["*Recent downloads:*\n"]
+    lines = [_("*Recent downloads:*") + "\n"]
     for entry in records:
         icon = {
             "success": "✅",

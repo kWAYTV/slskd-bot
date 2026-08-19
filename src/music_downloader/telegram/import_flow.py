@@ -13,6 +13,8 @@ from telegram.ext import ContextTypes
 
 from music_downloader.catalog.playlist import PlaylistResolver
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.i18n.catalog import gettext as _
+from music_downloader.i18n.catalog import set_locale
 from music_downloader.playlist_import.job import JobStatus, TrackStatus
 from music_downloader.soulseek.client import SlskdUnavailableError
 from music_downloader.soulseek.query import clean_search_title
@@ -47,14 +49,19 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
         if active:
             await update.message.reply_text(
-                f"You have an unfinished import: *{escape_md(active.name)}* "
-                f"({active.completed_tracks}/{active.total_tracks}).\n"
-                f"Send `/import resume` to continue, or /cancel to stop it.",
+                _(
+                    "You have an unfinished import: *{name}* ({done}/{total}).\n"
+                    "Send `/import resume` to continue, or /cancel to stop it."
+                ).format(
+                    name=escape_md(active.name),
+                    done=active.completed_tracks,
+                    total=active.total_tracks,
+                ),
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
         await update.message.reply_text(
-            "Usage: `/import <spotify_playlist_or_album_url>` or `/import resume`",
+            _("Usage: `/import <spotify_playlist_or_album_url>` or `/import resume`"),
             parse_mode=ParseMode.MARKDOWN,
         )
         return
@@ -63,24 +70,30 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not PlaylistResolver.is_spotify_url(url):
         await update.message.reply_text(
-            "Please provide a valid Spotify playlist or album URL.",
+            _("Please provide a valid Spotify playlist or album URL."),
         )
         return
 
     active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
     if active:
         await update.message.reply_text(
-            f"You already have an active import: *{escape_md(active.name)}* ({active.completed_tracks}/{active.total_tracks})\n"
-            f"Send `/import resume` to continue, or /cancel to stop it first.",
+            _(
+                "You already have an active import: *{name}* ({done}/{total})\n"
+                "Send `/import resume` to continue, or /cancel to stop it first."
+            ).format(
+                name=escape_md(active.name),
+                done=active.completed_tracks,
+                total=active.total_tracks,
+            ),
             parse_mode=ParseMode.MARKDOWN,
         )
         return
 
-    status_msg = await update.message.reply_text("\U0001f50d Resolving playlist...")
+    status_msg = await update.message.reply_text(_("🔍 Resolving playlist..."))
 
     playlist_info = await asyncio.to_thread(self.playlist_resolver.resolve, url)
     if not playlist_info:
-        await safe_edit(status_msg, "Failed to resolve playlist. Check the URL and try again.")
+        await safe_edit(status_msg, _("Failed to resolve playlist. Check the URL and try again."))
         return
 
     job_id = await asyncio.to_thread(
@@ -105,13 +118,15 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     await asyncio.to_thread(self.import_repo.add_tracks, job_id, track_dicts)
 
-    type_label = "album" if playlist_info.is_album else "playlist"
+    type_label = _("album") if playlist_info.is_album else _("playlist")
     await safe_edit(
         status_msg,
-        f"\U0001f4cb Found {type_label}: *{escape_md(playlist_info.name)}*\n"
-        f"By: {escape_md(playlist_info.owner)}\n"
-        f"Tracks: {playlist_info.total_tracks}\n\n"
-        f"Import all tracks one by one?",
+        _("📋 Found {kind}: *{name}*\nBy: {owner}\nTracks: {total}\n\nImport all tracks one by one?").format(
+            kind=type_label,
+            name=escape_md(playlist_info.name),
+            owner=escape_md(playlist_info.owner),
+            total=playlist_info.total_tracks,
+        ),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=build_import_confirm_keyboard(job_id),
     )
@@ -128,21 +143,21 @@ async def cmd_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if job_id:
         await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
         await self._cancel_chat_operations(chat_id)
-        await update.message.reply_text("❌ Import cancelled.")
+        await update.message.reply_text(_("❌ Import cancelled."))
         return
 
     active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
     if active:
         await asyncio.to_thread(self.import_repo.update_job_status, active.id, JobStatus.cancelled)
         await self._cancel_chat_operations(chat_id)
-        await update.message.reply_text("❌ Import cancelled.")
+        await update.message.reply_text(_("❌ Import cancelled."))
         return
 
     had_work = await self._cancel_chat_operations(chat_id)
     if had_work:
-        await update.message.reply_text("❌ Cancelled.")
+        await update.message.reply_text(_("❌ Cancelled."))
     else:
-        await update.message.reply_text("Nothing to cancel.")
+        await update.message.reply_text(_("Nothing to cancel."))
 
 
 async def handle_import_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
@@ -158,11 +173,11 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
 
     job = await asyncio.to_thread(self.import_repo.get_job_for_chat, job_id, chat_id)
     if not job:
-        await safe_query_edit(query, "⏹ Import not found.")
+        await safe_query_edit(query, _("⏹ Import not found."))
         return
 
     if prefix == "ic":
-        await safe_query_edit(query, "✅ Import started! Processing tracks one by one...")
+        await safe_query_edit(query, _("✅ Import started! Processing tracks one by one..."))
         await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.active)
         self._active_import[chat_id] = job_id
         generation = self._chat_generation.get(chat_id, 0)
@@ -175,7 +190,7 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
     elif prefix == "ix":
         await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
         self._active_import.pop(chat_id, None)
-        await safe_query_edit(query, "❌ Import cancelled.")
+        await safe_query_edit(query, _("❌ Import cancelled."))
 
     elif prefix == "ia":
         track_id = int(parts[1])
@@ -190,14 +205,14 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
         await asyncio.to_thread(
             self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Rejected by user"
         )
-        await safe_query_edit(query, "\U0001f6ab Track rejected.")
+        await safe_query_edit(query, _("🚫 Track rejected."))
         generation = self._chat_generation.get(chat_id, 0)
         await self._process_next_import_track(context, chat_id, job_id, generation)
 
     elif prefix == "is":
         track_id = int(parts[1])
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.skipped)
-        await safe_query_edit(query, "⏭ Track skipped.")
+        await safe_query_edit(query, _("⏭ Track skipped."))
         generation = self._chat_generation.get(chat_id, 0)
         await self._process_next_import_track(context, chat_id, job_id, generation)
 
@@ -213,7 +228,7 @@ async def handle_import_retry(self, update, context, chat_id: int, job_id: int, 
     pending_dl = self.downloads.get(dl_id)
 
     if not pending_dl:
-        await safe_query_edit(query, "⏹ Download expired. Use Skip or Mark failed to continue the import.")
+        await safe_query_edit(query, _("⏹ Download expired. Use Skip or Mark failed to continue the import."))
         return
 
     result = pending_dl.result
@@ -221,13 +236,13 @@ async def handle_import_retry(self, update, context, chat_id: int, job_id: int, 
 
     await safe_query_edit(
         query,
-        f"\U0001f504 Retrying: `{result.basename}`...",
+        _("🔄 Retrying: `{file}`...").format(file=result.basename),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"⬇️ Re-downloading from `{result.username}`...",
+        text=_("⬇️ Re-downloading from `{user}`...").format(user=result.username),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -245,17 +260,17 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
     query = update.callback_query
 
     if not self._can_save_library(query.from_user.id):
-        await self._edit_approval_message(query, "🚫 You are not allowed to save to the library.")
+        await self._edit_approval_message(query, _("🚫 You are not allowed to save to the library."))
         return
 
     pending_dl = self.downloads.pop(dl_id, None)
 
     if not pending_dl:
-        await self._edit_approval_message(query, "⏹ Download expired")
+        await self._edit_approval_message(query, _("⏹ Download expired"))
         return
 
     if not pending_dl.source_path:
-        await self._edit_approval_message(query, "❌ Source file not ready. Download may still be in progress.")
+        await self._edit_approval_message(query, _("❌ Source file not ready. Download may still be in progress."))
         self.downloads[dl_id] = pending_dl
         return
 
@@ -267,11 +282,11 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
         self.processor.cleanup_download(pending_dl.source_path)
         await self._embed_spotify_artwork(target_path, track)
         target_name = os.path.basename(target_path)
-        await self._edit_approval_message(query, f"✅ Saved: `{target_name}`")
+        await self._edit_approval_message(query, _("✅ Saved: `{name}`").format(name=target_name))
         await self._add_history(track, result, "success", chat_id=chat_id)
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.completed)
     else:
-        await self._edit_approval_message(query, "❌ Failed to save file.")
+        await self._edit_approval_message(query, _("❌ Failed to save file."))
         await asyncio.to_thread(
             self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "File processing failed"
         )
@@ -294,11 +309,9 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
         self._active_import.pop(chat_id, None)
         await context.bot.send_message(
             chat_id=chat_id,
-            text=f"\U0001f3c1 *Import complete!*\n\n"
-            f"✅ Saved: {completed}\n"
-            f"❌ Failed: {failed}\n"
-            f"⏭ Skipped: {skipped}\n"
-            f"\U0001f4ca Total: {total}",
+            text=_(
+                "🏁 *Import complete!*\n\n✅ Saved: {saved}\n❌ Failed: {failed}\n⏭ Skipped: {skipped}\n📊 Total: {total}"
+            ).format(saved=completed, failed=failed, skipped=skipped, total=total),
             parse_mode=ParseMode.MARKDOWN,
         )
         return
@@ -320,9 +333,14 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"\U0001f4cb *Import [{position}/{total}]*\n"
-        f"\U0001f50d Searching: *{escape_md(track_info.artist)} - {escape_md(track_info.title)}*\n"
-        f"Album: {escape_md(track_info.album)} ({escape_md(track_info.year)})",
+        text=_("📋 *Import [{position}/{total}]*\n🔍 Searching: *{artist} - {title}*\nAlbum: {album} ({year})").format(
+            position=position,
+            total=total,
+            artist=escape_md(track_info.artist),
+            title=escape_md(track_info.title),
+            album=escape_md(track_info.album),
+            year=escape_md(track_info.year),
+        ),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -342,7 +360,9 @@ async def do_import_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                f"\U0001f4cb *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n\nNo results found on Soulseek.",
+                _("📋 *Import track:* {artist} - {title}\n\nNo results found on Soulseek.").format(
+                    artist=escape_md(track.artist), title=escape_md(track.title)
+                ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_skip_keyboard(job_id, track_id),
             )
@@ -371,9 +391,13 @@ async def do_import_slskd_search(
 
         await safe_edit(
             searching_msg,
-            f"\U0001f4cb *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n"
-            f"⬇️ Downloading: `{best.basename}`\n"
-            f"From: `{best.username}` | {best.quality_display}",
+            _("📋 *Import track:* {artist} - {title}\n⬇️ Downloading: `{file}`\nFrom: `{user}` | {quality}").format(
+                artist=escape_md(track.artist),
+                title=escape_md(track.title),
+                file=best.basename,
+                user=best.username,
+                quality=best.quality_display,
+            ),
             parse_mode=ParseMode.MARKDOWN,
         )
 
@@ -387,14 +411,17 @@ async def do_import_slskd_search(
         logger.exception("slskd unreachable during import search for: %s - %s", track.artist, track.title)
         await safe_edit(
             searching_msg,
-            "Cannot reach slskd. Check `SLSKD_HOST` and the API key.",
+            _("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=build_import_skip_keyboard(job_id, track_id),
         )
         await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
     except Exception:
         logger.exception(f"Import search failed for: {track.artist} - {track.title}")
-        await safe_edit(searching_msg, f"❌ Search failed for {track.artist} - {track.title}")
+        await safe_edit(
+            searching_msg,
+            _("❌ Search failed for {artist} - {title}").format(artist=track.artist, title=track.title),
+        )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Search error")
         await self._process_next_import_track(context, chat_id, job_id, generation)
 
@@ -417,7 +444,7 @@ async def do_import_download(
         if not success:
             await safe_edit(
                 status_msg,
-                f"❌ Failed to enqueue from `{result.username}`",
+                _("❌ Failed to enqueue from `{user}`").format(user=result.username),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
             )
@@ -434,10 +461,10 @@ async def do_import_download(
             self.downloads[dl_id].transfer_id = transfer_id
 
         if status is None or status.is_failed:
-            state = status.state if status else "Timeout"
+            state = status.state if status else _("Timeout")
             await safe_edit(
                 status_msg,
-                f"❌ Download failed: {state}\n`{result.basename}`",
+                _("❌ Download failed: {state}\n`{file}`").format(state=state, file=result.basename),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_failure_keyboard(job_id, track_id, dl_id),
             )
@@ -448,7 +475,7 @@ async def do_import_download(
         if not source_path:
             await safe_edit(
                 status_msg,
-                "❌ Downloaded file not found on disk.",
+                _("❌ Downloaded file not found on disk."),
                 reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
@@ -461,13 +488,20 @@ async def do_import_download(
 
         file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
         quality_line = f"{result.quality_display} | {result.duration_display}"
-        caption = f"\U0001f4cb Import: {track.artist} - {track.title}\n{quality_line}"
+        caption = _("📋 Import: {artist} - {title}\n{quality}").format(
+            artist=track.artist, title=track.title, quality=quality_line
+        )
 
         if file_size > TELEGRAM_FILE_LIMIT:
             await safe_edit(
                 status_msg,
-                f"✅ Downloaded: `{result.basename}` ({file_size / (1024 * 1024):.0f}MB)\n"
-                f"{quality_line}\n\nFile too large to preview. Save to library?",
+                _(
+                    "✅ Downloaded: `{file}` ({size:.0f}MB)\n{quality}\n\nFile too large to preview. Save to library?"
+                ).format(
+                    file=result.basename,
+                    size=file_size / (1024 * 1024),
+                    quality=quality_line,
+                ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
             )
@@ -504,7 +538,11 @@ async def do_import_download(
         raise
     except Exception:
         logger.exception(f"Import download failed for {result.basename}")
-        await safe_edit(status_msg, f"❌ Error downloading `{result.basename}`", parse_mode=ParseMode.MARKDOWN)
+        await safe_edit(
+            status_msg,
+            _("❌ Error downloading `{file}`").format(file=result.basename),
+            parse_mode=ParseMode.MARKDOWN,
+        )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")
         await self._process_next_import_track(context, chat_id, job_id, generation)
 
@@ -531,18 +569,22 @@ async def resume_stale_imports(self, application) -> None:
 
 async def resume_import_job(self, context, chat_id: int, notify: bool = False, job=None) -> None:
     """Continue a persisted import job in its original chat."""
+    locale = self.locale_store.get(chat_id)
+    if locale:
+        set_locale(locale)
+
     if job is None:
         job = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
     if not job:
         if notify:
-            await context.bot.send_message(chat_id=chat_id, text="Nothing to resume.")
+            await context.bot.send_message(chat_id=chat_id, text=_("Nothing to resume."))
         return
 
     if self._active_import.get(chat_id) == job.id:
         if notify:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"Import of *{escape_md(job.name)}* is already running.",
+                text=_("Import of *{name}* is already running.").format(name=escape_md(job.name)),
                 parse_mode=ParseMode.MARKDOWN,
             )
         return
@@ -562,7 +604,11 @@ async def resume_import_job(self, context, chat_id: int, notify: bool = False, j
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=(
-                    f"Resuming import of *{escape_md(job.name)}* ({remaining} remaining, {job.completed_tracks} done)."
+                    _("Resuming import of *{name}* ({remaining} remaining, {done} done).").format(
+                        name=escape_md(job.name),
+                        remaining=remaining,
+                        done=job.completed_tracks,
+                    )
                 ),
                 parse_mode=ParseMode.MARKDOWN,
             )

@@ -6,6 +6,9 @@ from telegram import Message
 from telegram.error import BadRequest, NetworkError, TimedOut
 
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.i18n.catalog import gettext as _
+from music_downloader.i18n.catalog import ngettext
+from music_downloader.library.flac import FlacVerdict
 from music_downloader.soulseek.result import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -53,6 +56,35 @@ async def safe_query_edit(query, text: str, **kwargs) -> bool:
         return False
 
 
+def welcome_text() -> str:
+    return _(
+        "Send me a song name (e.g., `Nancy Sinatra Bang Bang`) "
+        "and I'll find and download it in FLAC.\n\n"
+        "Commands:\n"
+        "/auto — Toggle auto-download mode\n"
+        "/import <url> — Import a Spotify playlist or album\n"
+        "/import resume — Continue a paused import after restart\n"
+        "/status — Show active downloads\n"
+        "/history — Recent downloads\n"
+        "/cancel — Cancel the current search, download, or import\n"
+        "/lang — Change language\n"
+        "/help — Show this message"
+    )
+
+
+def format_flac_verdict(verdict: FlacVerdict) -> str:
+    """Localize a FLAC analysis line (domain `display` stays English)."""
+    if verdict.verdict == "AUTHENTIC":
+        return _("{emoji} Lossless OK (spectrum to {khz:.1f}kHz)").format(emoji=verdict.emoji, khz=verdict.cutoff_khz)
+    labels = {
+        "WARNING": _("Possible transcode"),
+        "SUSPICIOUS": _("Likely transcode"),
+        "FAKE": _("Fake lossless"),
+    }
+    label = labels.get(verdict.verdict, verdict.verdict)
+    return _("{emoji} {label} (cutoff {khz:.1f}kHz)").format(emoji=verdict.emoji, label=label, khz=verdict.cutoff_khz)
+
+
 def format_spotify_results(tracks: list[TrackInfo], page: int = 0, page_size: int = 5) -> str:
     """Format Spotify track candidates for selection (one page)."""
     total = len(tracks)
@@ -60,19 +92,27 @@ def format_spotify_results(tracks: list[TrackInfo], page: int = 0, page_size: in
     end = min(start + page_size, total)
     total_pages = (total + page_size - 1) // page_size
 
-    header = "🔍 *Multiple matches found on Spotify:*"
+    header = _("🔍 *Multiple matches found on Spotify:*")
     if total_pages > 1:
-        header += f" (page {page + 1}/{total_pages})"
+        header += _(" (page {page}/{total})").format(page=page + 1, total=total_pages)
     lines = [header + "\n"]
 
     for i in range(start, end):
         t = tracks[i]
         lines.append(
-            f"*#{i + 1} {escape_md(t.artist)} - {escape_md(t.title)}*\n"
-            f"    Album: {escape_md(t.album)} ({escape_md(t.year)}) | {t.duration_display}\n"
-            f"    [Listen on Spotify]({t.spotify_url})"
+            _(
+                "*#{n} {artist} - {title}*\n    Album: {album} ({year}) | {duration}\n    [Listen on Spotify]({url})"
+            ).format(
+                n=i + 1,
+                artist=escape_md(t.artist),
+                title=escape_md(t.title),
+                album=escape_md(t.album),
+                year=escape_md(t.year),
+                duration=t.duration_display,
+                url=t.spotify_url,
+            )
         )
-    lines.append("\nPick the correct version:")
+    lines.append("\n" + _("Pick the correct version:"))
     return "\n".join(lines)
 
 
@@ -92,33 +132,39 @@ def format_search_results(
     artist = escape_md(track.artist)
     title = escape_md(track.title)
     album = escape_md(track.album)
+    matches = ngettext("Found {n} FLAC match:", "Found {n} FLAC matches:", total).format(n=total)
     is_direct = track.duration_ms == 0
     if is_direct:
         if track.artist:
             header = [
                 f"🎵 *{artist} - {title}*\n",
-                f"Found {total} FLAC matches:\n",
+                matches + "\n",
             ]
         else:
             header = [
-                f"\U0001f50e *Direct search:* `{track.title}`\n",
-                f"Found {total} FLAC matches:\n",
+                _("🔍 *Direct search:* `{query}`").format(query=track.title) + "\n",
+                matches + "\n",
             ]
     elif is_fallback:
         header = [
             f"🎵 *{artist} - {title}*",
-            f"Duration: {track.duration_display} | Album: {album}\n",
-            f"⚠️ No FLAC found — showing all formats ({total} matches):\n",
+            _("Duration: {duration} | Album: {album}").format(duration=track.duration_display, album=album) + "\n",
+            ngettext(
+                "⚠️ No FLAC found — showing all formats ({n} match):",
+                "⚠️ No FLAC found — showing all formats ({n} matches):",
+                total,
+            ).format(n=total)
+            + "\n",
         ]
     else:
         header = [
             f"🎵 *{artist} - {title}*",
-            f"Duration: {track.duration_display} | Album: {album}\n",
-            f"Found {total} FLAC matches:\n",
+            _("Duration: {duration} | Album: {album}").format(duration=track.duration_display, album=album) + "\n",
+            matches + "\n",
         ]
 
     if total_pages > 1:
-        header.append(f"📄 Page {page + 1}/{total_pages}\n")
+        header.append(_("📄 Page {page}/{total}").format(page=page + 1, total=total_pages) + "\n")
 
     lines = header
     for i in range(start, end):

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- i18n via GNU gettext + Babel: English, Spanish, German, and Galician. First-time users pick a language; `/lang` (or `/language`) changes it later
+- Schema v3 adds `user_locales` for persisted language preference
 - Auto-mode actually downloads the best match after a successful search
 - Import download failures now offer Retry, Skip, and Mark failed (no longer stall)
 - `/import` and `/cancel` documented in `/help` and README

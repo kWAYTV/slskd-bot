@@ -1,0 +1,889 @@
+# German translations for telegram-slskd-local-bot
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-08-19 02:49+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: de\n"
+"Language-Team: de <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: src/music_downloader/telegram/app.py:98
+msgid "You are not authorized to use this bot."
+msgstr "Du bist nicht berechtigt, diesen Bot zu verwenden."
+
+#: src/music_downloader/telegram/app.py:107
+msgid ""
+"You can search and download files, but only library users can save to the"
+" music library or import playlists."
+msgstr ""
+"Du kannst suchen und Dateien herunterladen, aber nur Bibliotheksnutzer "
+"können in die Musikbibliothek speichern oder Playlists importieren."
+
+#: src/music_downloader/telegram/app.py:231
+#: src/music_downloader/telegram/commands.py:39
+msgid "ON"
+msgstr "AN"
+
+#: src/music_downloader/telegram/app.py:231
+#: src/music_downloader/telegram/commands.py:39
+msgid "OFF"
+msgstr "AUS"
+
+#: src/music_downloader/telegram/app.py:233
+#, python-brace-format
+msgid "Auto-download mode: *{mode}*"
+msgstr "Automatischer Download: *{mode}*"
+
+#: src/music_downloader/telegram/commands.py:41
+#, python-brace-format
+msgid ""
+"Auto-download mode is currently: *{mode}*\n"
+"\n"
+"When ON, the best FLAC match is downloaded automatically without asking "
+"you to pick."
+msgstr ""
+"Der automatische Download ist aktuell: *{mode}*\n"
+"\n"
+"Wenn AN, wird die beste FLAC-Übereinstimmung automatisch heruntergeladen,"
+" ohne dass du auswählen musst."
+
+#: src/music_downloader/telegram/commands.py:59
+msgid "*Active searches:*"
+msgstr "*Aktive Suchen:*"
+
+#: src/music_downloader/telegram/commands.py:67
+msgid "*Active downloads:*"
+msgstr "*Aktive Downloads:*"
+
+#: src/music_downloader/telegram/commands.py:72
+msgid "No active searches or downloads."
+msgstr "Keine aktiven Suchen oder Downloads."
+
+#: src/music_downloader/telegram/commands.py:86
+msgid "No downloads yet."
+msgstr "Noch keine Downloads."
+
+#: src/music_downloader/telegram/commands.py:89
+msgid "*Recent downloads:*"
+msgstr "*Letzte Downloads:*"
+
+#: src/music_downloader/telegram/download_flow.py:38
+#: src/music_downloader/telegram/search_flow.py:360
+#: src/music_downloader/telegram/search_flow.py:417
+#: src/music_downloader/telegram/search_flow.py:446
+msgid "Search expired. Send a new query."
+msgstr "Die Suche ist abgelaufen. Sende eine neue Anfrage."
+
+#: src/music_downloader/telegram/download_flow.py:45
+#: src/music_downloader/telegram/search_flow.py:333
+#: src/music_downloader/telegram/search_flow.py:386
+msgid "Cancelled."
+msgstr "Abgebrochen."
+
+#: src/music_downloader/telegram/download_flow.py:69
+#, python-brace-format
+msgid ""
+"⬇️ *Downloading #{n}...*\n"
+"{artist} - {title}\n"
+"From: `{user}`\n"
+"File: `{file}`"
+msgstr ""
+"⬇️ *Lade #{n} herunter...*\n"
+"{artist} - {title}\n"
+"Von: `{user}`\n"
+"Datei: `{file}`"
+
+#: src/music_downloader/telegram/download_flow.py:122
+#, python-brace-format
+msgid ""
+"❌ Failed to enqueue download from `{user}`.\n"
+"The user might be offline."
+msgstr ""
+"❌ Download von `{user}` konnte nicht eingereiht werden.\n"
+"Der Benutzer ist möglicherweise offline."
+
+#: src/music_downloader/telegram/download_flow.py:138
+#: src/music_downloader/telegram/import_flow.py:474
+msgid "Timeout"
+msgstr "Zeitüberschreitung"
+
+#: src/music_downloader/telegram/download_flow.py:151
+#, python-brace-format
+msgid ""
+"❌ Download failed: {state}\n"
+"File: `{file}`"
+msgstr ""
+"❌ Download fehlgeschlagen: {state}\n"
+"Datei: `{file}`"
+
+#: src/music_downloader/telegram/download_flow.py:161
+msgid ""
+"❌ Downloaded file not found on disk.\n"
+"Check DOWNLOAD_DIR configuration."
+msgstr ""
+"❌ Heruntergeladene Datei nicht auf der Festplatte gefunden.\n"
+"Prüfe die DOWNLOAD_DIR-Konfiguration."
+
+#: src/music_downloader/telegram/download_flow.py:180
+#, python-brace-format
+msgid "Quality: {quality} | {duration}"
+msgstr "Qualität: {quality} | {duration}"
+
+#: src/music_downloader/telegram/download_flow.py:187
+#, python-brace-format
+msgid ""
+"✅ *{label} Downloaded!* Sending preview...\n"
+"`{file}`\n"
+"{quality}"
+msgstr ""
+"✅ *{label} Heruntergeladen!* Sende Vorschau...\n"
+"`{file}`\n"
+"{quality}"
+
+#: src/music_downloader/telegram/download_flow.py:195
+#, python-brace-format
+msgid ""
+"{label} {quality}\n"
+"Save to library?"
+msgstr ""
+"{label} {quality}\n"
+"In die Bibliothek speichern?"
+
+#: src/music_downloader/telegram/download_flow.py:197
+#, python-brace-format
+msgid ""
+"{label} {quality}\n"
+"Sent to you — not saved to the library."
+msgstr ""
+"{label} {quality}\n"
+"An dich gesendet — nicht in der Bibliothek gespeichert."
+
+#: src/music_downloader/telegram/download_flow.py:263
+#, python-brace-format
+msgid "❌ Error downloading `{file}`. Check logs."
+msgstr "❌ Fehler beim Herunterladen von `{file}`. Prüfe die Logs."
+
+#: src/music_downloader/telegram/download_flow.py:294
+#, python-brace-format
+msgid ""
+"🎧 {label} Converted to OGG (original: {size:.0f}MB {fmt})\n"
+"{quality}\n"
+msgstr ""
+"🎧 {label} Nach OGG konvertiert (Original: {size:.0f}MB {fmt})\n"
+"{quality}\n"
+
+#: src/music_downloader/telegram/download_flow.py:300
+#: src/music_downloader/telegram/download_flow.py:351
+msgid "Save to library?"
+msgstr "In die Bibliothek speichern?"
+
+#: src/music_downloader/telegram/download_flow.py:300
+#: src/music_downloader/telegram/download_flow.py:351
+msgid "Sent to you — not saved to the library."
+msgstr "An dich gesendet — nicht in der Bibliothek gespeichert."
+
+#: src/music_downloader/telegram/download_flow.py:329
+#, python-brace-format
+msgid ""
+"❌ {label} Could not create preview for {size:.0f}MB file.\n"
+"{quality}\n"
+"\n"
+msgstr ""
+"❌ {label} Vorschau für die {size:.0f}MB-Datei konnte nicht erstellt "
+"werden.\n"
+"{quality}\n"
+"\n"
+
+#: src/music_downloader/telegram/download_flow.py:334
+msgid "Save to library anyway?"
+msgstr "Trotzdem in die Bibliothek speichern?"
+
+#: src/music_downloader/telegram/download_flow.py:334
+msgid "Could not create a preview."
+msgstr "Vorschau konnte nicht erstellt werden."
+
+#: src/music_downloader/telegram/download_flow.py:346
+#, python-brace-format
+msgid ""
+"🎧 {label} ~1 min preview (full file: {size:.0f}MB)\n"
+"{quality}\n"
+msgstr ""
+"🎧 {label} ~1 Min. Vorschau (volle Datei: {size:.0f}MB)\n"
+"{quality}\n"
+
+#: src/music_downloader/telegram/download_flow.py:379
+#: src/music_downloader/telegram/download_flow.py:442
+#: src/music_downloader/telegram/download_flow.py:449
+msgid "⏹ Cancelled"
+msgstr "⏹ Abgebrochen"
+
+#: src/music_downloader/telegram/download_flow.py:392
+#: src/music_downloader/telegram/import_flow.py:267
+msgid "🚫 You are not allowed to save to the library."
+msgstr "🚫 Du darfst nicht in die Bibliothek speichern."
+
+#: src/music_downloader/telegram/download_flow.py:400
+#: src/music_downloader/telegram/import_flow.py:291
+#, python-brace-format
+msgid "✅ Saved: `{name}`"
+msgstr "✅ Gespeichert: `{name}`"
+
+#: src/music_downloader/telegram/download_flow.py:405
+msgid "❌ Failed to save file. Check logs."
+msgstr "❌ Datei konnte nicht gespeichert werden. Prüfe die Logs."
+
+#: src/music_downloader/telegram/download_flow.py:408
+msgid "❌ Source file not found."
+msgstr "❌ Quelldatei nicht gefunden."
+
+#: src/music_downloader/telegram/download_flow.py:415
+#, python-brace-format
+msgid "🚫 Rejected: {artist} - {title}"
+msgstr "🚫 Abgelehnt: {artist} - {title}"
+
+#: src/music_downloader/telegram/download_flow.py:472
+msgid "⏹ Download expired. Send a new search."
+msgstr "⏹ Download abgelaufen. Starte eine neue Suche."
+
+#: src/music_downloader/telegram/download_flow.py:485
+#: src/music_downloader/telegram/import_flow.py:243
+#, python-brace-format
+msgid "🔄 Retrying: `{file}`..."
+msgstr "🔄 Erneuter Versuch: `{file}`..."
+
+#: src/music_downloader/telegram/download_flow.py:491
+#: src/music_downloader/telegram/import_flow.py:249
+#, python-brace-format
+msgid "⬇️ Re-downloading from `{user}`..."
+msgstr "⬇️ Lade erneut von `{user}` herunter..."
+
+#: src/music_downloader/telegram/download_flow.py:511
+msgid "⏹ No more results available. Try a new search."
+msgstr "⏹ Keine weiteren Ergebnisse. Starte eine neue Suche."
+
+#: src/music_downloader/telegram/download_flow.py:520
+msgid "⏹ No more results to try."
+msgstr "⏹ Keine weiteren Ergebnisse zum Ausprobieren."
+
+#: src/music_downloader/telegram/download_flow.py:531
+#, python-brace-format
+msgid "⏭ Trying next result: `{file}`"
+msgstr "⏭ Nächstes Ergebnis: `{file}`"
+
+#: src/music_downloader/telegram/download_flow.py:537
+#, python-brace-format
+msgid "⬇️ Downloading from `{user}`..."
+msgstr "⬇️ Lade von `{user}` herunter..."
+
+#: src/music_downloader/telegram/import_flow.py:53
+#, python-brace-format
+msgid ""
+"You have an unfinished import: *{name}* ({done}/{total}).\n"
+"Send `/import resume` to continue, or /cancel to stop it."
+msgstr ""
+"Du hast einen unfertigen Import: *{name}* ({done}/{total}).\n"
+"Sende `/import resume` zum Fortsetzen oder /cancel zum Abbrechen."
+
+#: src/music_downloader/telegram/import_flow.py:64
+msgid "Usage: `/import <spotify_playlist_or_album_url>` or `/import resume`"
+msgstr ""
+"Verwendung: `/import <spotify_playlist_oder_album_url>` oder `/import "
+"resume`"
+
+#: src/music_downloader/telegram/import_flow.py:73
+msgid "Please provide a valid Spotify playlist or album URL."
+msgstr "Bitte eine gültige Spotify-Playlist- oder Album-URL angeben."
+
+#: src/music_downloader/telegram/import_flow.py:81
+#, python-brace-format
+msgid ""
+"You already have an active import: *{name}* ({done}/{total})\n"
+"Send `/import resume` to continue, or /cancel to stop it first."
+msgstr ""
+"Du hast bereits einen aktiven Import: *{name}* ({done}/{total})\n"
+"Sende `/import resume` zum Fortsetzen oder brich zuerst mit /cancel ab."
+
+#: src/music_downloader/telegram/import_flow.py:92
+msgid "🔍 Resolving playlist..."
+msgstr "🔍 Playlist wird aufgelöst..."
+
+#: src/music_downloader/telegram/import_flow.py:96
+msgid "Failed to resolve playlist. Check the URL and try again."
+msgstr ""
+"Playlist konnte nicht aufgelöst werden. Prüfe die URL und versuche es "
+"erneut."
+
+#: src/music_downloader/telegram/import_flow.py:121
+msgid "album"
+msgstr "Album"
+
+#: src/music_downloader/telegram/import_flow.py:121
+msgid "playlist"
+msgstr "Playlist"
+
+#: src/music_downloader/telegram/import_flow.py:125
+#, python-brace-format
+msgid ""
+"📋 Found {kind}: *{name}*\n"
+"By: {owner}\n"
+"Tracks: {total}\n"
+"\n"
+"Import all tracks one by one?"
+msgstr ""
+"📋 {kind} gefunden: *{name}*\n"
+"Von: {owner}\n"
+"Titel: {total}\n"
+"\n"
+"Alle Titel nacheinander importieren?"
+
+#: src/music_downloader/telegram/import_flow.py:148
+#: src/music_downloader/telegram/import_flow.py:155
+#: src/music_downloader/telegram/import_flow.py:195
+msgid "❌ Import cancelled."
+msgstr "❌ Import abgebrochen."
+
+#: src/music_downloader/telegram/import_flow.py:160
+msgid "❌ Cancelled."
+msgstr "❌ Abgebrochen."
+
+#: src/music_downloader/telegram/import_flow.py:162
+msgid "Nothing to cancel."
+msgstr "Nichts zum Abbrechen."
+
+#: src/music_downloader/telegram/import_flow.py:178
+msgid "⏹ Import not found."
+msgstr "⏹ Import nicht gefunden."
+
+#: src/music_downloader/telegram/import_flow.py:182
+msgid "✅ Import started! Processing tracks one by one..."
+msgstr "✅ Import gestartet! Titel werden nacheinander verarbeitet..."
+
+#: src/music_downloader/telegram/import_flow.py:210
+msgid "🚫 Track rejected."
+msgstr "🚫 Titel abgelehnt."
+
+#: src/music_downloader/telegram/import_flow.py:217
+msgid "⏭ Track skipped."
+msgstr "⏭ Titel übersprungen."
+
+#: src/music_downloader/telegram/import_flow.py:234
+msgid "⏹ Download expired. Use Skip or Mark failed to continue the import."
+msgstr ""
+"⏹ Download abgelaufen. Nutze Überspringen oder Als fehlgeschlagen "
+"markieren, um den Import fortzusetzen."
+
+#: src/music_downloader/telegram/import_flow.py:273
+msgid "⏹ Download expired"
+msgstr "⏹ Download abgelaufen"
+
+#: src/music_downloader/telegram/import_flow.py:278
+msgid "❌ Source file not ready. Download may still be in progress."
+msgstr "❌ Quelldatei noch nicht bereit. Der Download läuft möglicherweise noch."
+
+#: src/music_downloader/telegram/import_flow.py:295
+msgid "❌ Failed to save file."
+msgstr "❌ Datei konnte nicht gespeichert werden."
+
+#: src/music_downloader/telegram/import_flow.py:319
+#, python-brace-format
+msgid ""
+"🏁 *Import complete!*\n"
+"\n"
+"✅ Saved: {saved}\n"
+"❌ Failed: {failed}\n"
+"⏭ Skipped: {skipped}\n"
+"📊 Total: {total}"
+msgstr ""
+"🏁 *Import abgeschlossen!*\n"
+"\n"
+"✅ Gespeichert: {saved}\n"
+"❌ Fehlgeschlagen: {failed}\n"
+"⏭ Übersprungen: {skipped}\n"
+"📊 Gesamt: {total}"
+
+#: src/music_downloader/telegram/import_flow.py:343
+#, python-brace-format
+msgid ""
+"📋 *Import [{position}/{total}]*\n"
+"🔍 Searching: *{artist} - {title}*\n"
+"Album: {album} ({year})"
+msgstr ""
+"📋 *Import [{position}/{total}]*\n"
+"🔍 Suche: *{artist} - {title}*\n"
+"Album: {album} ({year})"
+
+#: src/music_downloader/telegram/import_flow.py:371
+#, python-brace-format
+msgid ""
+"📋 *Import track:* {artist} - {title}\n"
+"\n"
+"No results found on Soulseek."
+msgstr ""
+"📋 *Import-Titel:* {artist} - {title}\n"
+"\n"
+"Keine Ergebnisse auf Soulseek gefunden."
+
+#: src/music_downloader/telegram/import_flow.py:403
+#, python-brace-format
+msgid ""
+"📋 *Import track:* {artist} - {title}\n"
+"⬇️ Downloading: `{file}`\n"
+"From: `{user}` | {quality}"
+msgstr ""
+"📋 *Import-Titel:* {artist} - {title}\n"
+"⬇️ Lade herunter: `{file}`\n"
+"Von: `{user}` | {quality}"
+
+#: src/music_downloader/telegram/import_flow.py:424
+#: src/music_downloader/telegram/search_flow.py:313
+#: src/music_downloader/telegram/search_flow.py:512
+msgid "Cannot reach slskd. Check `SLSKD_HOST` and the API key."
+msgstr "slskd ist nicht erreichbar. Prüfe `SLSKD_HOST` und den API-Schlüssel."
+
+#: src/music_downloader/telegram/import_flow.py:433
+#, python-brace-format
+msgid "❌ Search failed for {artist} - {title}"
+msgstr "❌ Suche fehlgeschlagen für {artist} - {title}"
+
+#: src/music_downloader/telegram/import_flow.py:457
+#, python-brace-format
+msgid "❌ Failed to enqueue from `{user}`"
+msgstr "❌ Einreihen von `{user}` fehlgeschlagen"
+
+#: src/music_downloader/telegram/import_flow.py:477
+#, python-brace-format
+msgid ""
+"❌ Download failed: {state}\n"
+"`{file}`"
+msgstr ""
+"❌ Download fehlgeschlagen: {state}\n"
+"`{file}`"
+
+#: src/music_downloader/telegram/import_flow.py:488
+msgid "❌ Downloaded file not found on disk."
+msgstr "❌ Heruntergeladene Datei nicht auf der Festplatte gefunden."
+
+#: src/music_downloader/telegram/import_flow.py:501
+#, python-brace-format
+msgid ""
+"📋 Import: {artist} - {title}\n"
+"{quality}"
+msgstr ""
+"📋 Import: {artist} - {title}\n"
+"{quality}"
+
+#: src/music_downloader/telegram/import_flow.py:509
+#, python-brace-format
+msgid ""
+"✅ Downloaded: `{file}` ({size:.0f}MB)\n"
+"{quality}\n"
+"\n"
+"File too large to preview. Save to library?"
+msgstr ""
+"✅ Heruntergeladen: `{file}` ({size:.0f}MB)\n"
+"{quality}\n"
+"\n"
+"Datei zu groß für die Vorschau. In die Bibliothek speichern?"
+
+#: src/music_downloader/telegram/import_flow.py:553
+#, python-brace-format
+msgid "❌ Error downloading `{file}`"
+msgstr "❌ Fehler beim Herunterladen von `{file}`"
+
+#: src/music_downloader/telegram/import_flow.py:590
+msgid "Nothing to resume."
+msgstr "Nichts zum Fortsetzen."
+
+#: src/music_downloader/telegram/import_flow.py:597
+#, python-brace-format
+msgid "Import of *{name}* is already running."
+msgstr "Der Import von *{name}* läuft bereits."
+
+#: src/music_downloader/telegram/import_flow.py:617
+#, python-brace-format
+msgid "Resuming import of *{name}* ({remaining} remaining, {done} done)."
+msgstr "Setze Import von *{name}* fort ({remaining} übrig, {done} erledigt)."
+
+#: src/music_downloader/telegram/keyboards.py:28
+#: src/music_downloader/telegram/keyboards.py:88
+msgid "◀️ Prev"
+msgstr "◀️ Zurück"
+
+#: src/music_downloader/telegram/keyboards.py:30
+#: src/music_downloader/telegram/keyboards.py:90
+msgid "Next ▶️"
+msgstr "Weiter ▶️"
+
+#: src/music_downloader/telegram/keyboards.py:36
+msgid "Auto-pick best"
+msgstr "Beste automatisch"
+
+#: src/music_downloader/telegram/keyboards.py:37
+#: src/music_downloader/telegram/keyboards.py:62
+#: src/music_downloader/telegram/keyboards.py:95
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: src/music_downloader/telegram/keyboards.py:47
+msgid "✅ Save to library"
+msgstr "✅ In Bibliothek speichern"
+
+#: src/music_downloader/telegram/keyboards.py:48
+#: src/music_downloader/telegram/keyboards.py:131
+msgid "🚫 Reject"
+msgstr "🚫 Ablehnen"
+
+#: src/music_downloader/telegram/keyboards.py:52
+#: src/music_downloader/telegram/keyboards.py:176
+msgid "⏭ Try next result"
+msgstr "⏭ Nächstes Ergebnis"
+
+#: src/music_downloader/telegram/keyboards.py:61
+msgid "Continue anyway"
+msgstr "Trotzdem fortfahren"
+
+#: src/music_downloader/telegram/keyboards.py:94
+#: src/music_downloader/telegram/keyboards.py:109
+msgid "🔍 Search Soulseek directly"
+msgstr "🔍 Direkt auf Soulseek suchen"
+
+#: src/music_downloader/telegram/keyboards.py:102
+msgid "Disable auto-mode"
+msgstr "Auto-Modus aus"
+
+#: src/music_downloader/telegram/keyboards.py:103
+msgid "Enable auto-mode"
+msgstr "Auto-Modus an"
+
+#: src/music_downloader/telegram/keyboards.py:118
+msgid "✅ Start import"
+msgstr "✅ Import starten"
+
+#: src/music_downloader/telegram/keyboards.py:119
+msgid "❌ Cancel"
+msgstr "❌ Abbrechen"
+
+#: src/music_downloader/telegram/keyboards.py:130
+msgid "✅ Save"
+msgstr "✅ Speichern"
+
+#: src/music_downloader/telegram/keyboards.py:134
+#: src/music_downloader/telegram/keyboards.py:146
+#: src/music_downloader/telegram/keyboards.py:159
+msgid "⏭ Skip track"
+msgstr "⏭ Titel überspringen"
+
+#: src/music_downloader/telegram/keyboards.py:145
+#: src/music_downloader/telegram/keyboards.py:158
+msgid "🚫 Mark failed"
+msgstr "🚫 Als fehlgeschlagen"
+
+#: src/music_downloader/telegram/keyboards.py:156
+#: src/music_downloader/telegram/keyboards.py:167
+#: src/music_downloader/telegram/keyboards.py:175
+msgid "🔄 Retry"
+msgstr "🔄 Erneut versuchen"
+
+#: src/music_downloader/telegram/language.py:91
+msgid "Choose a language:"
+msgstr "Wähle eine Sprache:"
+
+#: src/music_downloader/telegram/language.py:145
+#, python-brace-format
+msgid "Language set to {name}."
+msgstr "Sprache gesetzt: {name}."
+
+#: src/music_downloader/telegram/messages.py:61
+msgid ""
+"Send me a song name (e.g., `Nancy Sinatra Bang Bang`) and I'll find and "
+"download it in FLAC.\n"
+"\n"
+"Commands:\n"
+"/auto — Toggle auto-download mode\n"
+"/import <url> — Import a Spotify playlist or album\n"
+"/import resume — Continue a paused import after restart\n"
+"/status — Show active downloads\n"
+"/history — Recent downloads\n"
+"/cancel — Cancel the current search, download, or import\n"
+"/lang — Change language\n"
+"/help — Show this message"
+msgstr ""
+"Schick mir einen Songnamen (z. B. `Nancy Sinatra Bang Bang`) und ich "
+"suche und lade ihn als FLAC herunter.\n"
+"\n"
+"Befehle:\n"
+"/auto — Automatischen Download umschalten\n"
+"/import <url> — Spotify-Playlist oder -Album importieren\n"
+"/import resume — Pausierten Import nach einem Neustart fortsetzen\n"
+"/status — Aktive Downloads anzeigen\n"
+"/history — Letzte Downloads\n"
+"/cancel — Aktuelle Suche, Download oder Import abbrechen\n"
+"/lang — Sprache ändern\n"
+"/help — Diese Nachricht anzeigen"
+
+#: src/music_downloader/telegram/messages.py:78
+#, python-brace-format
+msgid "{emoji} Lossless OK (spectrum to {khz:.1f}kHz)"
+msgstr "{emoji} Lossless OK (Spektrum bis {khz:.1f}kHz)"
+
+#: src/music_downloader/telegram/messages.py:82
+msgid "Possible transcode"
+msgstr "Mögliche Transkodierung"
+
+#: src/music_downloader/telegram/messages.py:83
+msgid "Likely transcode"
+msgstr "Vermutlich transkodiert"
+
+#: src/music_downloader/telegram/messages.py:84
+msgid "Fake lossless"
+msgstr "Gefälschtes Lossless"
+
+#: src/music_downloader/telegram/messages.py:87
+#, python-brace-format
+msgid "{emoji} {label} (cutoff {khz:.1f}kHz)"
+msgstr "{emoji} {label} (Cutoff {khz:.1f}kHz)"
+
+#: src/music_downloader/telegram/messages.py:99
+msgid "🔍 *Multiple matches found on Spotify:*"
+msgstr "🔍 *Mehrere Treffer auf Spotify:*"
+
+#: src/music_downloader/telegram/messages.py:101
+#, python-brace-format
+msgid " (page {page}/{total})"
+msgstr " (Seite {page}/{total})"
+
+#: src/music_downloader/telegram/messages.py:107
+#, python-brace-format
+msgid ""
+"*#{n} {artist} - {title}*\n"
+"    Album: {album} ({year}) | {duration}\n"
+"    [Listen on Spotify]({url})"
+msgstr ""
+"*#{n} {artist} - {title}*\n"
+"    Album: {album} ({year}) | {duration}\n"
+"    [Auf Spotify anhören]({url})"
+
+#: src/music_downloader/telegram/messages.py:117
+msgid "Pick the correct version:"
+msgstr "Wähle die richtige Version:"
+
+#: src/music_downloader/telegram/messages.py:137
+#, python-brace-format
+msgid "Found {n} FLAC match:"
+msgid_plural "Found {n} FLAC matches:"
+msgstr[0] "{n} FLAC-Treffer gefunden:"
+msgstr[1] "{n} FLAC-Treffer gefunden:"
+
+#: src/music_downloader/telegram/messages.py:147
+#, python-brace-format
+msgid "🔍 *Direct search:* `{query}`"
+msgstr "🔍 *Direktsuche:* `{query}`"
+
+#: src/music_downloader/telegram/messages.py:153
+#: src/music_downloader/telegram/messages.py:165
+#, python-brace-format
+msgid "Duration: {duration} | Album: {album}"
+msgstr "Dauer: {duration} | Album: {album}"
+
+#: src/music_downloader/telegram/messages.py:156
+#, python-brace-format
+msgid "⚠️ No FLAC found — showing all formats ({n} match):"
+msgid_plural "⚠️ No FLAC found — showing all formats ({n} matches):"
+msgstr[0] "⚠️ Kein FLAC gefunden — zeige alle Formate ({n} Treffer):"
+msgstr[1] "⚠️ Kein FLAC gefunden — zeige alle Formate ({n} Treffer):"
+
+#: src/music_downloader/telegram/messages.py:171
+#, python-brace-format
+msgid "📄 Page {page}/{total}"
+msgstr "📄 Seite {page}/{total}"
+
+#: src/music_downloader/telegram/search_flow.py:72
+#, python-brace-format
+msgid ""
+"🔍 Searching slskd for: `{query}`\n"
+"Saving as: *{artist} - {title}*"
+msgstr ""
+"🔍 Suche auf slskd nach: `{query}`\n"
+"Speichern als: *{artist} - {title}*"
+
+#: src/music_downloader/telegram/search_flow.py:92
+#, python-brace-format
+msgid ""
+"⚠️ *Similar files already in library:*\n"
+"\n"
+"{files}\n"
+"\n"
+"Continue searching anyway?"
+msgstr ""
+"⚠️ *Ähnliche Dateien bereits in der Bibliothek:*\n"
+"\n"
+"{files}\n"
+"\n"
+"Trotzdem weitersuchen?"
+
+#: src/music_downloader/telegram/search_flow.py:110
+#, python-brace-format
+msgid "🔍 Looking up: `{query}`"
+msgstr "🔍 Suche: `{query}`"
+
+#: src/music_downloader/telegram/search_flow.py:122
+#, python-brace-format
+msgid ""
+"Could not find `{query}` on Spotify.\n"
+"You can search Soulseek directly instead."
+msgstr ""
+"`{query}` wurde auf Spotify nicht gefunden.\n"
+"Du kannst stattdessen direkt auf Soulseek suchen."
+
+#: src/music_downloader/telegram/search_flow.py:190
+#: src/music_downloader/telegram/search_flow.py:517
+msgid "Something went wrong. Please try again."
+msgstr "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+
+#: src/music_downloader/telegram/search_flow.py:258
+#, python-brace-format
+msgid ""
+"🎵 {track}\n"
+"Album: {album} ({year})\n"
+"Duration: {duration}\n"
+"\n"
+"Searching slskd..."
+msgstr ""
+"🎵 {track}\n"
+"Album: {album} ({year})\n"
+"Dauer: {duration}\n"
+"\n"
+"Suche auf slskd..."
+
+#: src/music_downloader/telegram/search_flow.py:269
+#, python-brace-format
+msgid ""
+"🎵 {track}\n"
+"\n"
+"No results with full query — retrying with song title only…"
+msgstr ""
+"🎵 {track}\n"
+"\n"
+"Keine Treffer mit voller Suche — versuche nur den Songtitel…"
+
+#: src/music_downloader/telegram/search_flow.py:272
+#, python-brace-format
+msgid ""
+"🎵 {track}\n"
+"\n"
+"Still no results — trying keyword variations with year…"
+msgstr ""
+"🎵 {track}\n"
+"\n"
+"Immer noch keine Treffer — versuche Keyword-Varianten mit Jahr…"
+
+#: src/music_downloader/telegram/search_flow.py:275
+#, python-brace-format
+msgid ""
+"🎵 {track}\n"
+"\n"
+"Still no results — trying artist + keyword search…"
+msgstr ""
+"🎵 {track}\n"
+"\n"
+"Immer noch keine Treffer — versuche Künstler + Keywords…"
+
+#: src/music_downloader/telegram/search_flow.py:289
+#, python-brace-format
+msgid ""
+"🎵 {track} ({duration})\n"
+"\n"
+"No results found on Soulseek matching this track.\n"
+"Try a different search query."
+msgstr ""
+"🎵 {track} ({duration})\n"
+"\n"
+"Keine passenden Ergebnisse auf Soulseek.\n"
+"Versuche eine andere Suche."
+
+#: src/music_downloader/telegram/search_flow.py:321
+msgid "Something went wrong during the search. Please try again."
+msgstr "Bei der Suche ist etwas schiefgelaufen. Bitte versuche es erneut."
+
+#: src/music_downloader/telegram/search_flow.py:337
+#, python-brace-format
+msgid "Continuing with search: `{query}`"
+msgstr "Suche wird fortgesetzt: `{query}`"
+
+#: src/music_downloader/telegram/search_flow.py:347
+#: src/music_downloader/telegram/search_flow.py:405
+msgid "🔍 Searching slskd for FLAC..."
+msgstr "🔍 Suche FLAC auf slskd..."
+
+#: src/music_downloader/telegram/search_flow.py:399
+#, python-brace-format
+msgid "Selected: {track} ({duration})"
+msgstr "Ausgewählt: {track} ({duration})"
+
+#: src/music_downloader/telegram/search_flow.py:454
+msgid ""
+"🎵 How should this track be saved?\n"
+"\n"
+"Send the name as: `Artist - Title`\n"
+"(This will be used for the filename and tags)"
+msgstr ""
+"🎵 Wie soll dieser Titel gespeichert werden?\n"
+"\n"
+"Sende den Namen als: `Interpret - Titel`\n"
+"(Wird für Dateiname und Tags verwendet)"
+
+#: src/music_downloader/telegram/search_flow.py:499
+#, python-brace-format
+msgid ""
+"🔍 Direct search: `{query}`\n"
+"\n"
+"No results found on Soulseek."
+msgstr ""
+"🔍 Direktsuche: `{query}`\n"
+"\n"
+"Keine Ergebnisse auf Soulseek."
+
+#: src/music_downloader/telegram/search_flow.py:536
+#, python-brace-format
+msgid "⚠️ *Already in the library:* {track}"
+msgstr "⚠️ *Bereits in der Bibliothek:* {track}"
+
+#: src/music_downloader/telegram/search_flow.py:538
+msgid "On disk:"
+msgstr "Auf der Festplatte:"
+
+#: src/music_downloader/telegram/search_flow.py:540
+#, python-brace-format
+msgid "Previously saved as `{filename}`"
+msgstr "Bereits gespeichert als `{filename}`"
+
+#: src/music_downloader/telegram/search_flow.py:541
+msgid "Search Soulseek anyway?"
+msgstr "Trotzdem auf Soulseek suchen?"
+
+#: src/music_downloader/telegram/search_flow.py:586
+#, python-brace-format
+msgid "⚡ Auto-downloading best match for {track}..."
+msgstr "⚡ Lade beste Übereinstimmung für {track} automatisch herunter..."
+
+#: src/music_downloader/telegram/search_flow.py:593
+#, python-brace-format
+msgid ""
+"⬇️ *Downloading #{n}...*\n"
+"{track}\n"
+"From: `{user}`\n"
+"File: `{file}`"
+msgstr ""
+"⬇️ *Lade #{n} herunter...*\n"
+"{track}\n"
+"Von: `{user}`\n"
+"Datei: `{file}`"
+

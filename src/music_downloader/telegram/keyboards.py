@@ -3,6 +3,7 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.i18n.catalog import gettext as _
 from music_downloader.soulseek.result import SearchResult
 
 
@@ -24,16 +25,16 @@ def build_results_keyboard(
 
     nav_row = []
     if page > 0:
-        nav_row.append(InlineKeyboardButton("◀️ Prev", callback_data=f"dl_page:{page - 1}"))
+        nav_row.append(InlineKeyboardButton(_("◀️ Prev"), callback_data=f"dl_page:{page - 1}"))
     if end < len(results):
-        nav_row.append(InlineKeyboardButton("Next ▶️", callback_data=f"dl_page:{page + 1}"))
+        nav_row.append(InlineKeyboardButton(_("Next ▶️"), callback_data=f"dl_page:{page + 1}"))
     if nav_row:
         buttons.append(nav_row)
 
     action_row = []
     if results:
-        action_row.append(InlineKeyboardButton("Auto-pick best", callback_data="dl:auto"))
-    action_row.append(InlineKeyboardButton("Cancel", callback_data="dl:cancel"))
+        action_row.append(InlineKeyboardButton(_("Auto-pick best"), callback_data="dl:auto"))
+    action_row.append(InlineKeyboardButton(_("Cancel"), callback_data="dl:cancel"))
     buttons.append(action_row)
 
     return InlineKeyboardMarkup(buttons)
@@ -43,12 +44,12 @@ def build_approve_keyboard(download_id: str, has_next: bool = False) -> InlineKe
     """Build approve/reject keyboard for a downloaded file."""
     rows = [
         [
-            InlineKeyboardButton("✅ Save to library", callback_data=f"approve:{download_id}"),
-            InlineKeyboardButton("🚫 Reject", callback_data=f"reject:{download_id}"),
+            InlineKeyboardButton(_("✅ Save to library"), callback_data=f"approve:{download_id}"),
+            InlineKeyboardButton(_("🚫 Reject"), callback_data=f"reject:{download_id}"),
         ]
     ]
     if has_next:
-        rows.append([InlineKeyboardButton("⏭ Try next result", callback_data=f"next:{download_id}")])
+        rows.append([InlineKeyboardButton(_("⏭ Try next result"), callback_data=f"next:{download_id}")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -57,8 +58,8 @@ def build_duplicate_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("Continue anyway", callback_data="dup:continue"),
-                InlineKeyboardButton("Cancel", callback_data="dup:cancel"),
+                InlineKeyboardButton(_("Continue anyway"), callback_data="dup:continue"),
+                InlineKeyboardButton(_("Cancel"), callback_data="dup:cancel"),
             ]
         ]
     )
@@ -84,28 +85,28 @@ def build_spotify_keyboard(
 
     nav_row = []
     if page > 0:
-        nav_row.append(InlineKeyboardButton("◀️ Prev", callback_data=f"sp_page:{page - 1}"))
+        nav_row.append(InlineKeyboardButton(_("◀️ Prev"), callback_data=f"sp_page:{page - 1}"))
     if end < len(tracks):
-        nav_row.append(InlineKeyboardButton("Next ▶️", callback_data=f"sp_page:{page + 1}"))
+        nav_row.append(InlineKeyboardButton(_("Next ▶️"), callback_data=f"sp_page:{page + 1}"))
     if nav_row:
         buttons.append(nav_row)
 
-    buttons.append([InlineKeyboardButton("\U0001f50e Search Soulseek directly", callback_data="direct:search")])
-    buttons.append([InlineKeyboardButton("Cancel", callback_data="sp:cancel")])
+    buttons.append([InlineKeyboardButton(_("🔍 Search Soulseek directly"), callback_data="direct:search")])
+    buttons.append([InlineKeyboardButton(_("Cancel"), callback_data="sp:cancel")])
     return InlineKeyboardMarkup(buttons)
 
 
 def build_auto_mode_keyboard(current_mode: bool) -> InlineKeyboardMarkup:
     """Build keyboard to toggle auto mode."""
     if current_mode:
-        return InlineKeyboardMarkup([[InlineKeyboardButton("Disable auto-mode", callback_data="auto:off")]])
-    return InlineKeyboardMarkup([[InlineKeyboardButton("Enable auto-mode", callback_data="auto:on")]])
+        return InlineKeyboardMarkup([[InlineKeyboardButton(_("Disable auto-mode"), callback_data="auto:off")]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton(_("Enable auto-mode"), callback_data="auto:on")]])
 
 
 def build_direct_search_keyboard() -> InlineKeyboardMarkup:
     """Button to search Soulseek directly without Spotify resolution."""
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("\U0001f50e Search Soulseek directly", callback_data="direct:search")]]
+        [[InlineKeyboardButton(_("🔍 Search Soulseek directly"), callback_data="direct:search")]]
     )
 
 
@@ -114,8 +115,8 @@ def build_import_confirm_keyboard(job_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("✅ Start import", callback_data=f"ic:{job_id}"),
-                InlineKeyboardButton("❌ Cancel", callback_data=f"ix:{job_id}"),
+                InlineKeyboardButton(_("✅ Start import"), callback_data=f"ic:{job_id}"),
+                InlineKeyboardButton(_("❌ Cancel"), callback_data=f"ix:{job_id}"),
             ]
         ]
     )
@@ -126,11 +127,11 @@ def build_import_track_keyboard(job_id: int, track_id: int, dl_id: str) -> Inlin
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("✅ Save", callback_data=f"ia:{job_id}:{track_id}:{dl_id}"),
-                InlineKeyboardButton("\U0001f6ab Reject", callback_data=f"ir:{job_id}:{track_id}"),
+                InlineKeyboardButton(_("✅ Save"), callback_data=f"ia:{job_id}:{track_id}:{dl_id}"),
+                InlineKeyboardButton(_("🚫 Reject"), callback_data=f"ir:{job_id}:{track_id}"),
             ],
             [
-                InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),
+                InlineKeyboardButton(_("⏭ Skip track"), callback_data=f"is:{job_id}:{track_id}"),
             ],
         ]
     )
@@ -141,8 +142,8 @@ def build_import_skip_keyboard(job_id: int, track_id: int) -> InlineKeyboardMark
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("\U0001f6ab Mark failed", callback_data=f"ir:{job_id}:{track_id}"),
-                InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),
+                InlineKeyboardButton(_("🚫 Mark failed"), callback_data=f"ir:{job_id}:{track_id}"),
+                InlineKeyboardButton(_("⏭ Skip track"), callback_data=f"is:{job_id}:{track_id}"),
             ],
         ]
     )
@@ -152,10 +153,10 @@ def build_import_failure_keyboard(job_id: int, track_id: int, dl_id: str) -> Inl
     """Retry / skip / fail keyboard when an import download fails."""
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("\U0001f504 Retry", callback_data=f"iy:{job_id}:{track_id}:{dl_id}")],
+            [InlineKeyboardButton(_("🔄 Retry"), callback_data=f"iy:{job_id}:{track_id}:{dl_id}")],
             [
-                InlineKeyboardButton("\U0001f6ab Mark failed", callback_data=f"ir:{job_id}:{track_id}"),
-                InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),
+                InlineKeyboardButton(_("🚫 Mark failed"), callback_data=f"ir:{job_id}:{track_id}"),
+                InlineKeyboardButton(_("⏭ Skip track"), callback_data=f"is:{job_id}:{track_id}"),
             ],
         ]
     )
@@ -163,7 +164,7 @@ def build_import_failure_keyboard(job_id: int, track_id: int, dl_id: str) -> Inl
 
 def build_retry_keyboard(dl_id: str) -> InlineKeyboardMarkup:
     """Retry button shown on download failure."""
-    return InlineKeyboardMarkup([[InlineKeyboardButton("\U0001f504 Retry", callback_data=f"retry:{dl_id}")]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton(_("🔄 Retry"), callback_data=f"retry:{dl_id}")]])
 
 
 def build_retry_next_keyboard(dl_id: str) -> InlineKeyboardMarkup:
@@ -171,8 +172,8 @@ def build_retry_next_keyboard(dl_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("\U0001f504 Retry", callback_data=f"retry:{dl_id}"),
-                InlineKeyboardButton("⏭ Try next result", callback_data=f"next:{dl_id}"),
+                InlineKeyboardButton(_("🔄 Retry"), callback_data=f"retry:{dl_id}"),
+                InlineKeyboardButton(_("⏭ Try next result"), callback_data=f"next:{dl_id}"),
             ]
         ]
     )
