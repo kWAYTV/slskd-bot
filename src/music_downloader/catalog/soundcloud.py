@@ -20,12 +20,15 @@ so both paths here use documented endpoints via plain HTTP.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+_TITLE_SEPARATORS = ("-", "–", "—", ":", "|")
 
 _OEMBED_ENDPOINT = "https://soundcloud.com/oembed"
 _TOKEN_ENDPOINT = "https://secure.soundcloud.com/oauth/token"
@@ -84,7 +87,7 @@ class SoundCloudApi:
             return None
         publisher = data.get("publisher_metadata") or {}
         artist = (publisher.get("artist") or "").strip() or (data.get("user") or {}).get("username", "").strip()
-        return SoundCloudTrack(artist=artist, title=title)
+        return SoundCloudTrack(artist=artist, title=_strip_artist_prefix(artist, title))
 
     @staticmethod
     def _resolve_request(url: str, token: str) -> requests.Response:
@@ -194,5 +197,45 @@ def _parse_oembed(payload: dict) -> SoundCloudTrack | None:
 
     suffix = f" by {author}"
     if author and title.endswith(suffix):
-        return SoundCloudTrack(artist=author, title=title[: -len(suffix)].strip())
-    return SoundCloudTrack(artist=author, title=title)
+        title = title[: -len(suffix)].strip()
+    return SoundCloudTrack(artist=author, title=_strip_artist_prefix(author, title))
+
+
+def _strip_artist_prefix(artist: str, title: str) -> str:
+    """Drop a leading 'Artist - ' from the title (SoundCloud titles often embed the artist)."""
+    if not artist or len(title) <= len(artist):
+        return title
+    if not title.casefold().startswith(artist.casefold()):
+        return title
+    rest = title[len(artist) :].lstrip()
+    if rest and rest[0] in _TITLE_SEPARATORS:
+        rest = rest[1:].strip()
+        if rest:
+            return rest
+    return title
+
+
+def _normalize(text: str) -> set[str]:
+    return set(re.findall(r"\w+", text.casefold()))
+
+
+def matches_spotify_candidate(sc_track: SoundCloudTrack, candidate_artist: str, candidate_title: str) -> bool:
+    """True when a Spotify candidate plausibly is the same song as the SoundCloud track.
+
+    Guards against the fuzzy Spotify search silently substituting a different
+    track by the same artist when the SoundCloud song isn't on Spotify.
+    """
+    sc_words = _normalize(sc_track.title)
+    cand_words = _normalize(candidate_title)
+    if not sc_words or not cand_words:
+        return False
+    overlap = len(sc_words & cand_words) / min(len(sc_words), len(cand_words))
+    if overlap < 0.5:
+        return False
+
+    if sc_track.artist:
+        sc_artist = _normalize(sc_track.artist)
+        cand_artist = _normalize(candidate_artist)
+        if not (sc_artist & cand_artist):
+            return False
+    return True

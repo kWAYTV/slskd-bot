@@ -73,12 +73,57 @@ class TestParseOembed:
         track = _parse_oembed({"title": "Some Track", "author_name": "Uploader"})
         assert track == SoundCloudTrack(artist="Uploader", title="Some Track")
 
+    def test_artist_prefix_in_title_is_stripped(self):
+        """SoundCloud titles often embed the artist: 'PÕNKY - REMONTADA by PÕNKY'."""
+        track = _parse_oembed({"title": "PÕNKY - REMONTADA by PÕNKY", "author_name": "PÕNKY"})
+        assert track == SoundCloudTrack(artist="PÕNKY", title="REMONTADA")
+
+    def test_artist_prefix_case_insensitive(self):
+        track = _parse_oembed({"title": "forss – Flickermood by Forss", "author_name": "Forss"})
+        assert track == SoundCloudTrack(artist="Forss", title="Flickermood")
+
+    def test_title_equal_to_artist_kept(self):
+        track = _parse_oembed({"title": "Forss by Forss", "author_name": "Forss"})
+        assert track == SoundCloudTrack(artist="Forss", title="Forss")
+
     def test_empty_title_returns_none(self):
         assert _parse_oembed({"title": "", "author_name": "x"}) is None
 
     def test_query_property(self):
         assert SoundCloudTrack(artist="Forss", title="Flickermood").query == "Forss - Flickermood"
         assert SoundCloudTrack(artist="", title="Flickermood").query == "Flickermood"
+
+
+class TestMatchesSpotifyCandidate:
+    def test_same_song_matches(self):
+        from music_downloader.catalog.soundcloud import matches_spotify_candidate
+
+        sc = SoundCloudTrack(artist="Forss", title="Flickermood")
+        assert matches_spotify_candidate(sc, "Forss", "Flickermood") is True
+
+    def test_different_song_same_artist_rejected(self):
+        from music_downloader.catalog.soundcloud import matches_spotify_candidate
+
+        sc = SoundCloudTrack(artist="Ponky", title="Remontada")
+        assert matches_spotify_candidate(sc, "Ponky", "Barado") is False
+
+    def test_extended_title_matches(self):
+        from music_downloader.catalog.soundcloud import matches_spotify_candidate
+
+        sc = SoundCloudTrack(artist="Ben Sims", title="Manipulated")
+        assert matches_spotify_candidate(sc, "Ben Sims", "Manipulated (Original Mix)") is True
+
+    def test_wrong_artist_rejected(self):
+        from music_downloader.catalog.soundcloud import matches_spotify_candidate
+
+        sc = SoundCloudTrack(artist="Ponky", title="Remontada")
+        assert matches_spotify_candidate(sc, "Someone Else", "Remontada") is False
+
+    def test_no_artist_matches_on_title_alone(self):
+        from music_downloader.catalog.soundcloud import matches_spotify_candidate
+
+        sc = SoundCloudTrack(artist="", title="Flickermood")
+        assert matches_spotify_candidate(sc, "Forss", "Flickermood") is True
 
 
 class TestSoundCloudResolver:

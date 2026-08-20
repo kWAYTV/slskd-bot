@@ -122,10 +122,16 @@ def _make_context(chat_id=67890):
 
 
 class TestEscapeMd:
-    def test_escapes_special_chars(self):
+    def test_escapes_v1_special_chars(self):
         assert _escape_md("hello_world") == "hello\\_world"
         assert _escape_md("*bold*") == "\\*bold\\*"
-        assert _escape_md("[link](url)") == "\\[link\\]\\(url\\)"
+        assert _escape_md("[link](url)") == "\\[link](url)"
+        assert _escape_md("`code`") == "\\`code\\`"
+
+    def test_v1_ignores_other_chars(self):
+        """V1 renders backslashes before non-special chars literally — don't add them."""
+        assert _escape_md("Artist - Title (Remix)!") == "Artist - Title (Remix)!"
+        assert _escape_md("A.B-C+D") == "A.B-C+D"
 
     def test_plain_text_unchanged(self):
         assert _escape_md("hello world") == "hello world"
@@ -917,7 +923,8 @@ class TestMusicBotHelpers:
         text = MusicBot._format_spotify_results(tracks)
         assert "AC\\_DC" in text
         assert "Hells\\*Bells" in text
-        assert "Back\\[in\\]Black" in text
+        # ']' is not special in Markdown V1; only '[' needs the escape.
+        assert "Back\\[in]Black" in text
 
     @patch("music_downloader.telegram.app.SpotifyResolver")
     @patch("music_downloader.telegram.app.SlskdClient")
@@ -1687,13 +1694,22 @@ class TestLinkQueries:
         assert bot.pending[67890].track is not None
 
     @pytest.mark.asyncio
-    async def test_soundcloud_link_runs_search_pipeline(self):
+    async def test_soundcloud_link_uses_verified_spotify_match(self):
         from music_downloader.catalog.soundcloud import SoundCloudTrack
         from music_downloader.telegram import search_flow
 
         bot = self._make_bot()
         bot.soundcloud.resolve = MagicMock(return_value=SoundCloudTrack(artist="Forss", title="Flickermood"))
-        bot._do_search = AsyncMock()
+        spotify_match = TrackInfo(
+            artist="Forss",
+            title="Flickermood",
+            album="Soulhack",
+            duration_ms=222000,
+            spotify_url="https://x",
+            year="2003",
+        )
+        bot.spotify.search_multiple = MagicMock(return_value=[spotify_match])
+        bot._do_slskd_search = AsyncMock()
         update = _make_update(text="https://soundcloud.com/forss/flickermood")
         context = _make_context()
 
@@ -1702,8 +1718,41 @@ class TestLinkQueries:
         )
         assert handled is True
         bot.soundcloud.resolve.assert_called_once_with("https://soundcloud.com/forss/flickermood")
-        bot._do_search.assert_awaited_once()
-        assert bot._do_search.await_args.args[2] == "Forss - Flickermood"
+        bot._do_slskd_search.assert_awaited_once()
+        assert bot._do_slskd_search.await_args.args[2] is spotify_match
+
+    @pytest.mark.asyncio
+    async def test_soundcloud_track_not_on_spotify_searches_directly(self):
+        """A wrong same-artist Spotify hit must not replace the SoundCloud track."""
+        from music_downloader.catalog.soundcloud import SoundCloudTrack
+        from music_downloader.telegram import search_flow
+
+        bot = self._make_bot()
+        bot.soundcloud.resolve = MagicMock(return_value=SoundCloudTrack(artist="Ponky", title="Remontada"))
+        wrong_track = TrackInfo(
+            artist="Ponky",
+            title="Barado",
+            album="Fire Ritual EP",
+            duration_ms=342000,
+            spotify_url="https://x",
+            year="2024",
+        )
+        bot.spotify.search_multiple = MagicMock(return_value=[wrong_track])
+        bot._do_slskd_search = AsyncMock()
+        bot._do_direct_slskd_search = AsyncMock()
+        update = _make_update(text="https://soundcloud.com/ponky/remontada")
+        context = _make_context()
+
+        handled = await search_flow._handle_link_query(
+            bot, update, context, 67890, "https://soundcloud.com/ponky/remontada"
+        )
+        assert handled is True
+        bot._do_slskd_search.assert_not_awaited()
+        bot._do_direct_slskd_search.assert_awaited_once()
+        assert bot._do_direct_slskd_search.await_args.args[2] == "Ponky Remontada"
+        display_track = bot._do_direct_slskd_search.await_args.kwargs["display_track"]
+        assert display_track.artist == "Ponky"
+        assert display_track.title == "Remontada"
 
     @pytest.mark.asyncio
     async def test_playlist_link_suggests_import(self):
