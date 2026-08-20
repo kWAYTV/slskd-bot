@@ -20,6 +20,7 @@ from telegram.ext import (
 )
 
 from music_downloader.catalog.playlist import PlaylistResolver
+from music_downloader.catalog.soundcloud import SoundCloudResolver
 from music_downloader.catalog.spotify import SpotifyResolver
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.history.store import HistoryRepository
@@ -46,6 +47,10 @@ class MusicBot:
     def __init__(self, config: Config):
         self.config = config
         self.spotify = SpotifyResolver(config.spotify_client_id, config.spotify_client_secret)
+        self.soundcloud = SoundCloudResolver(
+            client_id=config.soundcloud_client_id,
+            client_secret=config.soundcloud_client_secret,
+        )
         self.slskd = SlskdClient(config.slskd_host, config.slskd_api_key)
         self.scorer = ResultScorer(
             duration_tolerance_secs=config.duration_tolerance_secs,
@@ -70,6 +75,7 @@ class MusicBot:
         self._active_import = session._active_import
         self._import_pending = session._import_pending
         self._auto_overrides = session._auto_overrides
+        self._quality_overrides = session._quality_overrides
         self._session = session
 
         self.db = Database(f"{config.data_dir}/importer.db")
@@ -81,6 +87,10 @@ class MusicBot:
     def is_auto(self, chat_id: int) -> bool:
         """Effective auto-download mode for a chat: per-chat toggle, else config default."""
         return self._auto_overrides.get(chat_id, self.auto_mode)
+
+    def quality_pref(self, chat_id: int) -> str:
+        """Effective audio quality preference for a chat: per-chat toggle, else config default."""
+        return self._quality_overrides.get(chat_id, self.config.quality_preference)
 
     def _is_authorized(self, user_id: int) -> bool:
         if not self.config.telegram_allowed_users:
@@ -182,10 +192,16 @@ class MusicBot:
         return str(self._dl_counter)
 
     def _rank_responses(
-        self, raw_responses, track: TrackInfo, max_duration_diff: int | None = None
+        self,
+        raw_responses,
+        track: TrackInfo,
+        max_duration_diff: int | None = None,
+        quality_preference: str | None = None,
     ) -> tuple[list[SearchResult], bool]:
         """Parse raw slskd responses and rank: try FLAC first, fall back to all audio."""
         score_kwargs = {"max_duration_diff": max_duration_diff} if max_duration_diff else {}
+        if quality_preference:
+            score_kwargs["quality_preference"] = quality_preference
         flac_results = self.slskd.parse_results(raw_responses, flac_only=True)
         ranked = self.scorer.score_results(flac_results, track, **score_kwargs)
         if ranked:
@@ -249,6 +265,7 @@ class MusicBot:
             "ir": self._handle_import_callback,
             "is": self._handle_import_callback,
             "iy": self._handle_import_callback,
+            "if": self._handle_import_callback,
             "retry": self._handle_retry,
             "next": self._handle_next_result,
             "dup": self._handle_duplicate_response,
@@ -274,9 +291,23 @@ class MusicBot:
             )
             return
 
+        if data.startswith("qp:"):
+            pref = data.split(":", 1)[1]
+            if pref in ("cd", "hires"):
+                self._quality_overrides[chat_id] = pref
+            label = _("CD quality (16/44.1)") if self.quality_pref(chat_id) == "cd" else _("Hi-Res (24-bit)")
+            await safe_query_edit(
+                query,
+                _("Audio quality preference: *{label}*").format(label=label),
+                parse_mode="Markdown",
+            )
+            return
+
     cmd_start = commands.cmd_start
     cmd_help = commands.cmd_help
     cmd_auto = commands.cmd_auto
+    cmd_quality = commands.cmd_quality
+    cmd_undo = commands.cmd_undo
     cmd_status = commands.cmd_status
     cmd_history = commands.cmd_history
     cmd_lang = language.cmd_lang
@@ -312,6 +343,7 @@ class MusicBot:
     _handle_import_callback = import_flow.handle_import_callback
     _handle_import_approve = import_flow.handle_import_approve
     _handle_import_retry = import_flow.handle_import_retry
+    _handle_import_retry_failed = import_flow.handle_import_retry_failed
     _process_next_import_track = import_flow.process_next_import_track
     _do_import_slskd_search = import_flow.do_import_slskd_search
     _do_import_download = import_flow.do_import_download
@@ -335,6 +367,8 @@ def create_bot(config: Config) -> Application:
     app.add_handler(CommandHandler("start", bot.cmd_start))
     app.add_handler(CommandHandler("help", bot.cmd_help))
     app.add_handler(CommandHandler("auto", bot.cmd_auto))
+    app.add_handler(CommandHandler("quality", bot.cmd_quality))
+    app.add_handler(CommandHandler("undo", bot.cmd_undo))
     app.add_handler(CommandHandler("status", bot.cmd_status))
     app.add_handler(CommandHandler("history", bot.cmd_history))
     app.add_handler(CommandHandler(["lang", "language"], bot.cmd_lang))

@@ -231,3 +231,36 @@ class TestResumableJobs:
         assert statuses[tracks[0].id] == "pending"
         assert statuses[tracks[1].id] == "pending"
         assert statuses[tracks[2].id] == "completed"
+
+
+class TestRetryFailedTracks:
+    def _job_with_failures(self, repo):
+        job_id = repo.create_job(chat_id=1, spotify_url="https://spotify/playlist/1", name="P", total_tracks=3)
+        repo.add_tracks(job_id, _make_tracks(3))
+        tracks = repo.get_tracks_by_job(job_id)
+        repo.complete_track(job_id, tracks[0].id, TrackStatus.completed)
+        repo.complete_track(job_id, tracks[1].id, TrackStatus.failed, "no results")
+        repo.complete_track(job_id, tracks[2].id, TrackStatus.failed, "timeout")
+        repo.update_job_status(job_id, JobStatus.completed)
+        return job_id
+
+    def test_get_failed_tracks(self, repo):
+        job_id = self._job_with_failures(repo)
+        failed = repo.get_failed_tracks(job_id)
+        assert [t.title for t in failed] == ["Title1", "Title2"]
+
+    def test_reset_failed_tracks_repending_and_counter(self, repo):
+        job_id = self._job_with_failures(repo)
+        reset = repo.reset_failed_tracks(job_id)
+        assert reset == 2
+        completed, failed, skipped, total = repo.get_job_progress(job_id)
+        assert failed == 0
+        assert completed == 1
+        assert repo.get_next_pending_track(job_id) is not None
+        active = repo.get_active_job(1)
+        assert active is not None and active.id == job_id
+
+    def test_reset_failed_tracks_noop_without_failures(self, repo):
+        job_id = repo.create_job(chat_id=1, spotify_url="https://spotify/playlist/2", name="P2", total_tracks=1)
+        repo.add_tracks(job_id, _make_tracks(1))
+        assert repo.reset_failed_tracks(job_id) == 0

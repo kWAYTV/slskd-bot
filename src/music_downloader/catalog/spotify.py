@@ -62,6 +62,26 @@ class SpotifyResolver:
             logger.exception(f"Spotify search failed for: {query}")
             return None
 
+    def get_track(self, track_id: str) -> TrackInfo | None:
+        """Resolve a Spotify track ID (from a pasted link) to full metadata."""
+        try:
+            track = self.sp.track(track_id)
+            if not track:
+                return None
+            info = TrackInfo(
+                artist=track["artists"][0]["name"],
+                title=track["name"],
+                album=track["album"]["name"],
+                duration_ms=track["duration_ms"],
+                spotify_url=track["external_urls"].get("spotify", ""),
+                year=track["album"].get("release_date", "")[:4],
+            )
+            logger.info(f"Spotify track link resolved: {info}")
+            return info
+        except Exception:
+            logger.exception(f"Spotify track lookup failed for id: {track_id}")
+            return None
+
     def search_multiple(self, query: str, limit: int = 5) -> list[TrackInfo]:
         """
         Search Spotify for multiple matching tracks.

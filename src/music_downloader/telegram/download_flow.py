@@ -25,6 +25,7 @@ from music_downloader.telegram.keyboards import (
 from music_downloader.telegram.messages import (
     escape_md,
     format_flac_verdict,
+    format_result_reasons,
     md_code_safe,
     progress_bar,
     safe_edit,
@@ -201,6 +202,9 @@ async def do_download(
         quality_line = _("Quality: {quality} | {duration}").format(
             quality=result.quality_display, duration=result.duration_display
         )
+        reasons = format_result_reasons(track, result)
+        if reasons:
+            quality_line += f"\n{reasons}"
         if flac_verdict:
             quality_line += f"\n{format_flac_verdict(flac_verdict)}"
 
@@ -431,7 +435,7 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
         await self._cleanup_download_artifacts(pending_dl)
         await self._edit_approval_message(
             query,
-            _("🚫 Rejected: {artist} - {title}").format(artist=escape_md(track.artist), title=escape_md(track.title)),
+            _("🗑 Discarded: {artist} - {title}").format(artist=escape_md(track.artist), title=escape_md(track.title)),
         )
         await self._add_history(track, result, "rejected", chat_id=chat_id)
         logger.info(f"Rejected: {track.artist} - {track.title} ({result.basename})")

@@ -123,3 +123,39 @@ class TestSpotifyResolver:
         result = resolver.search("test")
         assert result is not None
         assert result.year == ""
+
+
+class TestGetTrack:
+    @pytest.fixture
+    def resolver(self):
+        with (
+            patch("music_downloader.catalog.spotify.SpotifyClientCredentials"),
+            patch("music_downloader.catalog.spotify.spotipy.Spotify") as mock_sp,
+        ):
+            r = SpotifyResolver("test-id", "test-secret")
+            r.sp = mock_sp.return_value
+            return r
+
+    def test_get_track_returns_metadata(self, resolver):
+        resolver.sp.track.return_value = {
+            "artists": [{"name": "Ben Sims"}],
+            "name": "Manipulated",
+            "album": {"name": "Manipulated EP", "release_date": "2001-05-01"},
+            "duration_ms": 372000,
+            "external_urls": {"spotify": "https://open.spotify.com/track/abc"},
+        }
+        track = resolver.get_track("abc")
+        assert track is not None
+        assert track.artist == "Ben Sims"
+        assert track.title == "Manipulated"
+        assert track.duration_ms == 372000
+        assert track.year == "2001"
+        resolver.sp.track.assert_called_once_with("abc")
+
+    def test_get_track_api_error_returns_none(self, resolver):
+        resolver.sp.track.side_effect = Exception("404")
+        assert resolver.get_track("nope") is None
+
+    def test_get_track_empty_response_returns_none(self, resolver):
+        resolver.sp.track.return_value = None
+        assert resolver.get_track("abc") is None

@@ -9,7 +9,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.i18n.catalog import gettext as _
-from music_downloader.telegram.keyboards import build_auto_mode_keyboard
+from music_downloader.telegram.keyboards import build_auto_mode_keyboard, build_quality_keyboard
 from music_downloader.telegram.messages import code_span, escape_md, welcome_text
 
 
@@ -44,6 +44,56 @@ async def cmd_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         ).format(mode=mode_str),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=build_auto_mode_keyboard(is_auto),
+    )
+
+
+async def cmd_quality(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /quality command — choose CD vs Hi-Res preference for result ranking."""
+    if not await self._check_auth(update):
+        return
+
+    pref = self.quality_pref(update.effective_chat.id)
+    label = _("CD quality (16/44.1)") if pref == "cd" else _("Hi-Res (24-bit)")
+    await update.message.reply_text(
+        _(
+            "Audio quality preference: *{label}*\n\n"
+            "This changes how search results are ranked — the preferred format scores higher."
+        ).format(label=label),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=build_quality_keyboard(pref),
+    )
+
+
+async def cmd_undo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /undo command — remove the last track saved to the library."""
+    if not await self._check_library_auth(update):
+        return
+
+    chat_id = update.effective_chat.id
+    entry = await asyncio.to_thread(self.history_repo.get_last_saved, chat_id)
+    if not entry:
+        await update.message.reply_text(_("Nothing to undo — no library saves in this chat."))
+        return
+
+    deleted = await asyncio.to_thread(self.processor.delete_library_file, entry.filename)
+    if not deleted:
+        matches = await asyncio.to_thread(self.processor.find_exact, entry.artist, entry.title)
+        if matches:
+            deleted = await asyncio.to_thread(self.processor.delete_library_file, matches[0])
+
+    if deleted:
+        await asyncio.to_thread(self.history_repo.set_status, entry.id, "undone")
+        await update.message.reply_text(
+            _("↩️ Removed from library: {name}").format(name=code_span(entry.filename)),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+
+    await update.message.reply_text(
+        _("Could not find {name} in the library — maybe it was already removed.").format(
+            name=code_span(entry.filename)
+        ),
+        parse_mode=ParseMode.MARKDOWN,
     )
 
 
@@ -118,6 +168,7 @@ async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
             "file_not_found": "❓",
             "process_failed": "⚠️",
             "delivered": "📲",
+            "undone": "↩️",
         }.get(entry.status, "❌")
         lines.append(f"{icon} {code_span(entry.filename)}")
 

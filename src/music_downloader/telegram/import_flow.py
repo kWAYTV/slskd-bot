@@ -24,6 +24,7 @@ from music_downloader.telegram.keyboards import (
     build_import_confirm_keyboard,
     build_import_failure_keyboard,
     build_import_skip_keyboard,
+    build_import_summary_keyboard,
     build_import_track_keyboard,
 )
 from music_downloader.telegram.messages import escape_md, md_code_safe, progress_bar, safe_edit, safe_query_edit
@@ -205,7 +206,7 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
         await asyncio.to_thread(
             self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Rejected by user"
         )
-        await safe_query_edit(query, _("🚫 Track rejected."))
+        await safe_query_edit(query, _("🗑 Track discarded."))
         generation = self._chat_generation.get(chat_id, 0)
         await self._process_next_import_track(context, chat_id, job_id, generation)
 
@@ -220,6 +221,9 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
         track_id = int(parts[1])
         dl_id = parts[2]
         await self._handle_import_retry(update, context, chat_id, job_id, track_id, dl_id)
+
+    elif prefix == "if":
+        await self._handle_import_retry_failed(update, context, chat_id, job_id)
 
 
 async def handle_import_retry(self, update, context, chat_id: int, job_id: int, track_id: int, dl_id: str):
@@ -303,17 +307,7 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
     next_track = await asyncio.to_thread(self.import_repo.get_next_pending_track, job_id)
 
     if not next_track:
-        progress = await asyncio.to_thread(self.import_repo.get_job_progress, job_id)
-        completed, failed, skipped, total = progress
-        await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.completed)
-        self._active_import.pop(chat_id, None)
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=_(
-                "🏁 *Import complete!*\n\n✅ Saved: {saved}\n❌ Failed: {failed}\n⏭ Skipped: {skipped}\n📊 Total: {total}"
-            ).format(saved=completed, failed=failed, skipped=skipped, total=total),
-            parse_mode=ParseMode.MARKDOWN,
-        )
+        await _send_import_summary(self, context, chat_id, job_id)
         return
 
     track_info = TrackInfo(
@@ -345,6 +339,60 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
     )
 
     await self._do_import_slskd_search(context, chat_id, track_info, searching_msg, generation, job_id, next_track.id)
+
+
+async def _send_import_summary(self, context, chat_id: int, job_id: int):
+    """Send the end-of-import summary card, listing failures with a retry button."""
+    completed, failed, skipped, total = await asyncio.to_thread(self.import_repo.get_job_progress, job_id)
+    await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.completed)
+    self._active_import.pop(chat_id, None)
+
+    lines = [
+        _("🏁 *Import complete!*") + "\n",
+        _("✅ Saved: {saved}\n❌ Failed: {failed}\n⏭ Skipped: {skipped}\n📊 Total: {total}").format(
+            saved=completed, failed=failed, skipped=skipped, total=total
+        ),
+    ]
+
+    reply_markup = None
+    if failed:
+        failed_tracks = await asyncio.to_thread(self.import_repo.get_failed_tracks, job_id)
+        if failed_tracks:
+            lines.append("\n" + _("*Failed tracks:*"))
+            for t in failed_tracks[:5]:
+                lines.append(f"• {escape_md(t.artist)} - {escape_md(t.title)}")
+            if len(failed_tracks) > 5:
+                lines.append(_("…and {n} more").format(n=len(failed_tracks) - 5))
+            reply_markup = build_import_summary_keyboard(job_id, len(failed_tracks))
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="\n".join(lines),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=reply_markup,
+    )
+
+
+async def handle_import_retry_failed(self, update, context, chat_id: int, job_id: int):
+    """Reset failed tracks to pending and continue the job (summary retry button)."""
+    query = update.callback_query
+
+    reset = await asyncio.to_thread(self.import_repo.reset_failed_tracks, job_id)
+    if not reset:
+        await safe_query_edit(query, _("Nothing to retry — no failed tracks left."))
+        return
+
+    await safe_query_edit(
+        query,
+        _("🔄 Retrying {n} failed track(s)...").format(n=reset),
+    )
+    self._active_import[chat_id] = job_id
+    generation = self._chat_generation.get(chat_id, 0)
+    task = context.application.create_task(
+        self._process_next_import_track(context, chat_id, job_id, generation),
+        update=update,
+    )
+    self._track_task(chat_id, task)
 
 
 async def do_import_slskd_search(
