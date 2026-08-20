@@ -124,6 +124,35 @@ class ImportRepository:
         cursor = self._conn.execute("SELECT * FROM import_jobs WHERE status IN ('pending', 'active') ORDER BY id")
         return [ImportJob(**dict(row)) for row in cursor.fetchall()]
 
+    def get_failed_tracks(self, job_id: int) -> list[ImportTrack]:
+        cursor = self._conn.execute(
+            "SELECT * FROM import_tracks WHERE job_id = ? AND status = 'failed' ORDER BY position",
+            (job_id,),
+        )
+        return [ImportTrack(**dict(row)) for row in cursor.fetchall()]
+
+    def reset_failed_tracks(self, job_id: int) -> int:
+        """Set failed tracks back to pending (and fix the job counter) so they can be retried."""
+        try:
+            self._conn.execute("BEGIN")
+            cursor = self._conn.execute(
+                """UPDATE import_tracks SET status = 'pending', error_message = '', updated_at = datetime('now')
+                WHERE job_id = ? AND status = 'failed'""",
+                (job_id,),
+            )
+            reset = cursor.rowcount
+            if reset:
+                self._conn.execute(
+                    "UPDATE import_jobs SET failed_tracks = failed_tracks - ?, status = 'active', "
+                    "updated_at = datetime('now') WHERE id = ?",
+                    (reset, job_id),
+                )
+            self._conn.commit()
+            return reset
+        except Exception:
+            self._conn.rollback()
+            raise
+
     def reset_in_flight_tracks(self, job_id: int) -> int:
         """Reset searching/awaiting tracks to pending so a resumed job can retry them."""
         cursor = self._conn.execute(
