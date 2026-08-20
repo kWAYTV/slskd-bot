@@ -26,6 +26,11 @@ class Config:
         self.spotify_client_id = self._get_required_env("SPOTIFY_CLIENT_ID")
         self.spotify_client_secret = self._get_required_env("SPOTIFY_CLIENT_SECRET")
 
+        # Optional: official SoundCloud API (registration requires Artist Pro).
+        # Without credentials, SoundCloud links resolve via the public oEmbed endpoint.
+        self.soundcloud_client_id = os.getenv("SOUNDCLOUD_CLIENT_ID", "")
+        self.soundcloud_client_secret = os.getenv("SOUNDCLOUD_CLIENT_SECRET", "")
+
         self.slskd_host = self._get_required_env("SLSKD_HOST")
         self.slskd_api_key = self._get_required_env("SLSKD_API_KEY")
 

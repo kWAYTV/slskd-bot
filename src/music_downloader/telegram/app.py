@@ -47,7 +47,10 @@ class MusicBot:
     def __init__(self, config: Config):
         self.config = config
         self.spotify = SpotifyResolver(config.spotify_client_id, config.spotify_client_secret)
-        self.soundcloud = SoundCloudResolver()
+        self.soundcloud = SoundCloudResolver(
+            client_id=config.soundcloud_client_id,
+            client_secret=config.soundcloud_client_secret,
+        )
         self.slskd = SlskdClient(config.slskd_host, config.slskd_api_key)
         self.scorer = ResultScorer(
             duration_tolerance_secs=config.duration_tolerance_secs,

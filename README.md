@@ -104,6 +104,8 @@ python -m music_downloader run
 | `TELEGRAM_LIBRARY_USERS` | No | — | Comma-separated Telegram user IDs allowed to save into the music library and run `/import`. Empty means all allowed users can save. Other allowed users still get the file via Telegram; the local copy is then deleted. |
 | `SPOTIFY_CLIENT_ID` | Yes | — | Spotify Developer app Client ID |
 | `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app Client Secret |
+| `SOUNDCLOUD_CLIENT_ID` | No | — | Official SoundCloud API Client ID ([registration](https://developers.soundcloud.com/docs/api/register-app) requires Artist Pro). Without it, SoundCloud links resolve via the public oEmbed endpoint |
+| `SOUNDCLOUD_CLIENT_SECRET` | No | — | Official SoundCloud API Client Secret |
 | `SLSKD_HOST` | Yes | — | slskd instance URL (e.g., `http://192.168.1.100:5030`) |
 | `SLSKD_API_KEY` | Yes | — | slskd API key (Settings > Security > API Keys) |
 | `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads (container path) |
