@@ -229,7 +229,7 @@ class TestDoSlskdSearch:
     @patch("music_downloader.telegram.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_slskd_unavailable_message(self, mock_slskd_cls, mock_spotify):
-        from music_downloader.soulseek.client import SlskdUnavailableError
+        from music_downloader.soulseek.errors import SlskdUnavailableError
 
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()

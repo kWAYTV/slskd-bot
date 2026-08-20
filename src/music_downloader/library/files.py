@@ -9,9 +9,9 @@ from difflib import SequenceMatcher
 
 import mutagen.flac
 
-logger = logging.getLogger(__name__)
+from music_downloader.library.formats import AUDIO_SUFFIXES
 
-_AUDIO_EXTENSIONS = {".flac", ".alac", ".wav", ".aiff", ".mp3", ".aac", ".m4a", ".ogg", ".opus", ".wma"}
+logger = logging.getLogger(__name__)
 
 
 class FileProcessor:
@@ -43,7 +43,7 @@ class FileProcessor:
         matches = []
         for filename in os.listdir(self.output_dir):
             _, ext = os.path.splitext(filename)
-            if ext.lower() not in _AUDIO_EXTENSIONS:
+            if ext.lower() not in AUDIO_SUFFIXES:
                 continue
 
             stem = os.path.splitext(filename)[0].lower()
@@ -72,7 +72,7 @@ class FileProcessor:
         matches = []
         for filename in os.listdir(self.output_dir):
             name, ext = os.path.splitext(filename)
-            if ext.lower() not in _AUDIO_EXTENSIONS:
+            if ext.lower() not in AUDIO_SUFFIXES:
                 continue
             if name.lower() == stem:
                 matches.append(filename)

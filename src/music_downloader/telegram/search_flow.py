@@ -14,7 +14,7 @@ from music_downloader.catalog.playlist import PlaylistResolver
 from music_downloader.catalog.soundcloud import matches_spotify_candidate
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.i18n.catalog import gettext as _
-from music_downloader.soulseek.client import SlskdUnavailableError
+from music_downloader.soulseek.errors import SlskdUnavailableError
 from music_downloader.soulseek.query import (
     build_reduced_queries,
     clean_search_title,

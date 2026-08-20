@@ -83,13 +83,3 @@ class DownloadStatus:
     @property
     def is_active(self) -> bool:
         return not self.is_complete and not self.is_failed
-
-
-@dataclass
-class ActiveDownload:
-    """Tracks a download request with its context."""
-
-    search_result: SearchResult
-    track_filename: str  # Desired output filename (e.g., "Artist - Title.flac")
-    status: DownloadStatus | None = None
-    local_path: str | None = None  # Path to the downloaded file on disk

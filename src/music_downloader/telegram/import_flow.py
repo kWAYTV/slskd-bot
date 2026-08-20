@@ -16,7 +16,7 @@ from music_downloader.catalog.track import TrackInfo
 from music_downloader.i18n.catalog import gettext as _
 from music_downloader.i18n.catalog import set_locale
 from music_downloader.playlist_import.job import JobStatus, TrackStatus
-from music_downloader.soulseek.client import SlskdUnavailableError
+from music_downloader.soulseek.errors import SlskdUnavailableError
 from music_downloader.soulseek.query import clean_search_title
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.download_flow import TELEGRAM_FILE_LIMIT

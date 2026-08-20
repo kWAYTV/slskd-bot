@@ -1,4 +1,4 @@
-"""Tests for SlskdClient._search_inner and _stop_and_collect."""
+"""Tests for the slskd search lifecycle (poll, stop, collect)."""
 
 from unittest.mock import MagicMock, patch
 
@@ -34,7 +34,7 @@ class TestSearchInner:
         client.client.searches.state = MagicMock(side_effect=state_side_effect)
         client.client.searches.delete = MagicMock()
 
-        results = await client._search_inner("test query", timeout_secs=10, response_limit=100)
+        results = await client.searches._poll("test query", timeout_secs=10, response_limit=100)
         assert isinstance(results, list)
 
     @pytest.mark.asyncio
@@ -56,7 +56,7 @@ class TestSearchInner:
         client.client.searches.state = MagicMock(side_effect=state_side_effect)
         client.client.searches.delete = MagicMock()
 
-        results = await client._search_inner("test", timeout_secs=15, response_limit=100)
+        results = await client.searches._poll("test", timeout_secs=15, response_limit=100)
         assert isinstance(results, list)
 
     @pytest.mark.asyncio
@@ -74,7 +74,7 @@ class TestSearchInner:
         client.client.searches.search_responses = MagicMock(return_value=[{"username": "u"}])
         client.client.searches.delete = MagicMock()
 
-        results = await client._search_inner("test", timeout_secs=10, response_limit=100)
+        results = await client.searches._poll("test", timeout_secs=10, response_limit=100)
         assert len(results) == 1
 
     @pytest.mark.asyncio
@@ -96,13 +96,13 @@ class TestSearchInner:
 
         client.client.searches.state = MagicMock(side_effect=state_side_effect)
 
-        await client._search_inner("test", timeout_secs=5, response_limit=100)
+        await client.searches._poll("test", timeout_secs=5, response_limit=100)
         # Should have deleted old-1 and old-2 plus the new search
         assert client.client.searches.delete.call_count >= 2
 
     @pytest.mark.asyncio
     async def test_cleanup_skips_in_flight_ids(self, client):
-        client._active_search_ids.add("keep-me")
+        client.searches._active_ids.add("keep-me")
         client.client.searches.get_all = MagicMock(
             return_value=[
                 {"id": "keep-me"},
@@ -123,7 +123,7 @@ class TestSearchInner:
             return {"fileCount": 0, "responseCount": 0, "isComplete": True}
 
         client.client.searches.state = MagicMock(side_effect=state_side_effect)
-        await client._search_inner("test", timeout_secs=5, response_limit=100)
+        await client.searches._poll("test", timeout_secs=5, response_limit=100)
         assert "keep-me" not in deleted
         assert "old-1" in deleted
 
@@ -141,7 +141,7 @@ class TestSearchInner:
         client.client.searches.state = MagicMock(side_effect=state_side_effect)
         client.client.searches.delete = MagicMock()
 
-        results = await client._search_inner("test", timeout_secs=5, response_limit=100)
+        results = await client.searches._poll("test", timeout_secs=5, response_limit=100)
         assert isinstance(results, list)
 
 
@@ -164,7 +164,7 @@ class TestStopAndCollect:
         )
         client.client.searches.delete = MagicMock()
 
-        results = await client._stop_and_collect("search-1")
+        results = await client.searches._stop_and_collect("search-1")
         assert len(results) == 2
 
     @pytest.mark.asyncio
@@ -179,7 +179,7 @@ class TestStopAndCollect:
         client.client.searches.search_responses = MagicMock(return_value=[{"username": "u"}])
         client.client.searches.delete = MagicMock()
 
-        results = await client._stop_and_collect("search-1")
+        results = await client.searches._stop_and_collect("search-1")
         assert len(results) == 1
 
     @pytest.mark.asyncio
@@ -188,5 +188,5 @@ class TestStopAndCollect:
         client.client.searches.state = MagicMock(side_effect=Exception("fail"))
         client.client.searches.delete = MagicMock()
 
-        results = await client._stop_and_collect("search-1")
+        results = await client.searches._stop_and_collect("search-1")
         assert results == []
