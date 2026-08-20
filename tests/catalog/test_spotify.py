@@ -1,4 +1,4 @@
-"""Extended tests for Spotify metadata resolver - covering SpotifyResolver class."""
+"""Tests for the Spotify metadata resolver."""
 
 from unittest.mock import patch
 

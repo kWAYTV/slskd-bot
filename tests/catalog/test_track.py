@@ -1,4 +1,4 @@
-"""Tests for Spotify metadata resolver."""
+"""Tests for Spotify track metadata (TrackInfo)."""
 
 import pytest
 

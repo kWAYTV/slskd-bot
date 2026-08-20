@@ -20,7 +20,7 @@ from telegram.ext import (
 )
 
 from music_downloader.catalog.playlist import PlaylistResolver
-from music_downloader.catalog.soundcloud import SoundCloudResolver
+from music_downloader.catalog.soundcloud_resolver import SoundCloudResolver
 from music_downloader.catalog.spotify import SpotifyResolver
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.history.store import HistoryRepository
