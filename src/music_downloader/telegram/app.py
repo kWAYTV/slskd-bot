@@ -34,7 +34,7 @@ from music_downloader.soulseek.query import parse_query_artist_title
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.soulseek.scoring import ResultScorer
 from music_downloader.telegram import commands, download_flow, import_flow, language, search_flow
-from music_downloader.telegram.messages import format_search_results, format_spotify_results
+from music_downloader.telegram.messages import format_search_results, format_spotify_results, safe_query_edit
 from music_downloader.telegram.session import ChatSession
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ class MusicBot:
             output_dir=config.output_dir,
             filename_template=config.filename_template,
         )
-        self.auto_mode = config.auto_mode
+        self.auto_mode = config.auto_mode  # process-wide default; per-chat overrides win
 
         session = ChatSession()
         self.pending = session.pending
@@ -69,6 +69,7 @@ class MusicBot:
         self._active_tasks = session._active_tasks
         self._active_import = session._active_import
         self._import_pending = session._import_pending
+        self._auto_overrides = session._auto_overrides
         self._session = session
 
         self.db = Database(f"{config.data_dir}/importer.db")
@@ -76,6 +77,10 @@ class MusicBot:
         self.import_repo = ImportRepository(self.db)
         self.locale_store = LocaleStore(self.db)
         self.playlist_resolver = PlaylistResolver(self.spotify)
+
+    def is_auto(self, chat_id: int) -> bool:
+        """Effective auto-download mode for a chat: per-chat toggle, else config default."""
+        return self._auto_overrides.get(chat_id, self.auto_mode)
 
     def _is_authorized(self, user_id: int) -> bool:
         if not self.config.telegram_allowed_users:
@@ -229,9 +234,10 @@ class MusicBot:
             return
 
         if data.startswith("auto:"):
-            self.auto_mode = data == "auto:on"
-            mode_str = _("ON") if self.auto_mode else _("OFF")
-            await query.edit_message_text(
+            self._auto_overrides[chat_id] = data == "auto:on"
+            mode_str = _("ON") if self.is_auto(chat_id) else _("OFF")
+            await safe_query_edit(
+                query,
                 _("Auto-download mode: *{mode}*").format(mode=mode_str),
                 parse_mode="Markdown",
             )

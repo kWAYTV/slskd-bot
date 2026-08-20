@@ -36,6 +36,7 @@ class PendingDownload:
     result_index: int = 0
     user_id: int | None = None
     transfer_id: str | None = None
+    progress_percent: float | None = None
 
 
 class ChatSession:
@@ -52,6 +53,7 @@ class ChatSession:
         self._active_tasks: dict[int, set[asyncio.Task]] = {}
         self._active_import: dict[int, int] = {}
         self._import_pending: dict[int, PendingSearch] = {}
+        self._auto_overrides: dict[int, bool] = {}
 
     def next_dl_id(self) -> str:
         self._dl_counter += 1

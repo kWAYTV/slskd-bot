@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Live download progress: the "Downloading" status message now updates with a percentage and progress bar (manual search and playlist import flows)
+- `/status` shows per-download progress ("42%" / "awaiting approval") and the active playlist import with saved/failed/skipped counters
+- `/auto` is now a per-chat toggle; the `AUTO_MODE` env var is only the default
+- Retry and "try next result" messages carry the `#n` result label so concurrent downloads stay distinguishable
+- Unexpected download errors now offer Retry / Try next result instead of a dead end
 - i18n via GNU gettext + Babel: English, Spanish, German, and Galician. First-time users pick a language; `/lang` (or `/language`) changes it later
 - Schema v3 adds `user_locales` for persisted language preference
 - Auto-mode actually downloads the best match after a successful search
@@ -22,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Soulseek filenames and usernames containing backticks no longer break Telegram Markdown code spans (`code_span()` / `md_code_safe()`)
+- All download status edits go through `safe_edit()`, so transient Telegram errors can't crash an in-flight download
+- In-flight downloads are registered immediately, so `/cancel` and `/status` see them before completion
 - `/status` no longer crashes when a pending search has no resolved track
 - `/status` is scoped to the current chat instead of leaking other users' activity
 - Results keyboard is locked after picking a download (prevents duplicate parallel picks)

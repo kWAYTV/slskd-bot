@@ -26,7 +26,7 @@ from music_downloader.telegram.keyboards import (
     build_import_skip_keyboard,
     build_import_track_keyboard,
 )
-from music_downloader.telegram.messages import escape_md, safe_edit, safe_query_edit
+from music_downloader.telegram.messages import escape_md, md_code_safe, progress_bar, safe_edit, safe_query_edit
 from music_downloader.telegram.session import PendingDownload, PendingSearch
 
 logger = logging.getLogger(__name__)
@@ -236,13 +236,13 @@ async def handle_import_retry(self, update, context, chat_id: int, job_id: int, 
 
     await safe_query_edit(
         query,
-        _("🔄 Retrying: `{file}`...").format(file=result.basename),
+        _("🔄 Retrying: `{file}`...").format(file=md_code_safe(result.basename)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("⬇️ Re-downloading from `{user}`...").format(user=result.username),
+        text=_("⬇️ Re-downloading from `{user}`...").format(user=md_code_safe(result.username)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -394,8 +394,8 @@ async def do_import_slskd_search(
             _("📋 *Import track:* {artist} - {title}\n⬇️ Downloading: `{file}`\nFrom: `{user}` | {quality}").format(
                 artist=escape_md(track.artist),
                 title=escape_md(track.title),
-                file=best.basename,
-                user=best.username,
+                file=md_code_safe(best.basename),
+                user=md_code_safe(best.username),
                 quality=best.quality_display,
             ),
             parse_mode=ParseMode.MARKDOWN,
@@ -444,27 +444,51 @@ async def do_import_download(
         if not success:
             await safe_edit(
                 status_msg,
-                _("❌ Failed to enqueue from `{user}`").format(user=result.username),
+                _("❌ Failed to enqueue from `{user}`").format(user=md_code_safe(result.username)),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
             return
 
+        last_edited_pct = -100.0
+
+        async def _on_progress(progress) -> None:
+            nonlocal last_edited_pct
+            pct = progress.percent_complete
+            if dl_id in self.downloads:
+                self.downloads[dl_id].progress_percent = pct
+                self.downloads[dl_id].transfer_id = progress.transfer_id or self.downloads[dl_id].transfer_id
+            if pct - last_edited_pct < 10:
+                return
+            last_edited_pct = pct
+            await safe_edit(
+                status_msg,
+                _("📋 *Import track:* {artist} - {title}\n⬇️ Downloading {pct}%\n{bar}\n`{file}`").format(
+                    artist=escape_md(track.artist),
+                    title=escape_md(track.title),
+                    pct=f"{pct:.0f}",
+                    bar=progress_bar(pct),
+                    file=md_code_safe(result.basename),
+                ),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
         status = await self.slskd.wait_for_download(
             username=result.username,
             filename=result.filename,
             timeout_secs=self.config.download_timeout_secs,
+            progress_callback=_on_progress,
         )
         transfer_id = status.transfer_id if status else None
         if dl_id in self.downloads:
-            self.downloads[dl_id].transfer_id = transfer_id
+            self.downloads[dl_id].transfer_id = transfer_id or self.downloads[dl_id].transfer_id
 
         if status is None or status.is_failed:
             state = status.state if status else _("Timeout")
             await safe_edit(
                 status_msg,
-                _("❌ Download failed: {state}\n`{file}`").format(state=state, file=result.basename),
+                _("❌ Download failed: {state}\n`{file}`").format(state=state, file=md_code_safe(result.basename)),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_failure_keyboard(job_id, track_id, dl_id),
             )
@@ -498,7 +522,7 @@ async def do_import_download(
                 _(
                     "✅ Downloaded: `{file}` ({size:.0f}MB)\n{quality}\n\nFile too large to preview. Save to library?"
                 ).format(
-                    file=result.basename,
+                    file=md_code_safe(result.basename),
                     size=file_size / (1024 * 1024),
                     quality=quality_line,
                 ),
@@ -540,7 +564,7 @@ async def do_import_download(
         logger.exception(f"Import download failed for {result.basename}")
         await safe_edit(
             status_msg,
-            _("❌ Error downloading `{file}`").format(file=result.basename),
+            _("❌ Error downloading `{file}`").format(file=md_code_safe(result.basename)),
             parse_mode=ParseMode.MARKDOWN,
         )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")

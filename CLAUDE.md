@@ -49,6 +49,7 @@ src/music_downloader/
   records/           # Shared SQLite connection used by history + import
   telegram/          # Conversation delivery — commands, search, download, import
   i18n/              # gettext catalogs + per-user locale (en/es/de/gl)
+  locales/           # .po/.mo translation files (maintained via scripts/i18n.sh)
   settings/          # Environment configuration and logging
   health/            # Process health-check endpoint
 ```
@@ -84,11 +85,14 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 
 ## Telegram UX Patterns
 
-- **Markdown escaping**: Dynamic text (filenames, paths from Soulseek) must be escaped with `_escape_md()` or wrapped in backtick code spans to avoid `BadRequest` from Telegram's Markdown parser
-- **Safe edits**: Always use the `_safe_edit()` wrapper (catches `BadRequest`, `TimedOut`, `NetworkError`) instead of raw `msg.edit_text()`
+- **Markdown escaping**: Dynamic text (filenames, paths from Soulseek) must be escaped with `escape_md()` or wrapped in backtick code spans via `code_span()` / `md_code_safe()` (plain backtick wrapping breaks when the value itself contains a backtick) to avoid `BadRequest` from Telegram's Markdown parser
+- **Safe edits**: Always use the `safe_edit()` / `safe_query_edit()` wrappers (catch `BadRequest`, `TimedOut`, `NetworkError`) instead of raw `msg.edit_text()`
 - **Result identification**: Download messages must include `#number` labels matching the result list so users can tell concurrent downloads apart
-- **Spotify results cap**: Show max 5 results to the user; fetch 10 from the API for filtering headroom
+- **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps) with a `progress_bar()` and update `PendingDownload.progress_percent` for `/status`
+- **Auto mode**: `/auto` toggles are per-chat (`MusicBot.is_auto(chat_id)`, overrides in `ChatSession._auto_overrides`); `AUTO_MODE` env is only the default
+- **Spotify results cap**: Show 5 results per page to the user; fetch up to 50 from the API for filtering headroom
 - **Spotify artist filter**: When query contains `artist - title`, filter Spotify results by artist substring match before dedup to remove noise; fall back to unfiltered if the filter empties the list
+- **i18n**: All user-facing strings go through `gettext` (`from music_downloader.i18n.catalog import gettext as _`); after changing strings run `scripts/i18n.sh` and fill in es/de/gl translations
 
 ## Deployment
 

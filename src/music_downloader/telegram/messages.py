@@ -21,6 +21,23 @@ def escape_md(text: str) -> str:
     return text
 
 
+def md_code_safe(text: str) -> str:
+    """Neutralize backticks in values interpolated into Markdown code spans."""
+    return text.replace("`", "ʼ")
+
+
+def code_span(text: str) -> str:
+    """Wrap text in a Markdown code span, neutralizing backticks that would break it."""
+    return f"`{md_code_safe(text)}`"
+
+
+def progress_bar(percent: float, width: int = 10) -> str:
+    """Render a text progress bar like ▰▰▰▱▱▱▱▱▱▱ for a 0-100 percent value."""
+    clamped = max(0.0, min(100.0, percent))
+    filled = round(clamped / 100 * width)
+    return "▰" * filled + "▱" * (width - filled)
+
+
 async def safe_edit(msg: Message, text: str, **kwargs) -> bool:
     """Edit a Telegram message, swallowing common failures.
 
@@ -64,7 +81,7 @@ def welcome_text() -> str:
         "/auto — Toggle auto-download mode\n"
         "/import <url> — Import a Spotify playlist or album\n"
         "/import resume — Continue a paused import after restart\n"
-        "/status — Show active downloads\n"
+        "/status — Show active searches, downloads, and imports\n"
         "/history — Recent downloads\n"
         "/cancel — Cancel the current search, download, or import\n"
         "/lang — Change language\n"
@@ -175,7 +192,7 @@ def format_search_results(
         lines.append(
             f"*#{i + 1}* {slot_icon} `{r.duration_display}` | "
             f"{r.quality_display}{format_tag} | {r.size_mb:.0f}MB\n"
-            f"    `{r.basename}`"
+            f"    {code_span(r.basename)}"
         )
 
     return "\n".join(lines)

@@ -257,8 +257,19 @@ class SlskdClient:
             logger.exception(f"Failed to get download status for {filename}")
             return None
 
-    async def wait_for_download(self, username: str, filename: str, timeout_secs: int = 600) -> DownloadStatus | None:
-        """Wait for a download to complete, polling periodically."""
+    async def wait_for_download(
+        self,
+        username: str,
+        filename: str,
+        timeout_secs: int = 600,
+        progress_callback=None,
+    ) -> DownloadStatus | None:
+        """Wait for a download to complete, polling periodically.
+
+        ``progress_callback`` is an optional async callable invoked with the
+        in-flight ``DownloadStatus`` on each poll (not on completion/failure).
+        Callback errors are logged and never abort the wait.
+        """
         start = time.time()
 
         while time.time() - start < timeout_secs:
@@ -278,6 +289,11 @@ class SlskdClient:
                 return status
 
             logger.debug(f"Download {status.percent_complete:.0f}%: {filename}")
+            if progress_callback is not None:
+                try:
+                    await progress_callback(status)
+                except Exception:
+                    logger.debug("Progress callback failed for %s", filename, exc_info=True)
 
         logger.warning(f"Download timed out after {timeout_secs}s: {filename}")
         return None

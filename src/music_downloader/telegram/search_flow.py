@@ -26,7 +26,7 @@ from music_downloader.telegram.keyboards import (
     build_results_keyboard,
     build_spotify_keyboard,
 )
-from music_downloader.telegram.messages import escape_md, safe_edit
+from music_downloader.telegram.messages import escape_md, md_code_safe, safe_edit
 from music_downloader.telegram.session import PendingSearch
 
 logger = logging.getLogger(__name__)
@@ -579,7 +579,7 @@ async def present_search_results(
         user_id=existing.user_id if existing else None,
     )
 
-    if self.auto_mode:
+    if self.is_auto(chat_id):
         header = _track_md(track)
         await safe_edit(
             searching_msg,
@@ -590,7 +590,7 @@ async def present_search_results(
         status_msg = await context.bot.send_message(
             chat_id=chat_id,
             text=_("⬇️ *Downloading #{n}...*\n{track}\nFrom: `{user}`\nFile: `{file}`").format(
-                n=1, track=header, user=result.username, file=result.basename
+                n=1, track=header, user=md_code_safe(result.username), file=md_code_safe(result.basename)
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
