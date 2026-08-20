@@ -39,11 +39,6 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
     ),
     "*Active searches:*": ("*Búsquedas activas:*", "*Aktive Suchen:*", "*Buscas activas:*"),
     "*Active downloads:*": ("*Descargas activas:*", "*Aktive Downloads:*", "*Descargas activas:*"),
-    "No active searches or downloads.": (
-        "No hay búsquedas ni descargas activas.",
-        "Keine aktiven Suchen oder Downloads.",
-        "Non hai buscas nin descargas activas.",
-    ),
     "No downloads yet.": (
         "Aún no hay descargas.",
         "Noch keine Downloads.",
@@ -154,10 +149,10 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "❌ Quelldatei nicht gefunden.",
         "❌ Non se atopou o ficheiro de orixe.",
     ),
-    "🚫 Rejected: {artist} - {title}": (
-        "🚫 Rechazado: {artist} - {title}",
-        "🚫 Abgelehnt: {artist} - {title}",
-        "🚫 Rexeitado: {artist} - {title}",
+    "🗑 Discarded: {artist} - {title}": (
+        "🗑 Descartado: {artist} - {title}",
+        "🗑 Verworfen: {artist} - {title}",
+        "🗑 Descartado: {artist} - {title}",
     ),
     "⏹ Download expired. Send a new search.": (
         "⏹ La descarga ha caducado. Envía una nueva búsqueda.",
@@ -183,16 +178,6 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "⏹ No hay más resultados que probar.",
         "⏹ Keine weiteren Ergebnisse zum Ausprobieren.",
         "⏹ Non hai máis resultados que probar.",
-    ),
-    "⏭ Trying next result: `{file}`": (
-        "⏭ Probando el siguiente resultado: `{file}`",
-        "⏭ Nächstes Ergebnis: `{file}`",
-        "⏭ Probando o seguinte resultado: `{file}`",
-    ),
-    "⬇️ Downloading from `{user}`...": (
-        "⬇️ Descargando de `{user}`...",
-        "⬇️ Lade von `{user}` herunter...",
-        "⬇️ Descargando de `{user}`...",
     ),
     "You have an unfinished import: *{name}* ({done}/{total}).\nSend `/import resume` to continue, or /cancel to stop it.": (
         "Tienes una importación sin terminar: *{name}* ({done}/{total}).\nEnvía `/import resume` para continuar, o /cancel para detenerla.",
@@ -252,7 +237,7 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "✅ Import gestartet! Titel werden nacheinander verarbeitet...",
         "✅ Importación iniciada! Procesando as pistas unha a unha...",
     ),
-    "🚫 Track rejected.": ("🚫 Pista rechazada.", "🚫 Titel abgelehnt.", "🚫 Pista rexeitada."),
+    "🗑 Track discarded.": ("🗑 Pista descartada.", "🗑 Titel verworfen.", "🗑 Pista descartada."),
     "⏭ Track skipped.": ("⏭ Pista omitida.", "⏭ Titel übersprungen.", "⏭ Pista omitida."),
     "⏹ Download expired. Use Skip or Mark failed to continue the import.": (
         "⏹ La descarga ha caducado. Usa Omitir o Marcar fallida para continuar la importación.",
@@ -270,10 +255,36 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "❌ Datei konnte nicht gespeichert werden.",
         "❌ Non se puido gardar o ficheiro.",
     ),
-    "🏁 *Import complete!*\n\n✅ Saved: {saved}\n❌ Failed: {failed}\n⏭ Skipped: {skipped}\n📊 Total: {total}": (
-        "🏁 *¡Importación completa!*\n\n✅ Guardadas: {saved}\n❌ Fallidas: {failed}\n⏭ Omitidas: {skipped}\n📊 Total: {total}",
-        "🏁 *Import abgeschlossen!*\n\n✅ Gespeichert: {saved}\n❌ Fehlgeschlagen: {failed}\n⏭ Übersprungen: {skipped}\n📊 Gesamt: {total}",
-        "🏁 *Importación completa!*\n\n✅ Gardadas: {saved}\n❌ Fallidas: {failed}\n⏭ Omitidas: {skipped}\n📊 Total: {total}",
+    "🏁 *Import complete!*": (
+        "🏁 *¡Importación completa!*",
+        "🏁 *Import abgeschlossen!*",
+        "🏁 *Importación completa!*",
+    ),
+    "✅ Saved: {saved}\n❌ Failed: {failed}\n⏭ Skipped: {skipped}\n📊 Total: {total}": (
+        "✅ Guardadas: {saved}\n❌ Fallidas: {failed}\n⏭ Omitidas: {skipped}\n📊 Total: {total}",
+        "✅ Gespeichert: {saved}\n❌ Fehlgeschlagen: {failed}\n⏭ Übersprungen: {skipped}\n📊 Gesamt: {total}",
+        "✅ Gardadas: {saved}\n❌ Fallidas: {failed}\n⏭ Omitidas: {skipped}\n📊 Total: {total}",
+    ),
+    "*Failed tracks:*": (
+        "*Pistas fallidas:*",
+        "*Fehlgeschlagene Titel:*",
+        "*Pistas fallidas:*",
+    ),
+    "…and {n} more": ("…y {n} más", "…und {n} weitere", "…e {n} máis"),
+    "Nothing to retry — no failed tracks left.": (
+        "Nada que reintentar: no quedan pistas fallidas.",
+        "Nichts zu wiederholen — keine fehlgeschlagenen Titel übrig.",
+        "Nada que reintentar: non quedan pistas fallidas.",
+    ),
+    "🔄 Retrying {n} failed track(s)...": (
+        "🔄 Reintentando {n} pista(s) fallida(s)...",
+        "🔄 {n} fehlgeschlagene(r) Titel werden wiederholt...",
+        "🔄 Reintentando {n} pista(s) fallida(s)...",
+    ),
+    ("🔄 Retry {n} failed track", "🔄 Retry {n} failed tracks"): (
+        ("🔄 Reintentar {n} pista fallida", "🔄 Reintentar {n} pistas fallidas"),
+        ("🔄 {n} fehlgeschlagenen Titel wiederholen", "🔄 {n} fehlgeschlagene Titel wiederholen"),
+        ("🔄 Reintentar {n} pista fallida", "🔄 Reintentar {n} pistas fallidas"),
     ),
     "📋 *Import [{position}/{total}]*\n🔍 Searching: *{artist} - {title}*\nAlbum: {album} ({year})": (
         "📋 *Importación [{position}/{total}]*\n🔍 Buscando: *{artist} - {title}*\nÁlbum: {album} ({year})",
@@ -349,8 +360,8 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
     "Next ▶️": ("Sig ▶️", "Weiter ▶️", "Seg ▶️"),
     "Auto-pick best": ("Elegir la mejor", "Beste automatisch", "Elixir a mellor"),
     "Cancel": ("Cancelar", "Abbrechen", "Cancelar"),
-    "✅ Save to library": ("✅ Guardar en la biblioteca", "✅ In Bibliothek speichern", "✅ Gardar na biblioteca"),
-    "🚫 Reject": ("🚫 Rechazar", "🚫 Ablehnen", "🚫 Rexeitar"),
+    "💾 Save to library": ("💾 Guardar en la biblioteca", "💾 In Bibliothek speichern", "💾 Gardar na biblioteca"),
+    "🗑 Discard": ("🗑 Descartar", "🗑 Verwerfen", "🗑 Descartar"),
     "⏭ Try next result": ("⏭ Probar el siguiente", "⏭ Nächstes Ergebnis", "⏭ Probar o seguinte"),
     "Continue anyway": ("Continuar de todos modos", "Trotzdem fortfahren", "Continuar de todos os xeitos"),
     "🔍 Search Soulseek directly": (
@@ -362,8 +373,79 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
     "Enable auto-mode": ("Activar auto-modo", "Auto-Modus an", "Activar auto-modo"),
     "✅ Start import": ("✅ Iniciar importación", "✅ Import starten", "✅ Iniciar importación"),
     "❌ Cancel": ("❌ Cancelar", "❌ Abbrechen", "❌ Cancelar"),
-    "✅ Save": ("✅ Guardar", "✅ Speichern", "✅ Gardar"),
     "⏭ Skip track": ("⏭ Omitir pista", "⏭ Titel überspringen", "⏭ Omitir pista"),
+    "Prefer Hi-Res (24-bit)": (
+        "Preferir Hi-Res (24 bits)",
+        "Hi-Res bevorzugen (24 Bit)",
+        "Preferir Hi-Res (24 bits)",
+    ),
+    "Prefer CD quality (16/44.1)": (
+        "Preferir calidad CD (16/44.1)",
+        "CD-Qualität bevorzugen (16/44.1)",
+        "Preferir calidade CD (16/44.1)",
+    ),
+    "CD quality (16/44.1)": ("Calidad CD (16/44.1)", "CD-Qualität (16/44.1)", "Calidade CD (16/44.1)"),
+    "Hi-Res (24-bit)": ("Hi-Res (24 bits)", "Hi-Res (24 Bit)", "Hi-Res (24 bits)"),
+    "Audio quality preference: *{label}*": (
+        "Preferencia de calidad de audio: *{label}*",
+        "Audioqualitäts-Präferenz: *{label}*",
+        "Preferencia de calidade de audio: *{label}*",
+    ),
+    "Audio quality preference: *{label}*\n\nThis changes how search results are ranked — the preferred format scores higher.": (
+        "Preferencia de calidad de audio: *{label}*\n\nEsto cambia cómo se ordenan los resultados de búsqueda: el formato preferido puntúa más alto.",
+        "Audioqualitäts-Präferenz: *{label}*\n\nDies ändert die Sortierung der Suchergebnisse — das bevorzugte Format erhält eine höhere Punktzahl.",
+        "Preferencia de calidade de audio: *{label}*\n\nIsto cambia como se ordenan os resultados da busca: o formato preferido puntúa máis alto.",
+    ),
+    "Nothing to undo — no library saves in this chat.": (
+        "Nada que deshacer: no hay guardados en la biblioteca en este chat.",
+        "Nichts rückgängig zu machen — keine gespeicherten Titel in diesem Chat.",
+        "Nada que desfacer: non hai gardados na biblioteca neste chat.",
+    ),
+    "↩️ Removed from library: {name}": (
+        "↩️ Eliminado de la biblioteca: {name}",
+        "↩️ Aus der Bibliothek entfernt: {name}",
+        "↩️ Eliminado da biblioteca: {name}",
+    ),
+    "Could not find {name} in the library — maybe it was already removed.": (
+        "No se encontró {name} en la biblioteca; quizá ya se eliminó.",
+        "{name} wurde nicht in der Bibliothek gefunden — vielleicht wurde es bereits entfernt.",
+        "Non se atopou {name} na biblioteca; quizais xa se eliminou.",
+    ),
+    "⏱ exact duration": ("⏱ duración exacta", "⏱ exakte Dauer", "⏱ duración exacta"),
+    "⏱ ±{secs}s": ("⏱ ±{secs}s", "⏱ ±{secs}s", "⏱ ±{secs}s"),
+    "🟢 free slot": ("🟢 hueco libre", "🟢 freier Slot", "🟢 oco libre"),
+    "🔴 queue of {n}": ("🔴 cola de {n}", "🔴 Warteschlange von {n}", "🔴 cola de {n}"),
+    "⭐ {score}/100": ("⭐ {score}/100", "⭐ {score}/100", "⭐ {score}/100"),
+    "That looks like a playlist or album link.\nUse `/import {url}` to import it.": (
+        "Eso parece un enlace de playlist o álbum.\nUsa `/import {url}` para importarlo.",
+        "Das sieht nach einem Playlist- oder Album-Link aus.\nVerwende `/import {url}`, um ihn zu importieren.",
+        "Iso parece unha ligazón de playlist ou álbum.\nUsa `/import {url}` para importalo.",
+    ),
+    "🔗 Resolving Spotify track link...": (
+        "🔗 Resolviendo el enlace de pista de Spotify...",
+        "🔗 Spotify-Track-Link wird aufgelöst...",
+        "🔗 Resolvendo a ligazón de pista de Spotify...",
+    ),
+    "Could not resolve that Spotify track link. Try the song name instead.": (
+        "No se pudo resolver ese enlace de pista de Spotify. Prueba con el nombre de la canción.",
+        "Dieser Spotify-Track-Link konnte nicht aufgelöst werden. Versuche es mit dem Songnamen.",
+        "Non se puido resolver esa ligazón de pista de Spotify. Proba co nome da canción.",
+    ),
+    "🔗 Resolving SoundCloud link...": (
+        "🔗 Resolviendo el enlace de SoundCloud...",
+        "🔗 SoundCloud-Link wird aufgelöst...",
+        "🔗 Resolvendo a ligazón de SoundCloud...",
+    ),
+    "Could not resolve that SoundCloud link. Try the song name instead.": (
+        "No se pudo resolver ese enlace de SoundCloud. Prueba con el nombre de la canción.",
+        "Dieser SoundCloud-Link konnte nicht aufgelöst werden. Versuche es mit dem Songnamen.",
+        "Non se puido resolver esa ligazón de SoundCloud. Proba co nome da canción.",
+    ),
+    "🎧 SoundCloud: *{artist} - {title}*\nLooking it up...": (
+        "🎧 SoundCloud: *{artist} - {title}*\nBuscándolo...",
+        "🎧 SoundCloud: *{artist} - {title}*\nWird gesucht...",
+        "🎧 SoundCloud: *{artist} - {title}*\nBuscándoo...",
+    ),
     "🚫 Mark failed": ("🚫 Marcar fallida", "🚫 Als fehlgeschlagen", "🚫 Marcar fallida"),
     "🔄 Retry": ("🔄 Reintentar", "🔄 Erneut versuchen", "🔄 Reintentar"),
     "Choose a language:": ("Elige un idioma:", "Wähle eine Sprache:", "Escolle un idioma:"),
@@ -372,10 +454,10 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "Sprache gesetzt: {name}.",
         "Idioma estabelecido: {name}.",
     ),
-    "Send me a song name (e.g., `Nancy Sinatra Bang Bang`) and I'll find and download it in FLAC.\n\nCommands:\n/auto — Toggle auto-download mode\n/import <url> — Import a Spotify playlist or album\n/import resume — Continue a paused import after restart\n/status — Show active downloads\n/history — Recent downloads\n/cancel — Cancel the current search, download, or import\n/lang — Change language\n/help — Show this message": (
-        "Envíame el nombre de una canción (p. ej., `Nancy Sinatra Bang Bang`) y la buscaré y descargaré en FLAC.\n\nComandos:\n/auto — Activar o desactivar la descarga automática\n/import <url> — Importar una playlist o álbum de Spotify\n/import resume — Continuar una importación pausada tras un reinicio\n/status — Mostrar descargas activas\n/history — Descargas recientes\n/cancel — Cancelar la búsqueda, descarga o importación actual\n/lang — Cambiar idioma\n/help — Mostrar este mensaje",
-        "Schick mir einen Songnamen (z. B. `Nancy Sinatra Bang Bang`) und ich suche und lade ihn als FLAC herunter.\n\nBefehle:\n/auto — Automatischen Download umschalten\n/import <url> — Spotify-Playlist oder -Album importieren\n/import resume — Pausierten Import nach einem Neustart fortsetzen\n/status — Aktive Downloads anzeigen\n/history — Letzte Downloads\n/cancel — Aktuelle Suche, Download oder Import abbrechen\n/lang — Sprache ändern\n/help — Diese Nachricht anzeigen",
-        "Envíame o nome dunha canción (p. ex., `Nancy Sinatra Bang Bang`) e buscareina e descargareina en FLAC.\n\nComandos:\n/auto — Activar ou desactivar a descarga automática\n/import <url> — Importar unha playlist ou álbum de Spotify\n/import resume — Continuar unha importación pausada tras un reinicio\n/status — Amosar descargas activas\n/history — Descargas recentes\n/cancel — Cancelar a busca, descarga ou importación actual\n/lang — Cambiar o idioma\n/help — Amosar esta mensaxe",
+    "Send me a song name (e.g., `Nancy Sinatra Bang Bang`), a Spotify track link, or a SoundCloud track link and I'll find and download it in FLAC.\n\nCommands:\n/auto — Toggle auto-download mode\n/quality — Prefer CD or Hi-Res audio\n/import <url> — Import a Spotify playlist or album\n/import resume — Continue a paused import after restart\n/status — Show active searches, downloads, and imports\n/history — Recent downloads\n/undo — Remove the last track saved to the library\n/cancel — Cancel the current search, download, or import\n/lang — Change language\n/help — Show this message": (
+        "Envíame el nombre de una canción (p. ej., `Nancy Sinatra Bang Bang`), un enlace de pista de Spotify o un enlace de pista de SoundCloud y la buscaré y descargaré en FLAC.\n\nComandos:\n/auto — Alternar el modo de descarga automática\n/quality — Preferir audio CD o Hi-Res\n/import <url> — Importar una playlist o álbum de Spotify\n/import resume — Continuar una importación pausada tras un reinicio\n/status — Mostrar búsquedas, descargas e importaciones activas\n/history — Descargas recientes\n/undo — Eliminar la última pista guardada en la biblioteca\n/cancel — Cancelar la búsqueda, descarga o importación actual\n/lang — Cambiar idioma\n/help — Mostrar este mensaje",
+        "Schick mir einen Songnamen (z. B. `Nancy Sinatra Bang Bang`), einen Spotify-Track-Link oder einen SoundCloud-Track-Link und ich finde und lade ihn als FLAC herunter.\n\nBefehle:\n/auto — Automatischen Download umschalten\n/quality — CD- oder Hi-Res-Audio bevorzugen\n/import <url> — Spotify-Playlist oder -Album importieren\n/import resume — Pausierten Import nach einem Neustart fortsetzen\n/status — Aktive Suchen, Downloads und Importe anzeigen\n/history — Letzte Downloads\n/undo — Zuletzt in der Bibliothek gespeicherten Titel entfernen\n/cancel — Aktuelle Suche, Download oder Import abbrechen\n/lang — Sprache ändern\n/help — Diese Nachricht anzeigen",
+        "Envíame o nome dunha canción (p. ex., `Nancy Sinatra Bang Bang`), unha ligazón de pista de Spotify ou unha ligazón de pista de SoundCloud e buscareina e descargareina en FLAC.\n\nComandos:\n/auto — Alternar o modo de descarga automática\n/quality — Preferir audio CD ou Hi-Res\n/import <url> — Importar unha playlist ou álbum de Spotify\n/import resume — Continuar unha importación pausada tras un reinicio\n/status — Amosar buscas, descargas e importacións activas\n/history — Descargas recentes\n/undo — Eliminar a última pista gardada na biblioteca\n/cancel — Cancelar a busca, descarga ou importación actual\n/lang — Cambiar o idioma\n/help — Amosar esta mensaxe",
     ),
     "{emoji} Lossless OK (spectrum to {khz:.1f}kHz)": (
         "{emoji} Lossless OK (espectro hasta {khz:.1f}kHz)",
@@ -549,6 +631,61 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "⬇️ *Descargando #{n}...*\n{track}\nDe: `{user}`\nArchivo: `{file}`",
         "⬇️ *Lade #{n} herunter...*\n{track}\nVon: `{user}`\nDatei: `{file}`",
         "⬇️ *Descargando #{n}...*\n{track}\nDe: `{user}`\nFicheiro: `{file}`",
+    ),
+    "awaiting approval": (
+        "esperando aprobación",
+        "wartet auf Freigabe",
+        "agardando aprobación",
+    ),
+    "starting...": (
+        "iniciando...",
+        "startet...",
+        "iniciando...",
+    ),
+    "*Active import:*": (
+        "*Importación activa:*",
+        "*Aktiver Import:*",
+        "*Importación activa:*",
+    ),
+    "• {name} — {done}/{total} processed ({ok} saved, {failed} failed, {skipped} skipped)": (
+        "• {name} — {done}/{total} procesadas ({ok} guardadas, {failed} fallidas, {skipped} omitidas)",
+        "• {name} — {done}/{total} verarbeitet ({ok} gespeichert, {failed} fehlgeschlagen, {skipped} übersprungen)",
+        "• {name} — {done}/{total} procesadas ({ok} gardadas, {failed} fallidas, {skipped} omitidas)",
+    ),
+    "No active searches, downloads, or imports.": (
+        "No hay búsquedas, descargas ni importaciones activas.",
+        "Keine aktiven Suchen, Downloads oder Importe.",
+        "Non hai buscas, descargas nin importacións activas.",
+    ),
+    "⬇️ *Downloading {label}...* {pct}%\n{bar}\n{artist} - {title}\nFile: `{file}`": (
+        "⬇️ *Descargando {label}...* {pct}%\n{bar}\n{artist} - {title}\nArchivo: `{file}`",
+        "⬇️ *Lade {label} herunter...* {pct}%\n{bar}\n{artist} - {title}\nDatei: `{file}`",
+        "⬇️ *Descargando {label}...* {pct}%\n{bar}\n{artist} - {title}\nFicheiro: `{file}`",
+    ),
+    "🔄 Retrying {label}: `{file}`...": (
+        "🔄 Reintentando {label}: `{file}`...",
+        "🔄 Erneuter Versuch {label}: `{file}`...",
+        "🔄 Reintentando {label}: `{file}`...",
+    ),
+    "⬇️ Re-downloading {label} from `{user}`...": (
+        "⬇️ Volviendo a descargar {label} de `{user}`...",
+        "⬇️ Lade {label} erneut von `{user}` herunter...",
+        "⬇️ Volvendo a descargar {label} de `{user}`...",
+    ),
+    "⏭ Trying next result {label}: `{file}`": (
+        "⏭ Probando el siguiente resultado {label}: `{file}`",
+        "⏭ Nächstes Ergebnis {label}: `{file}`",
+        "⏭ Probando o seguinte resultado {label}: `{file}`",
+    ),
+    "⬇️ Downloading {label} from `{user}`...": (
+        "⬇️ Descargando {label} de `{user}`...",
+        "⬇️ Lade {label} von `{user}` herunter...",
+        "⬇️ Descargando {label} de `{user}`...",
+    ),
+    "📋 *Import track:* {artist} - {title}\n⬇️ Downloading {pct}%\n{bar}\n`{file}`": (
+        "📋 *Pista de importación:* {artist} - {title}\n⬇️ Descargando {pct}%\n{bar}\n`{file}`",
+        "📋 *Import-Titel:* {artist} - {title}\n⬇️ Download {pct}%\n{bar}\n`{file}`",
+        "📋 *Pista de importación:* {artist} - {title}\n⬇️ Descargando {pct}%\n{bar}\n`{file}`",
     ),
 }
 
