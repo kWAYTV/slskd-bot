@@ -1305,7 +1305,7 @@ class TestRankResponses:
         bot = MusicBot(_make_config())
         track = _make_track()
         mp3_result = [_make_search_result()]
-        # First call (flac_only=True) returns nothing scored, second call returns results
+        # FLAC tier returns nothing scored, the next tier returns results.
         bot.slskd.parse_results = MagicMock(side_effect=[[], mp3_result])
         bot.scorer.score_results = MagicMock(side_effect=[[], mp3_result])
         ranked, is_fallback = bot._rank_responses([], track)
@@ -1782,32 +1782,55 @@ class TestLinkQueries:
 
 
 # ---------------------------------------------------------------------------
-# /quality and /undo commands
+# Format tiers: FLAC > other lossless > lossy
 # ---------------------------------------------------------------------------
 
 
-class TestQualityCommand:
-    @patch("music_downloader.telegram.app.SpotifyResolver")
-    @patch("music_downloader.telegram.app.SlskdClient")
-    def test_default_pref_from_config(self, mock_slskd, mock_spotify):
-        config = _make_config()
-        config.quality_preference = "hires"
-        bot = MusicBot(config)
-        assert bot.quality_pref(1) == "hires"
+class TestFormatTiers:
+    def _make_bot_with_real_parsing(self):
+        from music_downloader.soulseek.client import SlskdClient as RealSlskdClient
 
-    @patch("music_downloader.telegram.app.SpotifyResolver")
-    @patch("music_downloader.telegram.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_qp_callback_sets_override(self, mock_slskd, mock_spotify):
-        config = _make_config()
-        config.quality_preference = "hires"
-        bot = MusicBot(config)
-        update = _make_callback_update(data="qp:cd")
-        context = _make_context()
-        await bot.handle_callback(update, context)
-        assert bot.quality_pref(update.effective_chat.id) == "cd"
-        # Other chats keep the default.
-        assert bot.quality_pref(99999) == "hires"
+        with (
+            patch("music_downloader.telegram.app.SpotifyResolver"),
+            patch("music_downloader.telegram.app.SlskdClient"),
+        ):
+            bot = MusicBot(_make_config())
+        # parse_results only needs the class, not a live slskd connection.
+        bot.slskd = RealSlskdClient.__new__(RealSlskdClient)
+        return bot
+
+    @staticmethod
+    def _response(*filenames):
+        return [
+            {
+                "username": "user1",
+                "hasFreeUploadSlot": True,
+                "uploadSpeed": 1_000_000,
+                "queueLength": 0,
+                "files": [{"filename": f"\\Music\\{name}", "size": 30_000_000, "length": 162} for name in filenames],
+            }
+        ]
+
+    def test_flac_wins_over_everything(self):
+        bot = self._make_bot_with_real_parsing()
+        raw = self._response("Nancy Sinatra - Bang Bang.flac", "Nancy Sinatra - Bang Bang.wav")
+        ranked, is_fallback = bot._rank_responses(raw, _make_track())
+        assert [r.extension for r in ranked] == ["flac"]
+        assert is_fallback is False
+
+    def test_wav_wins_over_lossy_when_no_flac(self):
+        bot = self._make_bot_with_real_parsing()
+        raw = self._response("Nancy Sinatra - Bang Bang.wav", "Nancy Sinatra - Bang Bang.mp3")
+        ranked, is_fallback = bot._rank_responses(raw, _make_track())
+        assert [r.extension for r in ranked] == ["wav"]
+        assert is_fallback is True
+
+    def test_lossy_only_as_last_resort(self):
+        bot = self._make_bot_with_real_parsing()
+        raw = self._response("Nancy Sinatra - Bang Bang.mp3")
+        ranked, is_fallback = bot._rank_responses(raw, _make_track())
+        assert [r.extension for r in ranked] == ["mp3"]
+        assert is_fallback is True
 
 
 class TestUndoCommand:

@@ -374,28 +374,6 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
     "✅ Start import": ("✅ Iniciar importación", "✅ Import starten", "✅ Iniciar importación"),
     "❌ Cancel": ("❌ Cancelar", "❌ Abbrechen", "❌ Cancelar"),
     "⏭ Skip track": ("⏭ Omitir pista", "⏭ Titel überspringen", "⏭ Omitir pista"),
-    "Prefer Hi-Res (24-bit)": (
-        "Preferir Hi-Res (24 bits)",
-        "Hi-Res bevorzugen (24 Bit)",
-        "Preferir Hi-Res (24 bits)",
-    ),
-    "Prefer CD quality (16/44.1)": (
-        "Preferir calidad CD (16/44.1)",
-        "CD-Qualität bevorzugen (16/44.1)",
-        "Preferir calidade CD (16/44.1)",
-    ),
-    "CD quality (16/44.1)": ("Calidad CD (16/44.1)", "CD-Qualität (16/44.1)", "Calidade CD (16/44.1)"),
-    "Hi-Res (24-bit)": ("Hi-Res (24 bits)", "Hi-Res (24 Bit)", "Hi-Res (24 bits)"),
-    "Audio quality preference: *{label}*": (
-        "Preferencia de calidad de audio: *{label}*",
-        "Audioqualitäts-Präferenz: *{label}*",
-        "Preferencia de calidade de audio: *{label}*",
-    ),
-    "Audio quality preference: *{label}*\n\nThis changes how search results are ranked — the preferred format scores higher.": (
-        "Preferencia de calidad de audio: *{label}*\n\nEsto cambia cómo se ordenan los resultados de búsqueda: el formato preferido puntúa más alto.",
-        "Audioqualitäts-Präferenz: *{label}*\n\nDies ändert die Sortierung der Suchergebnisse — das bevorzugte Format erhält eine höhere Punktzahl.",
-        "Preferencia de calidade de audio: *{label}*\n\nIsto cambia como se ordenan os resultados da busca: o formato preferido puntúa máis alto.",
-    ),
     "Nothing to undo — no library saves in this chat.": (
         "Nada que deshacer: no hay guardados en la biblioteca en este chat.",
         "Nichts rückgängig zu machen — keine gespeicherten Titel in diesem Chat.",
@@ -459,10 +437,10 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "Sprache gesetzt: {name}.",
         "Idioma estabelecido: {name}.",
     ),
-    "Send me a song name (e.g., `Nancy Sinatra Bang Bang`), a Spotify track link, or a SoundCloud track link and I'll find and download it in FLAC.\n\nCommands:\n/auto — Toggle auto-download mode\n/quality — Prefer CD or Hi-Res audio\n/import <url> — Import a Spotify playlist or album\n/import resume — Continue a paused import after restart\n/status — Show active searches, downloads, and imports\n/history — Recent downloads\n/undo — Remove the last track saved to the library\n/cancel — Cancel the current search, download, or import\n/lang — Change language\n/help — Show this message": (
-        "Envíame el nombre de una canción (p. ej., `Nancy Sinatra Bang Bang`), un enlace de pista de Spotify o un enlace de pista de SoundCloud y la buscaré y descargaré en FLAC.\n\nComandos:\n/auto — Alternar el modo de descarga automática\n/quality — Preferir audio CD o Hi-Res\n/import <url> — Importar una playlist o álbum de Spotify\n/import resume — Continuar una importación pausada tras un reinicio\n/status — Mostrar búsquedas, descargas e importaciones activas\n/history — Descargas recientes\n/undo — Eliminar la última pista guardada en la biblioteca\n/cancel — Cancelar la búsqueda, descarga o importación actual\n/lang — Cambiar idioma\n/help — Mostrar este mensaje",
-        "Schick mir einen Songnamen (z. B. `Nancy Sinatra Bang Bang`), einen Spotify-Track-Link oder einen SoundCloud-Track-Link und ich finde und lade ihn als FLAC herunter.\n\nBefehle:\n/auto — Automatischen Download umschalten\n/quality — CD- oder Hi-Res-Audio bevorzugen\n/import <url> — Spotify-Playlist oder -Album importieren\n/import resume — Pausierten Import nach einem Neustart fortsetzen\n/status — Aktive Suchen, Downloads und Importe anzeigen\n/history — Letzte Downloads\n/undo — Zuletzt in der Bibliothek gespeicherten Titel entfernen\n/cancel — Aktuelle Suche, Download oder Import abbrechen\n/lang — Sprache ändern\n/help — Diese Nachricht anzeigen",
-        "Envíame o nome dunha canción (p. ex., `Nancy Sinatra Bang Bang`), unha ligazón de pista de Spotify ou unha ligazón de pista de SoundCloud e buscareina e descargareina en FLAC.\n\nComandos:\n/auto — Alternar o modo de descarga automática\n/quality — Preferir audio CD ou Hi-Res\n/import <url> — Importar unha playlist ou álbum de Spotify\n/import resume — Continuar unha importación pausada tras un reinicio\n/status — Amosar buscas, descargas e importacións activas\n/history — Descargas recentes\n/undo — Eliminar a última pista gardada na biblioteca\n/cancel — Cancelar a busca, descarga ou importación actual\n/lang — Cambiar o idioma\n/help — Amosar esta mensaxe",
+    "Send me a song name (e.g., `Nancy Sinatra Bang Bang`), a Spotify track link, or a SoundCloud track link and I'll find and download it in FLAC.\n\nCommands:\n/auto — Toggle auto-download mode\n/import <url> — Import a Spotify playlist or album\n/import resume — Continue a paused import after restart\n/status — Show active searches, downloads, and imports\n/history — Recent downloads\n/undo — Remove the last track saved to the library\n/cancel — Cancel the current search, download, or import\n/lang — Change language\n/help — Show this message": (
+        "Envíame el nombre de una canción (p. ej., `Nancy Sinatra Bang Bang`), un enlace de pista de Spotify o un enlace de pista de SoundCloud y la buscaré y descargaré en FLAC.\n\nComandos:\n/auto — Alternar el modo de descarga automática\n/import <url> — Importar una playlist o álbum de Spotify\n/import resume — Continuar una importación pausada tras un reinicio\n/status — Mostrar búsquedas, descargas e importaciones activas\n/history — Descargas recientes\n/undo — Eliminar la última pista guardada en la biblioteca\n/cancel — Cancelar la búsqueda, descarga o importación actual\n/lang — Cambiar idioma\n/help — Mostrar este mensaje",
+        "Schick mir einen Songnamen (z. B. `Nancy Sinatra Bang Bang`), einen Spotify-Track-Link oder einen SoundCloud-Track-Link und ich finde und lade ihn als FLAC herunter.\n\nBefehle:\n/auto — Automatischen Download umschalten\n/import <url> — Spotify-Playlist oder -Album importieren\n/import resume — Pausierten Import nach einem Neustart fortsetzen\n/status — Aktive Suchen, Downloads und Importe anzeigen\n/history — Letzte Downloads\n/undo — Zuletzt in der Bibliothek gespeicherten Titel entfernen\n/cancel — Aktuelle Suche, Download oder Import abbrechen\n/lang — Sprache ändern\n/help — Diese Nachricht anzeigen",
+        "Envíame o nome dunha canción (p. ex., `Nancy Sinatra Bang Bang`), unha ligazón de pista de Spotify ou unha ligazón de pista de SoundCloud e buscareina e descargareina en FLAC.\n\nComandos:\n/auto — Alternar o modo de descarga automática\n/import <url> — Importar unha playlist ou álbum de Spotify\n/import resume — Continuar unha importación pausada tras un reinicio\n/status — Amosar buscas, descargas e importacións activas\n/history — Descargas recentes\n/undo — Eliminar a última pista gardada na biblioteca\n/cancel — Cancelar a busca, descarga ou importación actual\n/lang — Cambiar o idioma\n/help — Amosar esta mensaxe",
     ),
     "{emoji} Lossless OK (spectrum to {khz:.1f}kHz)": (
         "{emoji} Lossless OK (espectro hasta {khz:.1f}kHz)",

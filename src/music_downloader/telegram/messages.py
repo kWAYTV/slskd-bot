@@ -83,7 +83,6 @@ def welcome_text() -> str:
         "or a SoundCloud track link and I'll find and download it in FLAC.\n\n"
         "Commands:\n"
         "/auto — Toggle auto-download mode\n"
-        "/quality — Prefer CD or Hi-Res audio\n"
         "/import <url> — Import a Spotify playlist or album\n"
         "/import resume — Continue a paused import after restart\n"
         "/status — Show active searches, downloads, and imports\n"

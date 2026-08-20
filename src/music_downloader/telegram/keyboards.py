@@ -104,13 +104,6 @@ def build_auto_mode_keyboard(current_mode: bool) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton(_("Enable auto-mode"), callback_data="auto:on")]])
 
 
-def build_quality_keyboard(current: str) -> InlineKeyboardMarkup:
-    """Build keyboard to switch the audio quality preference."""
-    if current == "cd":
-        return InlineKeyboardMarkup([[InlineKeyboardButton(_("Prefer Hi-Res (24-bit)"), callback_data="qp:hires")]])
-    return InlineKeyboardMarkup([[InlineKeyboardButton(_("Prefer CD quality (16/44.1)"), callback_data="qp:cd")]])
-
-
 def build_import_summary_keyboard(job_id: int, failed_count: int) -> InlineKeyboardMarkup:
     """Retry-failed button on the end-of-import summary."""
     label = ngettext("🔄 Retry {n} failed track", "🔄 Retry {n} failed tracks", failed_count).format(n=failed_count)

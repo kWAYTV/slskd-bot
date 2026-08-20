@@ -29,7 +29,6 @@ def bot_commands() -> list[tuple[str | None, list[BotCommand]]]:
             "help": "Show help",
             "lang": "Change language",
             "auto": "Toggle auto-download",
-            "quality": "Prefer CD or Hi-Res audio",
             "status": "Active searches and downloads",
             "history": "Recent downloads",
             "undo": "Remove the last saved track",
@@ -41,7 +40,6 @@ def bot_commands() -> list[tuple[str | None, list[BotCommand]]]:
             "help": "Mostrar ayuda",
             "lang": "Cambiar idioma",
             "auto": "Activar o desactivar la descarga automática",
-            "quality": "Preferir audio CD o Hi-Res",
             "status": "Búsquedas y descargas activas",
             "history": "Descargas recientes",
             "undo": "Eliminar la última pista guardada",
@@ -53,7 +51,6 @@ def bot_commands() -> list[tuple[str | None, list[BotCommand]]]:
             "help": "Hilfe anzeigen",
             "lang": "Sprache ändern",
             "auto": "Automatischen Download umschalten",
-            "quality": "CD- oder Hi-Res-Audio bevorzugen",
             "status": "Aktive Suchen und Downloads",
             "history": "Letzte Downloads",
             "undo": "Zuletzt gespeicherten Titel entfernen",
@@ -65,7 +62,6 @@ def bot_commands() -> list[tuple[str | None, list[BotCommand]]]:
             "help": "Amosar a axuda",
             "lang": "Cambiar o idioma",
             "auto": "Activar ou desactivar a descarga automática",
-            "quality": "Preferir audio CD ou Hi-Res",
             "status": "Buscas e descargas activas",
             "history": "Descargas recentes",
             "undo": "Eliminar a última pista gardada",
@@ -73,7 +69,7 @@ def bot_commands() -> list[tuple[str | None, list[BotCommand]]]:
             "cancel": "Cancelar a operación actual",
         },
     }
-    names = ("start", "help", "lang", "auto", "quality", "status", "history", "undo", "import", "cancel")
+    names = ("start", "help", "lang", "auto", "status", "history", "undo", "import", "cancel")
     packs: list[tuple[str | None, list[BotCommand]]] = []
     for code, texts in descriptions.items():
         commands = [BotCommand(name, texts[name]) for name in names]

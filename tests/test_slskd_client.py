@@ -191,7 +191,7 @@ class TestSlskdClientParseResults:
                 ],
             }
         ]
-        results = client.parse_results(responses, flac_only=True)
+        results = client.parse_results(responses, formats={"flac"})
         assert len(results) == 1
         assert results[0].extension == "flac"
 
@@ -210,13 +210,13 @@ class TestSlskdClientParseResults:
                 ],
             }
         ]
-        results = client.parse_results(responses, flac_only=False)
+        results = client.parse_results(responses)
         assert len(results) == 3
         exts = {r.extension for r in results}
         assert "jpg" not in exts
 
     def test_parse_empty_responses(self, client):
-        assert client.parse_results([], flac_only=True) == []
+        assert client.parse_results([], formats={"flac"}) == []
 
     def test_parse_preserves_user_info(self, client):
         responses = [
@@ -230,7 +230,7 @@ class TestSlskdClientParseResults:
                 ],
             }
         ]
-        results = client.parse_results(responses, flac_only=True)
+        results = client.parse_results(responses, formats={"flac"})
         assert results[0].username == "cooluser"
         assert results[0].has_free_slot is True
         assert results[0].upload_speed == 9_000_000
@@ -243,7 +243,7 @@ class TestSlskdClientParseResults:
                 "files": [{"filename": "\\Song.flac", "size": 0}],
             }
         ]
-        results = client.parse_results(responses, flac_only=True)
+        results = client.parse_results(responses, formats={"flac"})
         assert len(results) == 1
         assert results[0].has_free_slot is False
         assert results[0].upload_speed == 0

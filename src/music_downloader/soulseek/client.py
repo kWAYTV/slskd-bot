@@ -21,6 +21,8 @@ class SlskdClient:
     """Wrapper around slskd-api for search and download operations."""
 
     AUDIO_EXTENSIONS = {"flac", "alac", "wav", "aiff", "mp3", "aac", "m4a", "ogg", "opus", "wma"}
+    # Lossless formats preferred over lossy when no FLAC exists (FLAC itself is tier 1).
+    LOSSLESS_FALLBACK_EXTENSIONS = {"wav", "aiff", "alac"}
 
     def __init__(self, host: str, api_key: str):
         self.client = slskd_api.SlskdClient(host, api_key)
@@ -181,10 +183,14 @@ class SlskdClient:
         self._active_search_ids.discard(search_id)
         return responses
 
-    def parse_results(self, responses: list[dict], flac_only: bool = True) -> list[SearchResult]:
-        """Parse raw slskd search responses into SearchResult objects."""
+    def parse_results(self, responses: list[dict], formats: set[str] | None = None) -> list[SearchResult]:
+        """Parse raw slskd search responses into SearchResult objects.
+
+        ``formats`` restricts results to the given extensions; None allows any
+        audio format.
+        """
         results = []
-        allowed = {"flac"} if flac_only else self.AUDIO_EXTENSIONS
+        allowed = formats if formats is not None else self.AUDIO_EXTENSIONS
 
         for response in responses:
             username = response.get("username", "")
@@ -214,7 +220,7 @@ class SlskdClient:
                     )
                 )
 
-        label = "FLAC" if flac_only else "audio"
+        label = "/".join(sorted(allowed)) if formats is not None else "audio"
         logger.info(f"Parsed {len(results)} {label} results from {len(responses)} responses")
         return results
 

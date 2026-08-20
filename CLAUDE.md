@@ -74,7 +74,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 
 ## Soulseek (slskd) Search Patterns
 
-- **Single query, local filtering**: Never append format keywords (e.g. "flac") to the slskd search query -- Soulseek matches keywords against full file paths, which is unreliable. Instead, search with `artist title` and filter results locally by file extension (`.flac` preferred, fall back to other audio formats)
+- **Single query, local filtering**: Never append format keywords (e.g. "flac") to the slskd search query -- Soulseek matches keywords against full file paths, which is unreliable. Instead, search with `artist title` and filter results locally by file extension (`.flac` first, then other lossless `.wav`/`.aiff`/`.alac`, then any audio format)
 - **Search lifecycle**: `search_text()` -> poll `state()` -> `stop()` on timeout -> grab partial results from `search_responses()` -> `delete()` cleanup
 - **Async wrapping**: All synchronous `slskd-api` calls must be wrapped with `asyncio.to_thread()` to avoid blocking the Telegram bot event loop
 - **Timeouts**: Hard timeout via `asyncio.wait_for()` around the entire search+poll loop; `searches.stop()` actively cancels the server-side search on timeout
@@ -90,7 +90,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Result identification**: Download messages must include `#number` labels matching the result list so users can tell concurrent downloads apart
 - **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps) with a `progress_bar()` and update `PendingDownload.progress_percent` for `/status`
 - **Auto mode**: `/auto` toggles are per-chat (`MusicBot.is_auto(chat_id)`, overrides in `ChatSession._auto_overrides`); `AUTO_MODE` env is only the default
-- **Quality preference**: `/quality` toggles CD-vs-Hi-Res ranking per chat (`MusicBot.quality_pref(chat_id)`); `QUALITY_PREFERENCE` env is only the default. Scoring lives in `soulseek/scoring.py` (`_quality_points`)
+- **Format tiers**: results rank FLAC first, then other lossless (WAV/AIFF/ALAC), then any audio — no user setting; hi-res always outranks CD within a tier (`_rank_responses` in `telegram/app.py`, `_quality_points` in `soulseek/scoring.py`)
 - **Pasted links**: `catalog/links.py` detects Spotify track links/URIs and SoundCloud track URLs in free text. Spotify tracks resolve via `SpotifyResolver.get_track`. SoundCloud (`catalog/soundcloud.py`) tries the official API `/resolve` first when `SOUNDCLOUD_CLIENT_ID`/`SECRET` are set (Client Credentials flow, cached token + refresh grant), else the public oEmbed endpoint (no key — title format "Track by Artist"). Never scrape client_ids from web bundles (community packages do; it breaks). Playlist/album links in plain text get a "use /import" hint
 - **Undo**: `/undo` deletes the last chat save via `FileProcessor.delete_library_file` (refuses paths outside OUTPUT_DIR) and marks the history row `undone`
 - **Spotify results cap**: Show 5 results per page to the user; fetch up to 50 from the API for filtering headroom

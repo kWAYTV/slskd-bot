@@ -128,10 +128,10 @@ class TestDoSlskdSearch:
         bot.slskd.search = AsyncMock(return_value=[])
         call_count = 0
 
-        def parse_side_effect(responses, flac_only=True):
+        def parse_side_effect(responses, formats=None):
             nonlocal call_count
             call_count += 1
-            if not flac_only and call_count >= 2:
+            if formats is None and call_count >= 2:
                 return [_make_result(0, "mp3")]
             return []
 
@@ -710,5 +710,5 @@ class TestCreateBot:
             app = create_bot(config)
             assert app is mock_app
             mock_app.add_handler.assert_called()
-            # locale middleware + 10 command handlers + callback + text message
-            assert mock_app.add_handler.call_count == 13
+            # locale middleware + 9 command handlers + callback + text message
+            assert mock_app.add_handler.call_count == 12

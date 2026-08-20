@@ -139,24 +139,16 @@ class TestResultScorer:
         assert scored[0].score > 0
 
 
-class TestQualityPreference:
-    """CD-vs-Hi-Res preference flips how audio quality is scored."""
-
-    def test_default_prefers_hires(self, scorer, track):
+class TestBestQualityAlwaysWins:
+    def test_hires_preferred_over_cd(self, scorer, track):
         cd = make_result(filename="cd.flac", bit_depth=16, sample_rate=44100)
         hires = make_result(filename="hires.flac", bit_depth=24, sample_rate=96000)
         ranked = scorer.score_results([cd, hires], track)
         assert ranked[0].basename == "hires.flac"
 
-    def test_cd_preference_ranks_cd_first(self, scorer, track):
-        cd = make_result(filename="cd.flac", bit_depth=16, sample_rate=44100)
-        hires = make_result(filename="hires.flac", bit_depth=24, sample_rate=96000)
-        ranked = scorer.score_results([cd, hires], track, quality_preference="cd")
-        assert ranked[0].basename == "cd.flac"
-
-    def test_preference_does_not_change_other_factors(self, scorer, track):
-        exact = make_result(filename="exact.flac", length=162, bit_depth=24, sample_rate=96000)
-        off = make_result(filename="off.flac", length=170, bit_depth=16, sample_rate=44100)
-        ranked = scorer.score_results([exact, off], track, quality_preference="cd")
-        # Duration (40 pts) still dominates quality (25 pts).
+    def test_duration_still_dominates_quality(self, scorer, track):
+        exact = make_result(filename="exact.flac", length=162, bit_depth=16, sample_rate=44100)
+        off = make_result(filename="off.flac", length=170, bit_depth=24, sample_rate=96000)
+        ranked = scorer.score_results([exact, off], track)
+        # Duration (40 pts) dominates quality (25 pts).
         assert ranked[0].basename == "exact.flac"

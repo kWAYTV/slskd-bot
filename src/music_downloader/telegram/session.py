@@ -54,7 +54,6 @@ class ChatSession:
         self._active_import: dict[int, int] = {}
         self._import_pending: dict[int, PendingSearch] = {}
         self._auto_overrides: dict[int, bool] = {}
-        self._quality_overrides: dict[int, str] = {}
 
     def next_dl_id(self) -> str:
         self._dl_counter += 1

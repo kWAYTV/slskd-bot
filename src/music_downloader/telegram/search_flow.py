@@ -326,12 +326,11 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
     clean_title = clean_search_title(track.title)
     search_query = f"{track.artist} {clean_title}"
     timeout = self.config.search_timeout_secs
-    quality = self.quality_pref(chat_id)
 
     raw_responses = await self.slskd.search(search_query, timeout_secs=timeout)
     if self._is_stale(chat_id, generation):
         return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
+    ranked, is_fallback = self._rank_responses(raw_responses, track)
     if ranked:
         return ranked, is_fallback, False
 
@@ -341,7 +340,7 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
     raw_responses = await self.slskd.search(clean_title, timeout_secs=timeout)
     if self._is_stale(chat_id, generation):
         return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
+    ranked, is_fallback = self._rank_responses(raw_responses, track)
     if ranked:
         return ranked, is_fallback, False
 
@@ -355,7 +354,7 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
                 if self._is_stale(chat_id, generation):
                     return [], False, True
                 raw_responses = await self.slskd.search(fallback_query, timeout_secs=timeout)
-                ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
+                ranked, is_fallback = self._rank_responses(raw_responses, track)
                 if ranked:
                     logger.info("Keyword-reduction fallback hit: '%s'", fallback_query)
                     return ranked, is_fallback, False
@@ -368,7 +367,7 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
     raw_responses = await self.slskd.search(fb4_query, timeout_secs=timeout, response_limit=150)
     if self._is_stale(chat_id, generation):
         return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track, max_duration_diff=120, quality_preference=quality)
+    ranked, is_fallback = self._rank_responses(raw_responses, track, max_duration_diff=120)
     if ranked:
         logger.info("Artist-keyword fallback hit: '%s'", fb4_query)
     return ranked, is_fallback, False
@@ -620,9 +619,7 @@ async def do_direct_slskd_search(
                 year="",
             )
 
-        ranked, is_fallback = self._rank_responses(
-            raw_responses, synthetic_track, quality_preference=self.quality_pref(chat_id)
-        )
+        ranked, is_fallback = self._rank_responses(raw_responses, synthetic_track)
 
         if self._is_stale(chat_id, generation):
             return
