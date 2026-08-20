@@ -1,0 +1,95 @@
+"""Retry a failed download or move on to the next-best result."""
+
+from __future__ import annotations
+
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
+
+from music_downloader.i18n.catalog import gettext as _
+from music_downloader.telegram.ui.editing import safe_query_edit
+from music_downloader.telegram.ui.markdown import md_code_safe
+
+
+async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
+    """Retry a failed download."""
+    query = update.callback_query
+    dl_id = data.split(":", 1)[1]
+
+    pending_dl = self.downloads.pop(dl_id, None)
+    if not pending_dl:
+        await safe_query_edit(query, _("⏹ Download expired. Send a new search."))
+        return
+
+    if pending_dl.chat_id != chat_id:
+        self.downloads[dl_id] = pending_dl
+        return
+
+    result = pending_dl.result
+    track = pending_dl.track
+    result_index = pending_dl.result_index
+    label = f"#{result_index + 1}"
+
+    await safe_query_edit(
+        query,
+        _("🔄 Retrying {label}: `{file}`...").format(label=label, file=md_code_safe(result.basename)),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    status_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text=_("⬇️ Re-downloading {label} from `{user}`...").format(label=label, user=md_code_safe(result.username)),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    task = context.application.create_task(
+        self._do_download(context, chat_id, track, result, status_msg, result_index, user_id=pending_dl.user_id),
+        update=update,
+    )
+    self._track_task(chat_id, task)
+
+
+async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
+    """Try the next-best search result after a failed download."""
+    query = update.callback_query
+    dl_id = data.split(":", 1)[1]
+
+    pending = self.pending.get(chat_id) or self._import_pending.get(chat_id)
+    pending_dl = self.downloads.pop(dl_id, None)
+
+    if not pending or not pending.results or not pending_dl:
+        await safe_query_edit(query, _("⏹ No more results available. Try a new search."))
+        return
+
+    if pending_dl.chat_id != chat_id:
+        self.downloads[dl_id] = pending_dl
+        return
+
+    next_idx = pending_dl.result_index + 1
+    if next_idx >= len(pending.results):
+        await safe_query_edit(query, _("⏹ No more results to try."))
+        return
+
+    if pending_dl.source_path:
+        await self._cleanup_download_artifacts(pending_dl)
+
+    next_result = pending.results[next_idx]
+    track = pending_dl.track
+    label = f"#{next_idx + 1}"
+
+    await safe_query_edit(
+        query,
+        _("⏭ Trying next result {label}: `{file}`").format(label=label, file=md_code_safe(next_result.basename)),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    status_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text=_("⬇️ Downloading {label} from `{user}`...").format(label=label, user=md_code_safe(next_result.username)),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    task = context.application.create_task(
+        self._do_download(context, chat_id, track, next_result, status_msg, next_idx, user_id=pending_dl.user_id),
+        update=update,
+    )
+    self._track_task(chat_id, task)

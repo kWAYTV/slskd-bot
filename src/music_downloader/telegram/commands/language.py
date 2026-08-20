@@ -7,7 +7,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ApplicationHandlerStop, ContextTypes
 
 from music_downloader.i18n.catalog import DEFAULT_LOCALE, SUPPORTED_LOCALES, gettext, negotiate_locale, set_locale
-from music_downloader.telegram.messages import welcome_text
+from music_downloader.telegram.ui.formatting import welcome_text
 
 _ = gettext
 

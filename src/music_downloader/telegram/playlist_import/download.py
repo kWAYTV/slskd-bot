@@ -1,0 +1,143 @@
+"""Download one import track and ask for save approval."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+
+from telegram.constants import ParseMode
+
+from music_downloader.catalog.track import TrackInfo
+from music_downloader.i18n.catalog import gettext as _
+from music_downloader.playlist_import.job import TrackStatus
+from music_downloader.soulseek.result import SearchResult
+from music_downloader.telegram.core.session import PendingDownload
+from music_downloader.telegram.download.delivery import TELEGRAM_FILE_LIMIT, send_audio_or_document
+from music_downloader.telegram.download.transfer import fetch_from_peer, make_progress_callback
+from music_downloader.telegram.ui.editing import safe_edit
+from music_downloader.telegram.ui.formatting import progress_bar
+from music_downloader.telegram.ui.keyboards import build_import_failure_keyboard, build_import_track_keyboard
+from music_downloader.telegram.ui.markdown import escape_md, md_code_safe
+
+logger = logging.getLogger(__name__)
+
+
+async def do_import_download(
+    self,
+    context,
+    chat_id: int,
+    track: TrackInfo,
+    result: SearchResult,
+    status_msg,
+    generation: int,
+    job_id: int,
+    track_id: int,
+    dl_id: str,
+):
+    """Download a file within an import flow."""
+    # Registered by the import search; fall back to a detached record if expired.
+    pending_dl = self.downloads.get(dl_id) or PendingDownload(track=track, result=result, chat_id=chat_id)
+
+    async def _render_progress(pct: float) -> None:
+        await safe_edit(
+            status_msg,
+            _("📋 *Import track:* {artist} - {title}\n⬇️ Downloading {pct}%\n{bar}\n`{file}`").format(
+                artist=escape_md(track.artist),
+                title=escape_md(track.title),
+                pct=f"{pct:.0f}",
+                bar=progress_bar(pct),
+                file=md_code_safe(result.basename),
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    try:
+        outcome = await fetch_from_peer(self, result, make_progress_callback(pending_dl, _render_progress))
+        if not outcome.enqueued:
+            await safe_edit(
+                status_msg,
+                _("❌ Failed to enqueue from `{user}`").format(user=md_code_safe(result.username)),
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
+            )
+            await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
+            return
+
+        status = outcome.status
+        if status and status.transfer_id:
+            pending_dl.transfer_id = status.transfer_id
+
+        if outcome.failed:
+            state = status.state if status else _("Timeout")
+            await safe_edit(
+                status_msg,
+                _("❌ Download failed: {state}\n`{file}`").format(state=state, file=md_code_safe(result.basename)),
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=build_import_failure_keyboard(job_id, track_id, dl_id),
+            )
+            await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
+            return
+
+        source_path = outcome.source_path
+        if not source_path:
+            await safe_edit(
+                status_msg,
+                _("❌ Downloaded file not found on disk."),
+                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
+            )
+            await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
+            return
+
+        pending_dl.source_path = source_path
+
+        await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
+
+        file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
+        quality_line = f"{result.quality_display} | {result.duration_display}"
+        caption = _("📋 Import: {artist} - {title}\n{quality}").format(
+            artist=track.artist, title=track.title, quality=quality_line
+        )
+
+        if file_size > TELEGRAM_FILE_LIMIT:
+            await safe_edit(
+                status_msg,
+                _(
+                    "✅ Downloaded: `{file}` ({size:.0f}MB)\n{quality}\n\nFile too large to preview. Save to library?"
+                ).format(
+                    file=md_code_safe(result.basename),
+                    size=file_size / (1024 * 1024),
+                    quality=quality_line,
+                ),
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
+            )
+        else:
+            await send_audio_or_document(
+                context,
+                chat_id,
+                source_path,
+                filename=self.processor.build_filename(track.artist, track.title, result.extension),
+                title=track.title,
+                performer=track.artist,
+                duration=track.duration_secs,
+                caption=caption,
+                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
+            )
+
+    except asyncio.CancelledError:
+        pending_dl = self.downloads.pop(dl_id, None)
+        if pending_dl:
+            await self._cleanup_download_artifacts(pending_dl)
+        else:
+            await asyncio.to_thread(self.slskd.cancel_transfer, result.username, result.filename, None)
+        raise
+    except Exception:
+        logger.exception(f"Import download failed for {result.basename}")
+        await safe_edit(
+            status_msg,
+            _("❌ Error downloading `{file}`").format(file=md_code_safe(result.basename)),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")
+        await self._process_next_import_track(context, chat_id, job_id, generation)

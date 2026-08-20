@@ -1,38 +1,11 @@
-"""Telegram message helpers: Markdown escaping, safe edits, result formatting."""
-
-import logging
-
-from telegram import Message
-from telegram.error import BadRequest, NetworkError, TimedOut
+"""Text content for Telegram messages: welcome, progress, result formatting."""
 
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.i18n.catalog import gettext as _
 from music_downloader.i18n.catalog import ngettext
 from music_downloader.library.flac import FlacVerdict
 from music_downloader.soulseek.result import SearchResult
-
-logger = logging.getLogger(__name__)
-
-
-def escape_md(text: str) -> str:
-    """Escape Telegram legacy-Markdown (V1) special characters.
-
-    V1 only honors backslash escapes for ``_ * ` [`` — escaping anything else
-    renders the backslash literally (e.g. ``\\-`` shows up in the chat).
-    """
-    for ch in "_*`[":
-        text = text.replace(ch, f"\\{ch}")
-    return text
-
-
-def md_code_safe(text: str) -> str:
-    """Neutralize backticks in values interpolated into Markdown code spans."""
-    return text.replace("`", "ʼ")
-
-
-def code_span(text: str) -> str:
-    """Wrap text in a Markdown code span, neutralizing backticks that would break it."""
-    return f"`{md_code_safe(text)}`"
+from music_downloader.telegram.ui.markdown import code_span, escape_md
 
 
 def progress_bar(percent: float, width: int = 10) -> str:
@@ -42,39 +15,9 @@ def progress_bar(percent: float, width: int = 10) -> str:
     return "▰" * filled + "▱" * (width - filled)
 
 
-async def safe_edit(msg: Message, text: str, **kwargs) -> bool:
-    """Edit a Telegram message, swallowing common failures.
-
-    Returns True on success, False if the edit failed (logged as warning).
-    """
-    try:
-        await msg.edit_text(text, **kwargs)
-        return True
-    except BadRequest as exc:
-        logger.warning(f"Telegram edit failed (BadRequest): {exc}")
-        return False
-    except TimedOut:
-        logger.warning("Telegram edit timed out")
-        return False
-    except NetworkError as exc:
-        logger.warning(f"Telegram edit network error: {exc}")
-        return False
-
-
-async def safe_query_edit(query, text: str, **kwargs) -> bool:
-    """Edit a callback query message, swallowing transient Telegram errors."""
-    try:
-        await query.edit_message_text(text, **kwargs)
-        return True
-    except BadRequest as exc:
-        logger.warning(f"Telegram query edit failed (BadRequest): {exc}")
-        return False
-    except TimedOut:
-        logger.warning("Telegram query edit timed out")
-        return False
-    except NetworkError as exc:
-        logger.warning(f"Telegram query edit network error: {exc}")
-        return False
+def track_md(track: TrackInfo) -> str:
+    """Bold, escaped ``Artist - Title`` fragment."""
+    return f"*{escape_md(track.artist)} - {escape_md(track.title)}*"
 
 
 def welcome_text() -> str:

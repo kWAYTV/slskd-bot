@@ -20,9 +20,9 @@ from music_downloader.i18n.catalog import (
 )
 from music_downloader.i18n.store import LocaleStore
 from music_downloader.records.database import Database
-from music_downloader.telegram.app import MusicBot
-from music_downloader.telegram.language import FIRST_TIME_PROMPT, build_language_keyboard
-from music_downloader.telegram.messages import welcome_text
+from music_downloader.telegram.commands.language import FIRST_TIME_PROMPT, build_language_keyboard
+from music_downloader.telegram.core.app import MusicBot
+from music_downloader.telegram.ui.formatting import welcome_text
 
 
 @pytest.fixture(autouse=True)
@@ -157,8 +157,8 @@ class TestLanguageKeyboard:
 
 
 class TestLanguageFlow:
-    @patch("music_downloader.telegram.app.SpotifyResolver")
-    @patch("music_downloader.telegram.app.SlskdClient")
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_first_use_prompts_and_stops(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -169,8 +169,8 @@ class TestLanguageFlow:
         assert FIRST_TIME_PROMPT in update.message.reply_text.call_args[0][0]
         assert bot.locale_store.get(12345) is None
 
-    @patch("music_downloader.telegram.app.SpotifyResolver")
-    @patch("music_downloader.telegram.app.SlskdClient")
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_stored_locale_passes_through(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -180,8 +180,8 @@ class TestLanguageFlow:
         update.message.reply_text.assert_not_called()
         assert current_locale() == "de"
 
-    @patch("music_downloader.telegram.app.SpotifyResolver")
-    @patch("music_downloader.telegram.app.SlskdClient")
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_unauthorized_skips_picker(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config(allowed={111}))
@@ -190,8 +190,8 @@ class TestLanguageFlow:
         update.message.reply_text.assert_not_called()
         assert bot.locale_store.get(999) is None
 
-    @patch("music_downloader.telegram.app.SpotifyResolver")
-    @patch("music_downloader.telegram.app.SlskdClient")
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_lang_callback_persists_and_welcomes(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -208,8 +208,8 @@ class TestLanguageFlow:
         assert "/import" in welcome
         assert "/lang" in welcome
 
-    @patch("music_downloader.telegram.app.SpotifyResolver")
-    @patch("music_downloader.telegram.app.SlskdClient")
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cmd_lang_shows_picker(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())

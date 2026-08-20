@@ -17,9 +17,9 @@ from music_downloader.playlist_import import (
     TrackStatus,
 )
 from music_downloader.soulseek.result import SearchResult
-from music_downloader.telegram.app import MusicBot
-from music_downloader.telegram.messages import safe_query_edit as _safe_query_edit
-from music_downloader.telegram.session import PendingDownload, PendingSearch
+from music_downloader.telegram.core.app import MusicBot
+from music_downloader.telegram.core.session import PendingDownload, PendingSearch
+from music_downloader.telegram.ui.editing import safe_query_edit as _safe_query_edit
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -104,8 +104,8 @@ def _make_update(chat_id=67890, user_id=12345, text="/import https://open.spotif
     return update
 
 
-@patch("music_downloader.telegram.app.SpotifyResolver")
-@patch("music_downloader.telegram.app.SlskdClient")
+@patch("music_downloader.telegram.core.app.SpotifyResolver")
+@patch("music_downloader.telegram.core.app.SlskdClient")
 def _setup_bot(mock_slskd_cls, mock_spotify_cls):
     config = _make_config()
     mock_slskd_cls.return_value = MagicMock()
@@ -193,8 +193,8 @@ class TestSafeQueryEdit:
 
 
 class TestCmdImport:
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_cmd_import_no_args(self, mock_edit, mock_thread):
         bot = _setup_bot()
         update = _make_update(text="/import")
@@ -203,8 +203,8 @@ class TestCmdImport:
         update.message.reply_text.assert_awaited_once()
         assert "Usage" in update.message.reply_text.call_args[0][0]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_cmd_import_invalid_url(self, mock_edit, mock_thread):
         bot = _setup_bot()
         update = _make_update(text="/import https://example.com/not-spotify")
@@ -213,9 +213,9 @@ class TestCmdImport:
         update.message.reply_text.assert_awaited_once()
         assert "valid Spotify" in update.message.reply_text.call_args[0][0]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
-    @patch("music_downloader.telegram.import_flow.PlaylistResolver.is_spotify_url", return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("music_downloader.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
     async def test_cmd_import_active_job_exists(self, mock_is_url, mock_edit, mock_thread):
         bot = _setup_bot()
         bot.import_repo.get_active_job = MagicMock(return_value=_make_import_job())
@@ -225,9 +225,9 @@ class TestCmdImport:
         update.message.reply_text.assert_awaited_once()
         assert "already have an active import" in update.message.reply_text.call_args[0][0]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
-    @patch("music_downloader.telegram.import_flow.PlaylistResolver.is_spotify_url", return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("music_downloader.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
     async def test_cmd_import_resolve_fails(self, mock_is_url, mock_edit, mock_thread):
         bot = _setup_bot()
         bot.import_repo.get_active_job = MagicMock(return_value=None)
@@ -238,10 +238,10 @@ class TestCmdImport:
         mock_edit.assert_awaited()
         assert "Failed to resolve" in mock_edit.call_args[0][1]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
-    @patch("music_downloader.telegram.import_flow.PlaylistResolver.is_spotify_url", return_value=True)
-    @patch("music_downloader.telegram.import_flow.build_import_confirm_keyboard", return_value=None)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("music_downloader.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
+    @patch("music_downloader.telegram.playlist_import.command.build_import_confirm_keyboard", return_value=None)
     async def test_cmd_import_success(self, mock_kb, mock_is_url, mock_edit, mock_thread):
         bot = _setup_bot()
         bot.import_repo.get_active_job = MagicMock(return_value=None)
@@ -267,7 +267,7 @@ class TestCmdImport:
         mock_edit.assert_awaited()
         assert "My Playlist" in mock_edit.call_args[0][1]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_cmd_import_resume(self, mock_thread):
         bot = _setup_bot()
         job = _make_import_job()
@@ -290,7 +290,7 @@ class TestCmdImport:
         context.bot.send_message.assert_awaited()
         assert "Resuming import" in context.bot.send_message.call_args.kwargs["text"]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_cmd_import_resume_nothing(self, mock_thread):
         bot = _setup_bot()
         update = _make_update(text="/import resume")
@@ -299,7 +299,7 @@ class TestCmdImport:
         context.bot.send_message.assert_awaited_once()
         assert "Nothing to resume" in context.bot.send_message.call_args.kwargs["text"]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_cmd_import_no_args_with_active_job(self, mock_thread):
         bot = _setup_bot()
         bot.import_repo.get_active_job = MagicMock(return_value=_make_import_job())
@@ -312,7 +312,7 @@ class TestCmdImport:
 
 
 class TestResumeStaleImports:
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_skips_pending_confirmation_jobs(self, mock_thread):
         bot = _setup_bot()
         pending = _make_import_job(status="pending")
@@ -324,7 +324,7 @@ class TestResumeStaleImports:
         application.create_task.assert_not_called()
         assert pending.chat_id not in bot._active_import
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_resumes_active_jobs(self, mock_thread):
         bot = _setup_bot()
         job = _make_import_job(status="active")
@@ -351,7 +351,7 @@ class TestResumeStaleImports:
 
 
 class TestCmdCancel:
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_cmd_cancel_active_import(self, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -364,7 +364,7 @@ class TestCmdCancel:
         update.message.reply_text.assert_awaited_once()
         assert "Import cancelled" in update.message.reply_text.call_args[0][0]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_cmd_cancel_no_work(self, mock_thread):
         bot = _setup_bot()
         update = _make_update(chat_id=67890, text="/cancel")
@@ -380,8 +380,10 @@ class TestCmdCancel:
 
 
 class TestHandleImportCallback:
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_confirm_start(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -395,8 +397,10 @@ class TestHandleImportCallback:
         assert bot._active_import[chat_id] == 1
         context.application.create_task.assert_called_once()
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_cancel(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -412,8 +416,10 @@ class TestHandleImportCallback:
         mock_qedit.assert_awaited()
         assert "cancelled" in mock_qedit.call_args[0][1]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_reject_track(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -428,8 +434,10 @@ class TestHandleImportCallback:
         await bot._handle_import_callback(update, context, chat_id, "ir:1:5")
         bot.import_repo.complete_track.assert_called_once_with(1, 5, TrackStatus.failed, "Rejected by user")
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_skip_track(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -444,8 +452,10 @@ class TestHandleImportCallback:
         await bot._handle_import_callback(update, context, chat_id, "is:1:5")
         bot.import_repo.complete_track.assert_called_once_with(1, 5, TrackStatus.skipped)
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_callback_wrong_chat(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -463,8 +473,10 @@ class TestHandleImportCallback:
 
 
 class TestHandleImportApprove:
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_approve_expired_download(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -475,8 +487,10 @@ class TestHandleImportApprove:
         bot.import_repo.update_job_status = MagicMock()
         await bot._handle_import_approve(update, _make_context(), chat_id, 1, 5, "nonexistent")
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_approve_source_not_ready(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -489,7 +503,7 @@ class TestHandleImportApprove:
         # Download should be put back
         assert dl_id in bot.downloads
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_import_approve_success(self, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -522,7 +536,7 @@ class TestHandleImportApprove:
 
 
 class TestProcessNextImportTrack:
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_process_next_no_more_tracks(self, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -540,8 +554,8 @@ class TestProcessNextImportTrack:
         assert "7" in msg_text  # completed
         assert "2" in msg_text  # failed
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_process_next_has_track(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -562,8 +576,8 @@ class TestProcessNextImportTrack:
 
 
 class TestDoImportSlskdSearch:
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_search_no_results(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -579,8 +593,8 @@ class TestDoImportSlskdSearch:
         bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.awaiting_approval)
         assert bot.slskd.search.await_count >= 1
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_search_success(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -602,8 +616,8 @@ class TestDoImportSlskdSearch:
         assert chat_id in bot._import_pending
         context.application.create_task.assert_called_once()
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_search_exception(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -625,8 +639,8 @@ class TestDoImportSlskdSearch:
 
 
 class TestDoImportDownload:
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.download.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_download_enqueue_fails(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -652,8 +666,8 @@ class TestDoImportDownload:
         assert "Failed to enqueue" in mock_edit.call_args[0][1]
         bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.awaiting_approval)
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.download.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_download_timeout(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -685,8 +699,10 @@ class TestDoImportDownload:
         assert "ir:1:5" in callbacks
         bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.awaiting_approval)
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_retry_uses_import_flow(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -709,8 +725,10 @@ class TestDoImportDownload:
         # Download stays registered so _do_import_download can attach source_path
         assert "dl_7" in bot.downloads
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_query_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch(
+        "music_downloader.telegram.playlist_import.callbacks.safe_query_edit", new_callable=AsyncMock, return_value=True
+    )
     async def test_import_retry_expired_download(self, mock_qedit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -722,7 +740,7 @@ class TestDoImportDownload:
         context.application.create_task.assert_not_called()
         assert "expired" in mock_qedit.call_args[0][1]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_import_approve_denied_for_non_library_user(self, mock_thread):
         bot = _setup_bot()
         bot.config.telegram_library_users = {12345}
@@ -736,8 +754,8 @@ class TestDoImportDownload:
         assert "dl_9" in bot.downloads  # not consumed
         assert "not allowed" in bot._edit_approval_message.call_args[0][1]
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.download.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_download_success_large_file(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -757,7 +775,7 @@ class TestDoImportDownload:
         bot.downloads[dl_id] = PendingDownload(track=_make_track(), result=result, chat_id=chat_id)
         context = _make_context()
         # Patch TELEGRAM_FILE_LIMIT to be smaller than our file
-        with patch("music_downloader.telegram.import_flow.TELEGRAM_FILE_LIMIT", 50):
+        with patch("music_downloader.telegram.playlist_import.download.TELEGRAM_FILE_LIMIT", 50):
             await bot._do_import_download(
                 context,
                 chat_id,
@@ -773,8 +791,8 @@ class TestDoImportDownload:
         assert "too large" in mock_edit.call_args[0][1]
         os.unlink(source.name)
 
-    @patch("music_downloader.telegram.import_flow.asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.import_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("music_downloader.telegram.playlist_import.download.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_download_success_sends_audio(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -844,7 +862,7 @@ class TestHandleDirectSearch:
 
 
 class TestDoDirectSlskdSearch:
-    @patch("music_downloader.telegram.search_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("music_downloader.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_direct_search_no_results(self, mock_edit):
         bot = _setup_bot()
         chat_id = 67890
@@ -855,7 +873,7 @@ class TestDoDirectSlskdSearch:
         mock_edit.assert_awaited()
         assert "No results" in mock_edit.call_args[0][1]
 
-    @patch("music_downloader.telegram.search_flow.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("music_downloader.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_direct_search_finds_results(self, mock_edit):
         bot = _setup_bot()
         chat_id = 67890

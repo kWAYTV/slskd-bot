@@ -2,7 +2,7 @@
 
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.soulseek.result import SearchResult
-from music_downloader.telegram.keyboards import (
+from music_downloader.telegram.ui.keyboards import (
     build_approve_keyboard,
     build_auto_mode_keyboard,
     build_duplicate_keyboard,
