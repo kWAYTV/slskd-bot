@@ -1663,6 +1663,46 @@ class TestFormatResultReasons:
 
 
 # ---------------------------------------------------------------------------
+# format_search_results
+# ---------------------------------------------------------------------------
+
+
+class TestFormatSearchResults:
+    def test_direct_search_fallback_does_not_claim_flac(self):
+        """Direct search (no reference duration) must honor is_fallback: an MP3
+        fallback list used to be headlined 'Found N FLAC matches'."""
+        from music_downloader.telegram.messages import format_search_results
+
+        track = _make_track()
+        track.duration_ms = 0  # direct search marker
+        result = _make_search_result()
+        result.filename = "\\Music\\Nancy Sinatra - Bang Bang.mp3"
+
+        text = format_search_results(track, [result], is_fallback=True)
+        assert "FLAC match" not in text
+        assert "No FLAC found" in text
+        assert "[MP3]" in text
+
+    def test_direct_search_flac_header(self):
+        from music_downloader.telegram.messages import format_search_results
+
+        track = _make_track()
+        track.duration_ms = 0
+        text = format_search_results(track, [_make_search_result()], is_fallback=False)
+        assert "Found 1 FLAC match" in text
+
+    def test_spotify_search_fallback_header_unchanged(self):
+        from music_downloader.telegram.messages import format_search_results
+
+        track = _make_track()
+        result = _make_search_result()
+        result.filename = "\\Music\\Nancy Sinatra - Bang Bang.mp3"
+        text = format_search_results(track, [result], is_fallback=True)
+        assert "No FLAC found" in text
+        assert "FLAC match" not in text
+
+
+# ---------------------------------------------------------------------------
 # Pasted link handling
 # ---------------------------------------------------------------------------
 
