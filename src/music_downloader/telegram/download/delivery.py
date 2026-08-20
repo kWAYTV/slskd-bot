@@ -79,12 +79,20 @@ async def send_large_file(
         if ogg_size <= TELEGRAM_FILE_LIMIT:
             try:
                 target_name = self.processor.build_filename(track.artist, track.title, "ogg")
-                caption = _("🎧 {label} Converted to OGG (original: {size:.0f}MB {fmt})\n{quality}\n").format(
+                # The OGG is only the in-chat preview: Telegram bots cannot send
+                # files above TELEGRAM_FILE_LIMIT. Approval saves the original.
+                caption = _("🎧 {label} OGG preview — Telegram only sends up to {limit}MB\n{quality}\n").format(
                     label=label,
-                    size=file_size / (1024 * 1024),
-                    fmt=result.extension.upper(),
+                    limit=TELEGRAM_FILE_LIMIT // (1024 * 1024),
                     quality=quality_line,
-                ) + (_("Save to library?") if can_save else _("Sent to you — not saved to the library."))
+                ) + (
+                    _("Save the untouched {size:.0f}MB {fmt} to the library?").format(
+                        size=file_size / (1024 * 1024),
+                        fmt=result.extension.upper(),
+                    )
+                    if can_save
+                    else _("Sent to you — not saved to the library.")
+                )
                 with open(ogg_path, "rb") as f:
                     sent = await context.bot.send_audio(
                         chat_id=chat_id,
