@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-20 16:08+0000\n"
+"POT-Creation-Date: 2026-08-20 16:34+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: gl\n"
@@ -15,11 +15,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: src/music_downloader/telegram/app.py:110
+#: src/music_downloader/telegram/app.py:113
 msgid "You are not authorized to use this bot."
 msgstr "Non estás autorizado para usar este bot."
 
-#: src/music_downloader/telegram/app.py:120
+#: src/music_downloader/telegram/app.py:123
 msgid ""
 "You can search and download files, but only library users can save to the"
 " music library or import playlists."
@@ -27,32 +27,32 @@ msgstr ""
 "Podes buscar e descargar ficheiros, pero só os usuarios da biblioteca "
 "poden gardar na biblioteca ou importar playlists."
 
-#: src/music_downloader/telegram/app.py:283
+#: src/music_downloader/telegram/app.py:286
 #: src/music_downloader/telegram/commands.py:40
 msgid "ON"
 msgstr "ACTIVADO"
 
-#: src/music_downloader/telegram/app.py:283
+#: src/music_downloader/telegram/app.py:286
 #: src/music_downloader/telegram/commands.py:40
 msgid "OFF"
 msgstr "DESACTIVADO"
 
-#: src/music_downloader/telegram/app.py:286
+#: src/music_downloader/telegram/app.py:289
 #, python-brace-format
 msgid "Auto-download mode: *{mode}*"
 msgstr "Modo de descarga automática: *{mode}*"
 
-#: src/music_downloader/telegram/app.py:295
+#: src/music_downloader/telegram/app.py:298
 #: src/music_downloader/telegram/commands.py:56
 msgid "CD quality (16/44.1)"
 msgstr "Calidade CD (16/44.1)"
 
-#: src/music_downloader/telegram/app.py:295
+#: src/music_downloader/telegram/app.py:298
 #: src/music_downloader/telegram/commands.py:56
 msgid "Hi-Res (24-bit)"
 msgstr "Hi-Res (24 bits)"
 
-#: src/music_downloader/telegram/app.py:298
+#: src/music_downloader/telegram/app.py:301
 #, python-brace-format
 msgid "Audio quality preference: *{label}*"
 msgstr "Preferencia de calidade de audio: *{label}*"
@@ -139,15 +139,15 @@ msgid "*Recent downloads:*"
 msgstr "*Descargas recentes:*"
 
 #: src/music_downloader/telegram/download_flow.py:46
-#: src/music_downloader/telegram/search_flow.py:444
-#: src/music_downloader/telegram/search_flow.py:501
-#: src/music_downloader/telegram/search_flow.py:530
+#: src/music_downloader/telegram/search_flow.py:492
+#: src/music_downloader/telegram/search_flow.py:549
+#: src/music_downloader/telegram/search_flow.py:578
 msgid "Search expired. Send a new query."
 msgstr "A busca caducou. Envía unha nova consulta."
 
 #: src/music_downloader/telegram/download_flow.py:53
-#: src/music_downloader/telegram/search_flow.py:417
-#: src/music_downloader/telegram/search_flow.py:470
+#: src/music_downloader/telegram/search_flow.py:465
+#: src/music_downloader/telegram/search_flow.py:518
 msgid "Cancelled."
 msgstr "Cancelado."
 
@@ -540,8 +540,8 @@ msgstr ""
 "De: `{user}` | {quality}"
 
 #: src/music_downloader/telegram/import_flow.py:462
-#: src/music_downloader/telegram/search_flow.py:397
-#: src/music_downloader/telegram/search_flow.py:598
+#: src/music_downloader/telegram/search_flow.py:445
+#: src/music_downloader/telegram/search_flow.py:646
 msgid "Cannot reach slskd. Check `SLSKD_HOST` and the API key."
 msgstr "Non se pode conectar con slskd. Comproba `SLSKD_HOST` e a clave API."
 
@@ -725,7 +725,7 @@ msgstr "Escolle un idioma:"
 msgid "Language set to {name}."
 msgstr "Idioma estabelecido: {name}."
 
-#: src/music_downloader/telegram/messages.py:78
+#: src/music_downloader/telegram/messages.py:82
 msgid ""
 "Send me a song name (e.g., `Nancy Sinatra Bang Bang`), a Spotify track "
 "link, or a SoundCloud track link and I'll find and download it in FLAC.\n"
@@ -758,61 +758,61 @@ msgstr ""
 "/lang — Cambiar o idioma\n"
 "/help — Amosar esta mensaxe"
 
-#: src/music_downloader/telegram/messages.py:102
+#: src/music_downloader/telegram/messages.py:106
 msgid "⏱ exact duration"
 msgstr "⏱ duración exacta"
 
-#: src/music_downloader/telegram/messages.py:102
+#: src/music_downloader/telegram/messages.py:106
 #, python-brace-format
 msgid "⏱ ±{secs}s"
 msgstr "⏱ ±{secs}s"
 
-#: src/music_downloader/telegram/messages.py:104
+#: src/music_downloader/telegram/messages.py:108
 msgid "🟢 free slot"
 msgstr "🟢 oco libre"
 
-#: src/music_downloader/telegram/messages.py:106
+#: src/music_downloader/telegram/messages.py:110
 #, python-brace-format
 msgid "🔴 queue of {n}"
 msgstr "🔴 cola de {n}"
 
-#: src/music_downloader/telegram/messages.py:108
+#: src/music_downloader/telegram/messages.py:112
 #, python-brace-format
 msgid "⭐ {score}/100"
 msgstr "⭐ {score}/100"
 
-#: src/music_downloader/telegram/messages.py:115
+#: src/music_downloader/telegram/messages.py:119
 #, python-brace-format
 msgid "{emoji} Lossless OK (spectrum to {khz:.1f}kHz)"
 msgstr "{emoji} Lossless OK (espectro ata {khz:.1f}kHz)"
 
-#: src/music_downloader/telegram/messages.py:117
+#: src/music_downloader/telegram/messages.py:121
 msgid "Possible transcode"
 msgstr "Posible transcodificación"
 
-#: src/music_downloader/telegram/messages.py:118
+#: src/music_downloader/telegram/messages.py:122
 msgid "Likely transcode"
 msgstr "Probable transcodificación"
 
-#: src/music_downloader/telegram/messages.py:119
+#: src/music_downloader/telegram/messages.py:123
 msgid "Fake lossless"
 msgstr "Falso lossless"
 
-#: src/music_downloader/telegram/messages.py:122
+#: src/music_downloader/telegram/messages.py:126
 #, python-brace-format
 msgid "{emoji} {label} (cutoff {khz:.1f}kHz)"
 msgstr "{emoji} {label} (corte {khz:.1f}kHz)"
 
-#: src/music_downloader/telegram/messages.py:132
+#: src/music_downloader/telegram/messages.py:136
 msgid "🔍 *Multiple matches found on Spotify:*"
 msgstr "🔍 *Varias coincidencias en Spotify:*"
 
-#: src/music_downloader/telegram/messages.py:134
+#: src/music_downloader/telegram/messages.py:138
 #, python-brace-format
 msgid " (page {page}/{total})"
 msgstr " (páxina {page}/{total})"
 
-#: src/music_downloader/telegram/messages.py:141
+#: src/music_downloader/telegram/messages.py:145
 #, python-brace-format
 msgid ""
 "*#{n} {artist} - {title}*\n"
@@ -823,41 +823,41 @@ msgstr ""
 "    Álbum: {album} ({year}) | {duration}\n"
 "    [Escoitar en Spotify]({url})"
 
-#: src/music_downloader/telegram/messages.py:152
+#: src/music_downloader/telegram/messages.py:156
 msgid "Pick the correct version:"
 msgstr "Escolle a versión correcta:"
 
-#: src/music_downloader/telegram/messages.py:172
+#: src/music_downloader/telegram/messages.py:176
 #, python-brace-format
 msgid "Found {n} FLAC match:"
 msgid_plural "Found {n} FLAC matches:"
 msgstr[0] "Atopouse {n} coincidencia FLAC:"
 msgstr[1] "Atopáronse {n} coincidencias FLAC:"
 
-#: src/music_downloader/telegram/messages.py:182
+#: src/music_downloader/telegram/messages.py:186
 #, python-brace-format
 msgid "🔍 *Direct search:* `{query}`"
 msgstr "🔍 *Busca directa:* `{query}`"
 
-#: src/music_downloader/telegram/messages.py:188
-#: src/music_downloader/telegram/messages.py:199
+#: src/music_downloader/telegram/messages.py:192
+#: src/music_downloader/telegram/messages.py:203
 #, python-brace-format
 msgid "Duration: {duration} | Album: {album}"
 msgstr "Duración: {duration} | Álbum: {album}"
 
-#: src/music_downloader/telegram/messages.py:190
+#: src/music_downloader/telegram/messages.py:194
 #, python-brace-format
 msgid "⚠️ No FLAC found — showing all formats ({n} match):"
 msgid_plural "⚠️ No FLAC found — showing all formats ({n} matches):"
 msgstr[0] "⚠️ Non se atopou FLAC — amosando todos os formatos ({n} coincidencia):"
 msgstr[1] "⚠️ Non se atopou FLAC — amosando todos os formatos ({n} coincidencias):"
 
-#: src/music_downloader/telegram/messages.py:204
+#: src/music_downloader/telegram/messages.py:208
 #, python-brace-format
 msgid "📄 Page {page}/{total}"
 msgstr "📄 Páxina {page}/{total}"
 
-#: src/music_downloader/telegram/search_flow.py:74
+#: src/music_downloader/telegram/search_flow.py:75
 #, python-brace-format
 msgid ""
 "🔍 Searching slskd for: `{query}`\n"
@@ -866,7 +866,7 @@ msgstr ""
 "🔍 Buscando en slskd: `{query}`\n"
 "Gardarase como: *{artist} - {title}*"
 
-#: src/music_downloader/telegram/search_flow.py:97
+#: src/music_downloader/telegram/search_flow.py:98
 #, python-brace-format
 msgid ""
 "⚠️ *Similar files already in library:*\n"
@@ -881,7 +881,7 @@ msgstr ""
 "\n"
 "Continuar a busca de todos os xeitos?"
 
-#: src/music_downloader/telegram/search_flow.py:115
+#: src/music_downloader/telegram/search_flow.py:116
 #, python-brace-format
 msgid ""
 "That looks like a playlist or album link.\n"
@@ -890,25 +890,25 @@ msgstr ""
 "Iso parece unha ligazón de playlist ou álbum.\n"
 "Usa `/import {url}` para importalo."
 
-#: src/music_downloader/telegram/search_flow.py:142
+#: src/music_downloader/telegram/search_flow.py:143
 msgid "🔗 Resolving Spotify track link..."
 msgstr "🔗 Resolvendo a ligazón de pista de Spotify..."
 
-#: src/music_downloader/telegram/search_flow.py:149
+#: src/music_downloader/telegram/search_flow.py:150
 msgid "Could not resolve that Spotify track link. Try the song name instead."
 msgstr ""
 "Non se puido resolver esa ligazón de pista de Spotify. Proba co nome da "
 "canción."
 
-#: src/music_downloader/telegram/search_flow.py:167
+#: src/music_downloader/telegram/search_flow.py:173
 msgid "🔗 Resolving SoundCloud link..."
 msgstr "🔗 Resolvendo a ligazón de SoundCloud..."
 
-#: src/music_downloader/telegram/search_flow.py:174
+#: src/music_downloader/telegram/search_flow.py:180
 msgid "Could not resolve that SoundCloud link. Try the song name instead."
 msgstr "Non se puido resolver esa ligazón de SoundCloud. Proba co nome da canción."
 
-#: src/music_downloader/telegram/search_flow.py:179
+#: src/music_downloader/telegram/search_flow.py:185
 #, python-brace-format
 msgid ""
 "🎧 SoundCloud: *{artist} - {title}*\n"
@@ -917,12 +917,21 @@ msgstr ""
 "🎧 SoundCloud: *{artist} - {title}*\n"
 "Buscándoo..."
 
-#: src/music_downloader/telegram/search_flow.py:193
+#: src/music_downloader/telegram/search_flow.py:224
+#, python-brace-format
+msgid ""
+"🎧 SoundCloud: *{artist} - {title}*\n"
+"Not on Spotify — searching Soulseek directly..."
+msgstr ""
+"🎧 SoundCloud: *{artist} - {title}*\n"
+"Non está en Spotify — buscando directamente en Soulseek..."
+
+#: src/music_downloader/telegram/search_flow.py:241
 #, python-brace-format
 msgid "🔍 Looking up: `{query}`"
 msgstr "🔍 Buscando: `{query}`"
 
-#: src/music_downloader/telegram/search_flow.py:205
+#: src/music_downloader/telegram/search_flow.py:253
 #, python-brace-format
 msgid ""
 "Could not find `{query}` on Spotify.\n"
@@ -931,12 +940,12 @@ msgstr ""
 "Non se atopou `{query}` en Spotify.\n"
 "Podes buscar en Soulseek directamente."
 
-#: src/music_downloader/telegram/search_flow.py:273
-#: src/music_downloader/telegram/search_flow.py:603
+#: src/music_downloader/telegram/search_flow.py:321
+#: src/music_downloader/telegram/search_flow.py:651
 msgid "Something went wrong. Please try again."
 msgstr "Algo saíu mal. Téntao de novo."
 
-#: src/music_downloader/telegram/search_flow.py:342
+#: src/music_downloader/telegram/search_flow.py:390
 #, python-brace-format
 msgid ""
 "🎵 {track}\n"
@@ -951,7 +960,7 @@ msgstr ""
 "\n"
 "Buscando en slskd..."
 
-#: src/music_downloader/telegram/search_flow.py:353
+#: src/music_downloader/telegram/search_flow.py:401
 #, python-brace-format
 msgid ""
 "🎵 {track}\n"
@@ -962,7 +971,7 @@ msgstr ""
 "\n"
 "Sen resultados coa consulta completa — reintentando só co título…"
 
-#: src/music_downloader/telegram/search_flow.py:356
+#: src/music_downloader/telegram/search_flow.py:404
 #, python-brace-format
 msgid ""
 "🎵 {track}\n"
@@ -973,7 +982,7 @@ msgstr ""
 "\n"
 "Segue sen haber resultados — probando variacións de palabras clave co ano…"
 
-#: src/music_downloader/telegram/search_flow.py:359
+#: src/music_downloader/telegram/search_flow.py:407
 #, python-brace-format
 msgid ""
 "🎵 {track}\n"
@@ -984,7 +993,7 @@ msgstr ""
 "\n"
 "Segue sen haber resultados — buscando artista + palabras clave…"
 
-#: src/music_downloader/telegram/search_flow.py:373
+#: src/music_downloader/telegram/search_flow.py:421
 #, python-brace-format
 msgid ""
 "🎵 {track} ({duration})\n"
@@ -997,26 +1006,26 @@ msgstr ""
 "Non se atoparon resultados en Soulseek para esta pista.\n"
 "Proba con outra busca."
 
-#: src/music_downloader/telegram/search_flow.py:405
+#: src/music_downloader/telegram/search_flow.py:453
 msgid "Something went wrong during the search. Please try again."
 msgstr "Algo saíu mal durante a busca. Téntao de novo."
 
-#: src/music_downloader/telegram/search_flow.py:421
+#: src/music_downloader/telegram/search_flow.py:469
 #, python-brace-format
 msgid "Continuing with search: `{query}`"
 msgstr "Continuando a busca: `{query}`"
 
-#: src/music_downloader/telegram/search_flow.py:431
-#: src/music_downloader/telegram/search_flow.py:489
+#: src/music_downloader/telegram/search_flow.py:479
+#: src/music_downloader/telegram/search_flow.py:537
 msgid "🔍 Searching slskd for FLAC..."
 msgstr "🔍 Buscando FLAC en slskd..."
 
-#: src/music_downloader/telegram/search_flow.py:483
+#: src/music_downloader/telegram/search_flow.py:531
 #, python-brace-format
 msgid "Selected: {track} ({duration})"
 msgstr "Seleccionado: {track} ({duration})"
 
-#: src/music_downloader/telegram/search_flow.py:538
+#: src/music_downloader/telegram/search_flow.py:586
 msgid ""
 "🎵 How should this track be saved?\n"
 "\n"
@@ -1028,7 +1037,7 @@ msgstr ""
 "Envía o nome así: `Artista - Título`\n"
 "(Usarase para o nome de ficheiro e as etiquetas)"
 
-#: src/music_downloader/telegram/search_flow.py:585
+#: src/music_downloader/telegram/search_flow.py:633
 #, python-brace-format
 msgid ""
 "🔍 Direct search: `{query}`\n"
@@ -1039,30 +1048,30 @@ msgstr ""
 "\n"
 "Non se atoparon resultados en Soulseek."
 
-#: src/music_downloader/telegram/search_flow.py:622
+#: src/music_downloader/telegram/search_flow.py:670
 #, python-brace-format
 msgid "⚠️ *Already in the library:* {track}"
 msgstr "⚠️ *Xa está na biblioteca:* {track}"
 
-#: src/music_downloader/telegram/search_flow.py:624
+#: src/music_downloader/telegram/search_flow.py:672
 msgid "On disk:"
 msgstr "No disco:"
 
-#: src/music_downloader/telegram/search_flow.py:626
+#: src/music_downloader/telegram/search_flow.py:674
 #, python-brace-format
 msgid "Previously saved as `{filename}`"
 msgstr "Gardado anteriormente como `{filename}`"
 
-#: src/music_downloader/telegram/search_flow.py:627
+#: src/music_downloader/telegram/search_flow.py:675
 msgid "Search Soulseek anyway?"
 msgstr "Buscar en Soulseek de todos os xeitos?"
 
-#: src/music_downloader/telegram/search_flow.py:672
+#: src/music_downloader/telegram/search_flow.py:720
 #, python-brace-format
 msgid "⚡ Auto-downloading best match for {track}..."
 msgstr "⚡ Descargando automaticamente a mellor coincidencia de {track}..."
 
-#: src/music_downloader/telegram/search_flow.py:676
+#: src/music_downloader/telegram/search_flow.py:724
 #, python-brace-format
 msgid ""
 "⬇️ *Downloading #{n}...*\n"
