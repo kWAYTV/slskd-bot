@@ -23,6 +23,9 @@ SLOT_AVAILABLE_POINTS = 7.5
 SPEED_MAX_POINTS = 7.5
 QUEUE_MAX_POINTS = 5.0
 
+QUALITY_PREFER_HIRES = "hires"
+QUALITY_PREFER_CD = "cd"
+
 
 class ResultScorer:
     """Scores and ranks slskd search results against a catalog track."""
@@ -50,6 +53,7 @@ class ResultScorer:
         results: list[SearchResult],
         track: TrackInfo,
         max_duration_diff: int | None = None,
+        quality_preference: str = QUALITY_PREFER_HIRES,
     ) -> list[SearchResult]:
         """
         Score and rank search results against the reference track.
@@ -58,7 +62,7 @@ class ResultScorer:
         scored = []
 
         for result in results:
-            score = self._calculate_score(result, track, max_duration_diff)
+            score = self._calculate_score(result, track, max_duration_diff, quality_preference)
             if score is not None:
                 result.score = score
                 scored.append(result)
@@ -77,7 +81,11 @@ class ResultScorer:
         return deduplicated
 
     def _calculate_score(
-        self, result: SearchResult, track: TrackInfo, max_duration_diff: int | None = None
+        self,
+        result: SearchResult,
+        track: TrackInfo,
+        max_duration_diff: int | None = None,
+        quality_preference: str = QUALITY_PREFER_HIRES,
     ) -> float | None:
         """Calculate a score for a single result, or None to exclude it."""
         score = 0.0
@@ -111,23 +119,7 @@ class ResultScorer:
         else:
             score += DURATION_FLAT_POINTS
 
-        if result.bit_depth:
-            if result.bit_depth >= 24:
-                score += QUALITY_HIRES_POINTS
-            elif result.bit_depth == 16:
-                score += QUALITY_CD_POINTS
-            else:
-                score += SAMPLE_RATE_CD_POINTS
-
-        if result.sample_rate:
-            if result.sample_rate >= 88200:
-                score += SAMPLE_RATE_HIRES_POINTS
-            elif result.sample_rate == 48000:
-                score += 7.0
-            elif result.sample_rate == 44100:
-                score += 6.0
-            else:
-                score += 3.0
+        score += _quality_points(result, quality_preference)
 
         if result.has_free_slot:
             score += SLOT_AVAILABLE_POINTS
@@ -155,3 +147,29 @@ class ResultScorer:
         score += title_match * SPEED_MAX_POINTS
 
         return round(score, 2)
+
+
+def _quality_points(result: SearchResult, preference: str) -> float:
+    """Audio-quality points (25 max). ``cd`` preference favors 16/44.1 over hi-res."""
+    prefer_cd = preference == QUALITY_PREFER_CD
+    points = 0.0
+
+    if result.bit_depth:
+        if result.bit_depth >= 24:
+            points += QUALITY_CD_POINTS if prefer_cd else QUALITY_HIRES_POINTS
+        elif result.bit_depth == 16:
+            points += QUALITY_HIRES_POINTS if prefer_cd else QUALITY_CD_POINTS
+        else:
+            points += SAMPLE_RATE_CD_POINTS
+
+    if result.sample_rate:
+        if result.sample_rate >= 88200:
+            points += SAMPLE_RATE_CD_POINTS if prefer_cd else SAMPLE_RATE_HIRES_POINTS
+        elif result.sample_rate == 48000:
+            points += 7.0
+        elif result.sample_rate == 44100:
+            points += SAMPLE_RATE_HIRES_POINTS if prefer_cd else 6.0
+        else:
+            points += 3.0
+
+    return points

@@ -47,6 +47,9 @@ class Config:
 
         self.filename_template = os.getenv("FILENAME_TEMPLATE", "{artist} - {title}")
 
+        quality_pref = os.getenv("QUALITY_PREFERENCE", "hires").strip().lower()
+        self.quality_preference = quality_pref if quality_pref in ("hires", "cd") else "hires"
+
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         if log_level == "WARN":
             log_level = "WARNING"
