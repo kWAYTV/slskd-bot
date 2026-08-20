@@ -173,7 +173,14 @@ def format_search_results(
     artist = escape_md(track.artist)
     title = escape_md(track.title)
     album = escape_md(track.album)
-    matches = ngettext("Found {n} FLAC match:", "Found {n} FLAC matches:", total).format(n=total)
+    if is_fallback:
+        matches = ngettext(
+            "⚠️ No FLAC found — showing all formats ({n} match):",
+            "⚠️ No FLAC found — showing all formats ({n} matches):",
+            total,
+        ).format(n=total)
+    else:
+        matches = ngettext("Found {n} FLAC match:", "Found {n} FLAC matches:", total).format(n=total)
     is_direct = track.duration_ms == 0
     if is_direct:
         if track.artist:
@@ -186,17 +193,6 @@ def format_search_results(
                 _("🔍 *Direct search:* `{query}`").format(query=track.title) + "\n",
                 matches + "\n",
             ]
-    elif is_fallback:
-        header = [
-            f"🎵 *{artist} - {title}*",
-            _("Duration: {duration} | Album: {album}").format(duration=track.duration_display, album=album) + "\n",
-            ngettext(
-                "⚠️ No FLAC found — showing all formats ({n} match):",
-                "⚠️ No FLAC found — showing all formats ({n} matches):",
-                total,
-            ).format(n=total)
-            + "\n",
-        ]
     else:
         header = [
             f"🎵 *{artist} - {title}*",
