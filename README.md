@@ -29,7 +29,7 @@ Bot: Downloaded! Nancy Sinatra - Bang Bang (My Baby Shot Me Down).flac -> /music
 
 ### Flow
 
-1. Send a song name to the Telegram bot (text message)
+1. Send a song name — or paste a **Spotify track link** or **SoundCloud track link** — to the Telegram bot
 2. Bot resolves the track on **Spotify** (artist, title, duration, album)
 3. Bot searches **slskd** (Soulseek) for FLAC files matching the track
 4. Results are **scored** by duration match, audio quality, source reliability, and filename relevance
@@ -110,6 +110,7 @@ python -m music_downloader run
 | `OUTPUT_DIR` | No | `/music` | Where to place renamed FLAC files (container path) |
 | `DATA_DIR` | No | `/data` | SQLite directory for history and playlist imports |
 | `AUTO_MODE` | No | `false` | Auto-download best match without asking |
+| `QUALITY_PREFERENCE` | No | `hires` | `hires` or `cd` — which audio quality ranks higher (per-chat `/quality` overrides) |
 | `MAX_RESULTS` | No | `5` | Maximum search results shown to user |
 | `DURATION_TOLERANCE_SECS` | No | `5` | Duration match tolerance in seconds |
 | `SEARCH_TIMEOUT_SECS` | No | `30` | slskd search timeout |
@@ -126,7 +127,10 @@ The first time an allowed user talks to the bot they pick a language (English, S
 | Command | Description |
 |---------|-------------|
 | *(any text)* | Search for a song and show download options |
+| *(Spotify/SoundCloud track link)* | Resolve the link and search for it |
 | `/auto` | Toggle auto-download mode on/off (per chat) |
+| `/quality` | Prefer CD (16/44.1) or Hi-Res (24-bit) when ranking results (per chat) |
+| `/undo` | Remove the last track saved to the library (library users only) |
 | `/import <url>` | Import a Spotify playlist or album (library users only) |
 | `/import resume` | Continue a paused import after a bot restart |
 | `/status` | Show active searches, downloads (with progress), and imports for this chat |
