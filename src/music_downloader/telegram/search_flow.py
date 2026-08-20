@@ -15,13 +15,8 @@ from music_downloader.catalog.soundcloud import matches_spotify_candidate
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.i18n.catalog import gettext as _
 from music_downloader.soulseek.errors import SlskdUnavailableError
-from music_downloader.soulseek.query import (
-    build_reduced_queries,
-    clean_search_title,
-    extract_latin_keywords,
-    has_non_latin_script,
-    parse_query_artist_title,
-)
+from music_downloader.soulseek.fallbacks import search_with_fallbacks as soulseek_search_with_fallbacks
+from music_downloader.soulseek.query import parse_query_artist_title
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.keyboards import (
     build_direct_search_keyboard,
@@ -323,55 +318,15 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
 
 async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation: int, on_tier=None):
     """Four-tier slskd search: full query, title-only, keyword+year, artist+latin keywords."""
-    clean_title = clean_search_title(track.title)
-    search_query = f"{track.artist} {clean_title}"
-    timeout = self.config.search_timeout_secs
-    quality = self.quality_pref(chat_id)
-
-    raw_responses = await self.slskd.search(search_query, timeout_secs=timeout)
-    if self._is_stale(chat_id, generation):
-        return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
-    if ranked:
-        return ranked, is_fallback, False
-
-    if on_tier:
-        await on_tier("title-only")
-    logger.info("No results for '%s', retrying with title-only: '%s'", search_query, clean_title)
-    raw_responses = await self.slskd.search(clean_title, timeout_secs=timeout)
-    if self._is_stale(chat_id, generation):
-        return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
-    if ranked:
-        return ranked, is_fallback, False
-
-    if not has_non_latin_script(clean_title):
-        reduced_queries = build_reduced_queries(clean_title, track.year)
-        if reduced_queries:
-            if on_tier:
-                await on_tier("keywords")
-            logger.info("No results for title-only '%s', trying keyword reduction + year", clean_title)
-            for fallback_query in reduced_queries:
-                if self._is_stale(chat_id, generation):
-                    return [], False, True
-                raw_responses = await self.slskd.search(fallback_query, timeout_secs=timeout)
-                ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
-                if ranked:
-                    logger.info("Keyword-reduction fallback hit: '%s'", fallback_query)
-                    return ranked, is_fallback, False
-
-    latin_kw = extract_latin_keywords(clean_title)
-    fb4_query = f"{track.artist} {' '.join(latin_kw)}" if latin_kw else track.artist
-    if on_tier:
-        await on_tier("artist-keywords")
-    logger.info("Trying artist + Latin keywords fallback: '%s'", fb4_query)
-    raw_responses = await self.slskd.search(fb4_query, timeout_secs=timeout, response_limit=150)
-    if self._is_stale(chat_id, generation):
-        return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track, max_duration_diff=120, quality_preference=quality)
-    if ranked:
-        logger.info("Artist-keyword fallback hit: '%s'", fb4_query)
-    return ranked, is_fallback, False
+    return await soulseek_search_with_fallbacks(
+        self.slskd,
+        self.scorer,
+        track,
+        timeout_secs=self.config.search_timeout_secs,
+        quality_preference=self.quality_pref(chat_id),
+        is_cancelled=lambda: self._is_stale(chat_id, generation),
+        on_tier=on_tier,
+    )
 
 
 async def do_slskd_search(
