@@ -279,7 +279,7 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
 
     target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
     if target_path:
-        self.processor.cleanup_download(pending_dl.source_path)
+        await self._remove_download_file(pending_dl.source_path)
         await self._embed_spotify_artwork(target_path, track)
         target_name = os.path.basename(target_path)
         await self._edit_approval_message(query, _("✅ Saved: `{name}`").format(name=target_name))

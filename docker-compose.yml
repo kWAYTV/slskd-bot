@@ -37,8 +37,10 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
     volumes:
-      # Mount slskd completed downloads directory (read-only)
-      # Adjust the host path to match your slskd downloads location
+      # Mount slskd completed downloads directory (read-only).
+      # Adjust the host path to match your slskd downloads location.
+      # With a read-only mount, originals are deleted through slskd's API after
+      # saving — enable SLSKD_REMOTE_FILE_MANAGEMENT=true on the slskd container.
       - ${SLSKD_DOWNLOAD_PATH:-./downloads}:/downloads:ro
 
       # Mount output music directory (read-write)

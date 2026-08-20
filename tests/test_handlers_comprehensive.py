@@ -1524,3 +1524,88 @@ class TestCmdStatusDetails:
         context = _make_context()
         await bot.cmd_status(update, context)
         update.message.reply_text.assert_called_once_with("No active searches, downloads, or imports.")
+
+
+# ---------------------------------------------------------------------------
+# _remove_download_file (read-only DOWNLOAD_DIR fallback)
+# ---------------------------------------------------------------------------
+
+
+class TestRemoveDownloadFile:
+    def _make_bot_with_download(self):
+        config = _make_config()
+        with (
+            patch("music_downloader.telegram.app.SpotifyResolver"),
+            patch("music_downloader.telegram.app.SlskdClient"),
+        ):
+            bot = MusicBot(config)
+        source = os.path.join(config.download_dir, "someuser", "song.flac")
+        os.makedirs(os.path.dirname(source))
+        with open(source, "w") as f:
+            f.write("data")
+        return bot, source
+
+    @pytest.mark.asyncio
+    async def test_local_delete_skips_slskd(self):
+        bot, source = self._make_bot_with_download()
+        await bot._remove_download_file(source)
+        assert not os.path.exists(source)
+        bot.slskd.delete_downloaded_file.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_none_source_is_noop(self):
+        bot, _ = self._make_bot_with_download()
+        await bot._remove_download_file(None)
+        bot.slskd.delete_downloaded_file.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_slskd_when_local_delete_fails(self):
+        """Read-only DOWNLOAD_DIR: local remove fails, slskd deletes remotely."""
+        bot, source = self._make_bot_with_download()
+        bot.processor.cleanup_download = MagicMock(return_value=False)
+
+        def _remote_delete(rel_path):
+            os.remove(source)
+            return True
+
+        bot.slskd.delete_downloaded_file = MagicMock(side_effect=_remote_delete)
+        bot.slskd.delete_downloaded_directory = MagicMock(return_value=True)
+
+        await bot._remove_download_file(source)
+
+        bot.slskd.delete_downloaded_file.assert_called_once_with("someuser/song.flac")
+        # Parent dir became empty, so the per-user directory is removed remotely too.
+        bot.slskd.delete_downloaded_directory.assert_called_once_with("someuser")
+
+    @pytest.mark.asyncio
+    async def test_keeps_user_dir_when_not_empty(self):
+        bot, source = self._make_bot_with_download()
+        sibling = os.path.join(os.path.dirname(source), "other.flac")
+        with open(sibling, "w") as f:
+            f.write("data")
+        bot.processor.cleanup_download = MagicMock(return_value=False)
+
+        def _remote_delete(rel_path):
+            os.remove(source)
+            return True
+
+        bot.slskd.delete_downloaded_file = MagicMock(side_effect=_remote_delete)
+        bot.slskd.delete_downloaded_directory = MagicMock()
+
+        await bot._remove_download_file(source)
+
+        bot.slskd.delete_downloaded_file.assert_called_once_with("someuser/song.flac")
+        bot.slskd.delete_downloaded_directory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_remote_delete_failure_is_logged_not_raised(self):
+        bot, source = self._make_bot_with_download()
+        bot.processor.cleanup_download = MagicMock(return_value=False)
+        bot.slskd.delete_downloaded_file = MagicMock(return_value=False)
+        bot.slskd.delete_downloaded_directory = MagicMock()
+
+        await bot._remove_download_file(source)
+
+        bot.slskd.delete_downloaded_file.assert_called_once()
+        bot.slskd.delete_downloaded_directory.assert_not_called()
+        assert os.path.exists(source)
