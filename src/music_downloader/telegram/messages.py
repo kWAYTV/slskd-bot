@@ -75,18 +75,38 @@ async def safe_query_edit(query, text: str, **kwargs) -> bool:
 
 def welcome_text() -> str:
     return _(
-        "Send me a song name (e.g., `Nancy Sinatra Bang Bang`) "
-        "and I'll find and download it in FLAC.\n\n"
+        "Send me a song name (e.g., `Nancy Sinatra Bang Bang`), a Spotify track link, "
+        "or a SoundCloud track link and I'll find and download it in FLAC.\n\n"
         "Commands:\n"
         "/auto — Toggle auto-download mode\n"
+        "/quality — Prefer CD or Hi-Res audio\n"
         "/import <url> — Import a Spotify playlist or album\n"
         "/import resume — Continue a paused import after restart\n"
         "/status — Show active searches, downloads, and imports\n"
         "/history — Recent downloads\n"
+        "/undo — Remove the last track saved to the library\n"
         "/cancel — Cancel the current search, download, or import\n"
         "/lang — Change language\n"
         "/help — Show this message"
     )
+
+
+def format_result_reasons(track: TrackInfo, result: SearchResult) -> str:
+    """One-line 'why this match won' — duration closeness, source health, score.
+
+    Quality (bit depth/sample rate) is omitted: callers already display it.
+    """
+    parts = []
+    if track.duration_secs > 0 and result.length:
+        diff = abs(result.length - track.duration_secs)
+        parts.append(_("⏱ exact duration") if diff == 0 else _("⏱ ±{secs}s").format(secs=diff))
+    if result.has_free_slot:
+        parts.append(_("🟢 free slot"))
+    elif result.queue_length:
+        parts.append(_("🔴 queue of {n}").format(n=result.queue_length))
+    if result.score:
+        parts.append(_("⭐ {score}/100").format(score=f"{result.score:.0f}"))
+    return " · ".join(parts)
 
 
 def format_flac_verdict(verdict: FlacVerdict) -> str:

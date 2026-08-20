@@ -710,5 +710,5 @@ class TestCreateBot:
             app = create_bot(config)
             assert app is mock_app
             mock_app.add_handler.assert_called()
-            # locale middleware + 8 command handlers + callback + text message
-            assert mock_app.add_handler.call_count == 11
+            # locale middleware + 10 command handlers + callback + text message
+            assert mock_app.add_handler.call_count == 13

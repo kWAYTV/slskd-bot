@@ -9,6 +9,8 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from music_downloader.catalog.links import extract_soundcloud_url, extract_spotify_track_id
+from music_downloader.catalog.playlist import PlaylistResolver
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.i18n.catalog import gettext as _
 from music_downloader.soulseek.client import SlskdUnavailableError
@@ -26,7 +28,7 @@ from music_downloader.telegram.keyboards import (
     build_results_keyboard,
     build_spotify_keyboard,
 )
-from music_downloader.telegram.messages import escape_md, md_code_safe, safe_edit
+from music_downloader.telegram.messages import escape_md, format_result_reasons, md_code_safe, safe_edit
 from music_downloader.telegram.session import PendingSearch
 
 logger = logging.getLogger(__name__)
@@ -82,6 +84,9 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    if await _handle_link_query(self, update, context, chat_id, query):
+        return
+
     await self._cancel_chat_operations(chat_id)
     generation = self._chat_generation[chat_id]
 
@@ -99,6 +104,84 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await self._do_search(update, context, query, generation)
+
+
+async def _handle_link_query(
+    self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, query: str
+) -> bool:
+    """Handle pasted Spotify/SoundCloud links. Returns True when the message was a link."""
+    if PlaylistResolver.is_spotify_url(query):
+        await update.message.reply_text(
+            _("That looks like a playlist or album link.\nUse `/import {url}` to import it.").format(
+                url=query.split()[0]
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return True
+
+    spotify_track_id = extract_spotify_track_id(query)
+    if spotify_track_id:
+        await _search_from_spotify_link(self, update, context, chat_id, spotify_track_id)
+        return True
+
+    soundcloud_url = extract_soundcloud_url(query)
+    if soundcloud_url:
+        await _search_from_soundcloud_link(self, update, context, chat_id, soundcloud_url)
+        return True
+
+    return False
+
+
+async def _search_from_spotify_link(self, update, context, chat_id: int, track_id: str):
+    """Resolve a pasted Spotify track link directly (no search ambiguity) and hit Soulseek."""
+    await self._cancel_chat_operations(chat_id)
+    generation = self._chat_generation[chat_id]
+
+    searching_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text=_("🔗 Resolving Spotify track link..."),
+    )
+
+    track = await asyncio.to_thread(self.spotify.get_track, track_id)
+    if self._is_stale(chat_id, generation):
+        return
+    if not track:
+        await safe_edit(searching_msg, _("Could not resolve that Spotify track link. Try the song name instead."))
+        return
+
+    self.pending[chat_id] = PendingSearch(
+        query=f"{track.artist} {track.title}",
+        track=track,
+        user_id=update.effective_user.id,
+    )
+    await self._do_slskd_search(context, chat_id, track, searching_msg, generation)
+
+
+async def _search_from_soundcloud_link(self, update, context, chat_id: int, url: str):
+    """Resolve a SoundCloud link to artist/title, then run the normal search pipeline."""
+    await self._cancel_chat_operations(chat_id)
+    generation = self._chat_generation[chat_id]
+
+    searching_msg = await context.bot.send_message(
+        chat_id=chat_id,
+        text=_("🔗 Resolving SoundCloud link..."),
+    )
+
+    sc_track = await asyncio.to_thread(self.soundcloud.resolve, url)
+    if self._is_stale(chat_id, generation):
+        return
+    if not sc_track:
+        await safe_edit(searching_msg, _("Could not resolve that SoundCloud link. Try the song name instead."))
+        return
+
+    await safe_edit(
+        searching_msg,
+        _("🎧 SoundCloud: *{artist} - {title}*\nLooking it up...").format(
+            artist=escape_md(sc_track.artist), title=escape_md(sc_track.title)
+        ),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    await self._do_search(update, context, sc_track.query, generation)
 
 
 async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, generation: int):
@@ -195,11 +278,12 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
     clean_title = clean_search_title(track.title)
     search_query = f"{track.artist} {clean_title}"
     timeout = self.config.search_timeout_secs
+    quality = self.quality_pref(chat_id)
 
     raw_responses = await self.slskd.search(search_query, timeout_secs=timeout)
     if self._is_stale(chat_id, generation):
         return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track)
+    ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
     if ranked:
         return ranked, is_fallback, False
 
@@ -209,7 +293,7 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
     raw_responses = await self.slskd.search(clean_title, timeout_secs=timeout)
     if self._is_stale(chat_id, generation):
         return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track)
+    ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
     if ranked:
         return ranked, is_fallback, False
 
@@ -223,7 +307,7 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
                 if self._is_stale(chat_id, generation):
                     return [], False, True
                 raw_responses = await self.slskd.search(fallback_query, timeout_secs=timeout)
-                ranked, is_fallback = self._rank_responses(raw_responses, track)
+                ranked, is_fallback = self._rank_responses(raw_responses, track, quality_preference=quality)
                 if ranked:
                     logger.info("Keyword-reduction fallback hit: '%s'", fallback_query)
                     return ranked, is_fallback, False
@@ -236,7 +320,7 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
     raw_responses = await self.slskd.search(fb4_query, timeout_secs=timeout, response_limit=150)
     if self._is_stale(chat_id, generation):
         return [], False, True
-    ranked, is_fallback = self._rank_responses(raw_responses, track, max_duration_diff=120)
+    ranked, is_fallback = self._rank_responses(raw_responses, track, max_duration_diff=120, quality_preference=quality)
     if ranked:
         logger.info("Artist-keyword fallback hit: '%s'", fb4_query)
     return ranked, is_fallback, False
@@ -488,7 +572,9 @@ async def do_direct_slskd_search(
                 year="",
             )
 
-        ranked, is_fallback = self._rank_responses(raw_responses, synthetic_track)
+        ranked, is_fallback = self._rank_responses(
+            raw_responses, synthetic_track, quality_preference=self.quality_pref(chat_id)
+        )
 
         if self._is_stale(chat_id, generation):
             return
@@ -587,11 +673,15 @@ async def present_search_results(
             parse_mode=ParseMode.MARKDOWN,
         )
         result = ranked[0]
+        text = _("⬇️ *Downloading #{n}...*\n{track}\nFrom: `{user}`\nFile: `{file}`").format(
+            n=1, track=header, user=md_code_safe(result.username), file=md_code_safe(result.basename)
+        )
+        reasons = format_result_reasons(track, result)
+        if reasons:
+            text += f"\n{reasons}"
         status_msg = await context.bot.send_message(
             chat_id=chat_id,
-            text=_("⬇️ *Downloading #{n}...*\n{track}\nFrom: `{user}`\nFile: `{file}`").format(
-                n=1, track=header, user=md_code_safe(result.username), file=md_code_safe(result.basename)
-            ),
+            text=text,
             parse_mode=ParseMode.MARKDOWN,
         )
         user_id = self.pending[chat_id].user_id if chat_id in self.pending else None

@@ -1609,3 +1609,213 @@ class TestRemoveDownloadFile:
         bot.slskd.delete_downloaded_file.assert_called_once()
         bot.slskd.delete_downloaded_directory.assert_not_called()
         assert os.path.exists(source)
+
+
+# ---------------------------------------------------------------------------
+# format_result_reasons
+# ---------------------------------------------------------------------------
+
+
+class TestFormatResultReasons:
+    def test_full_reasons_line(self):
+        from music_downloader.telegram.messages import format_result_reasons
+
+        track = _make_track()  # 162s reference
+        result = _make_search_result()
+        result.length = 162
+        result.has_free_slot = True
+        result.score = 87.4
+        line = format_result_reasons(track, result)
+        assert "exact duration" in line
+        assert "free slot" in line
+        assert "87/100" in line
+
+    def test_duration_diff_and_queue(self):
+        from music_downloader.telegram.messages import format_result_reasons
+
+        track = _make_track()
+        result = _make_search_result()
+        result.length = 165
+        result.has_free_slot = False
+        result.queue_length = 3
+        result.score = 60.0
+        line = format_result_reasons(track, result)
+        assert "±3s" in line
+        assert "queue of 3" in line
+
+    def test_no_reference_duration(self):
+        from music_downloader.telegram.messages import format_result_reasons
+
+        track = _make_track()
+        track.duration_ms = 0
+        result = _make_search_result()
+        result.score = 0
+        result.has_free_slot = False
+        result.queue_length = 0
+        assert format_result_reasons(track, result) == ""
+
+
+# ---------------------------------------------------------------------------
+# Pasted link handling
+# ---------------------------------------------------------------------------
+
+
+class TestLinkQueries:
+    def _make_bot(self):
+        with (
+            patch("music_downloader.telegram.app.SpotifyResolver"),
+            patch("music_downloader.telegram.app.SlskdClient"),
+        ):
+            return MusicBot(_make_config())
+
+    @pytest.mark.asyncio
+    async def test_spotify_track_link_resolves_directly(self):
+        from music_downloader.telegram import search_flow
+
+        bot = self._make_bot()
+        bot.spotify.get_track = MagicMock(return_value=_make_track())
+        bot._do_slskd_search = AsyncMock()
+        update = _make_update(text="https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC")
+        context = _make_context()
+
+        handled = await search_flow._handle_link_query(
+            bot, update, context, 67890, "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"
+        )
+        assert handled is True
+        bot.spotify.get_track.assert_called_once_with("4uLU6hMCjMI75M1A2tKUQC")
+        bot._do_slskd_search.assert_awaited_once()
+        assert bot.pending[67890].track is not None
+
+    @pytest.mark.asyncio
+    async def test_soundcloud_link_runs_search_pipeline(self):
+        from music_downloader.catalog.soundcloud import SoundCloudTrack
+        from music_downloader.telegram import search_flow
+
+        bot = self._make_bot()
+        bot.soundcloud.resolve = MagicMock(return_value=SoundCloudTrack(artist="Forss", title="Flickermood"))
+        bot._do_search = AsyncMock()
+        update = _make_update(text="https://soundcloud.com/forss/flickermood")
+        context = _make_context()
+
+        handled = await search_flow._handle_link_query(
+            bot, update, context, 67890, "https://soundcloud.com/forss/flickermood"
+        )
+        assert handled is True
+        bot.soundcloud.resolve.assert_called_once_with("https://soundcloud.com/forss/flickermood")
+        bot._do_search.assert_awaited_once()
+        assert bot._do_search.await_args.args[2] == "Forss - Flickermood"
+
+    @pytest.mark.asyncio
+    async def test_playlist_link_suggests_import(self):
+        from music_downloader.telegram import search_flow
+
+        bot = self._make_bot()
+        update = _make_update(text="https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M")
+        context = _make_context()
+
+        handled = await search_flow._handle_link_query(
+            bot, update, context, 67890, "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+        )
+        assert handled is True
+        text = update.message.reply_text.call_args.args[0]
+        assert "/import" in text
+
+    @pytest.mark.asyncio
+    async def test_plain_text_is_not_handled(self):
+        from music_downloader.telegram import search_flow
+
+        bot = self._make_bot()
+        update = _make_update(text="nancy sinatra bang bang")
+        context = _make_context()
+
+        handled = await search_flow._handle_link_query(bot, update, context, 67890, "nancy sinatra bang bang")
+        assert handled is False
+
+
+# ---------------------------------------------------------------------------
+# /quality and /undo commands
+# ---------------------------------------------------------------------------
+
+
+class TestQualityCommand:
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    def test_default_pref_from_config(self, mock_slskd, mock_spotify):
+        config = _make_config()
+        config.quality_preference = "hires"
+        bot = MusicBot(config)
+        assert bot.quality_pref(1) == "hires"
+
+    @patch("music_downloader.telegram.app.SpotifyResolver")
+    @patch("music_downloader.telegram.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_qp_callback_sets_override(self, mock_slskd, mock_spotify):
+        config = _make_config()
+        config.quality_preference = "hires"
+        bot = MusicBot(config)
+        update = _make_callback_update(data="qp:cd")
+        context = _make_context()
+        await bot.handle_callback(update, context)
+        assert bot.quality_pref(update.effective_chat.id) == "cd"
+        # Other chats keep the default.
+        assert bot.quality_pref(99999) == "hires"
+
+
+class TestUndoCommand:
+    def _make_bot(self):
+        with (
+            patch("music_downloader.telegram.app.SpotifyResolver"),
+            patch("music_downloader.telegram.app.SlskdClient"),
+        ):
+            return MusicBot(_make_config())
+
+    @pytest.mark.asyncio
+    async def test_undo_removes_file_and_marks_history(self):
+        bot = self._make_bot()
+        target = os.path.join(bot.config.output_dir, "Artist - Song.flac")
+        with open(target, "w") as f:
+            f.write("data")
+        bot.history_repo.add(
+            artist="Artist",
+            title="Song",
+            filename="Artist - Song.flac",
+            source_user="u",
+            status="success",
+            chat_id=67890,
+        )
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_undo(update, context)
+        assert not os.path.exists(target)
+        assert bot.history_repo.get_last_saved(67890) is None
+        text = update.message.reply_text.call_args.args[0]
+        assert "Removed from library" in text
+
+    @pytest.mark.asyncio
+    async def test_undo_without_saves(self):
+        bot = self._make_bot()
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_undo(update, context)
+        text = update.message.reply_text.call_args.args[0]
+        assert "Nothing to undo" in text
+
+    @pytest.mark.asyncio
+    async def test_undo_falls_back_to_exact_match(self):
+        """If the canonical filename is gone (e.g. counter suffix), find_exact locates it."""
+        bot = self._make_bot()
+        target = os.path.join(bot.config.output_dir, "Artist - Song.mp3")
+        with open(target, "w") as f:
+            f.write("data")
+        bot.history_repo.add(
+            artist="Artist",
+            title="Song",
+            filename="Artist - Song.flac",
+            source_user="u",
+            status="success",
+            chat_id=67890,
+        )
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_undo(update, context)
+        assert not os.path.exists(target)

@@ -4,6 +4,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.i18n.catalog import gettext as _
+from music_downloader.i18n.catalog import ngettext
 from music_downloader.soulseek.result import SearchResult
 
 
@@ -44,8 +45,8 @@ def build_approve_keyboard(download_id: str, has_next: bool = False) -> InlineKe
     """Build approve/reject keyboard for a downloaded file."""
     rows = [
         [
-            InlineKeyboardButton(_("✅ Save to library"), callback_data=f"approve:{download_id}"),
-            InlineKeyboardButton(_("🚫 Reject"), callback_data=f"reject:{download_id}"),
+            InlineKeyboardButton(_("💾 Save to library"), callback_data=f"approve:{download_id}"),
+            InlineKeyboardButton(_("🗑 Discard"), callback_data=f"reject:{download_id}"),
         ]
     ]
     if has_next:
@@ -103,6 +104,19 @@ def build_auto_mode_keyboard(current_mode: bool) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton(_("Enable auto-mode"), callback_data="auto:on")]])
 
 
+def build_quality_keyboard(current: str) -> InlineKeyboardMarkup:
+    """Build keyboard to switch the audio quality preference."""
+    if current == "cd":
+        return InlineKeyboardMarkup([[InlineKeyboardButton(_("Prefer Hi-Res (24-bit)"), callback_data="qp:hires")]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton(_("Prefer CD quality (16/44.1)"), callback_data="qp:cd")]])
+
+
+def build_import_summary_keyboard(job_id: int, failed_count: int) -> InlineKeyboardMarkup:
+    """Retry-failed button on the end-of-import summary."""
+    label = ngettext("🔄 Retry {n} failed track", "🔄 Retry {n} failed tracks", failed_count).format(n=failed_count)
+    return InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data=f"if:{job_id}")]])
+
+
 def build_direct_search_keyboard() -> InlineKeyboardMarkup:
     """Button to search Soulseek directly without Spotify resolution."""
     return InlineKeyboardMarkup(
@@ -127,8 +141,8 @@ def build_import_track_keyboard(job_id: int, track_id: int, dl_id: str) -> Inlin
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(_("✅ Save"), callback_data=f"ia:{job_id}:{track_id}:{dl_id}"),
-                InlineKeyboardButton(_("🚫 Reject"), callback_data=f"ir:{job_id}:{track_id}"),
+                InlineKeyboardButton(_("💾 Save to library"), callback_data=f"ia:{job_id}:{track_id}:{dl_id}"),
+                InlineKeyboardButton(_("🗑 Discard"), callback_data=f"ir:{job_id}:{track_id}"),
             ],
             [
                 InlineKeyboardButton(_("⏭ Skip track"), callback_data=f"is:{job_id}:{track_id}"),
