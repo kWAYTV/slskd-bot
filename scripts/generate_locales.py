@@ -446,6 +446,11 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "🎧 SoundCloud: *{artist} - {title}*\nWird gesucht...",
         "🎧 SoundCloud: *{artist} - {title}*\nBuscándoo...",
     ),
+    "🎧 SoundCloud: *{artist} - {title}*\nNot on Spotify — searching Soulseek directly...": (
+        "🎧 SoundCloud: *{artist} - {title}*\nNo está en Spotify — buscando directamente en Soulseek...",
+        "🎧 SoundCloud: *{artist} - {title}*\nNicht auf Spotify — suche direkt auf Soulseek...",
+        "🎧 SoundCloud: *{artist} - {title}*\nNon está en Spotify — buscando directamente en Soulseek...",
+    ),
     "🚫 Mark failed": ("🚫 Marcar fallida", "🚫 Als fehlgeschlagen", "🚫 Marcar fallida"),
     "🔄 Retry": ("🔄 Reintentar", "🔄 Erneut versuchen", "🔄 Reintentar"),
     "Choose a language:": ("Elige un idioma:", "Wähle eine Sprache:", "Escolle un idioma:"),

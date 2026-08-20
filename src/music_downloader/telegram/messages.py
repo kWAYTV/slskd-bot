@@ -15,8 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 def escape_md(text: str) -> str:
-    """Escape Markdown V1 special characters for safe display."""
-    for ch in r"\_*[]()~`>#+-=|{}.!":
+    """Escape Telegram legacy-Markdown (V1) special characters.
+
+    V1 only honors backslash escapes for ``_ * ` [`` — escaping anything else
+    renders the backslash literally (e.g. ``\\-`` shows up in the chat).
+    """
+    for ch in "_*`[":
         text = text.replace(ch, f"\\{ch}")
     return text
 

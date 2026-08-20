@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 
 from music_downloader.catalog.links import extract_soundcloud_url, extract_spotify_track_id
 from music_downloader.catalog.playlist import PlaylistResolver
+from music_downloader.catalog.soundcloud import matches_spotify_candidate
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.i18n.catalog import gettext as _
 from music_downloader.soulseek.client import SlskdUnavailableError
@@ -158,7 +159,12 @@ async def _search_from_spotify_link(self, update, context, chat_id: int, track_i
 
 
 async def _search_from_soundcloud_link(self, update, context, chat_id: int, url: str):
-    """Resolve a SoundCloud link to artist/title, then run the normal search pipeline."""
+    """Resolve a SoundCloud link, enrich via a *verified* Spotify match, or search directly.
+
+    The Spotify match is verified against the SoundCloud title so a track that
+    isn't on Spotify (common for fresh SoundCloud releases) can't be silently
+    replaced by a different song from the same artist.
+    """
     await self._cancel_chat_operations(chat_id)
     generation = self._chat_generation[chat_id]
 
@@ -181,7 +187,49 @@ async def _search_from_soundcloud_link(self, update, context, chat_id: int, url:
         ),
         parse_mode=ParseMode.MARKDOWN,
     )
-    await self._do_search(update, context, sc_track.query, generation)
+
+    candidates = await asyncio.to_thread(self.spotify.search_multiple, sc_track.query, 10)
+    if self._is_stale(chat_id, generation):
+        return
+    verified = next(
+        (c for c in candidates if matches_spotify_candidate(sc_track, c.artist, c.title)),
+        None,
+    )
+
+    if verified:
+        self.pending[chat_id] = PendingSearch(
+            query=sc_track.query,
+            track=verified,
+            user_id=update.effective_user.id,
+        )
+        await self._do_slskd_search(context, chat_id, verified, searching_msg, generation)
+        return
+
+    # Not on Spotify — search Soulseek directly, saving under the SoundCloud name.
+    synthetic_track = TrackInfo(
+        artist=sc_track.artist,
+        title=sc_track.title,
+        album="",
+        duration_ms=0,
+        spotify_url="",
+        year="",
+    )
+    self.pending[chat_id] = PendingSearch(
+        query=sc_track.query,
+        track=None,
+        user_id=update.effective_user.id,
+    )
+    await safe_edit(
+        searching_msg,
+        _("🎧 SoundCloud: *{artist} - {title}*\nNot on Spotify — searching Soulseek directly...").format(
+            artist=escape_md(sc_track.artist), title=escape_md(sc_track.title)
+        ),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    direct_query = f"{sc_track.artist} {sc_track.title}".strip()
+    await self._do_direct_slskd_search(
+        context, chat_id, direct_query, searching_msg, generation, display_track=synthetic_track
+    )
 
 
 async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, generation: int):
