@@ -315,6 +315,35 @@ class SlskdClient:
             logger.exception("Failed to cancel slskd transfer for %s", filename)
             return False
 
+    def delete_downloaded_file(self, relative_path: str) -> bool:
+        """Delete a file inside slskd's downloads directory via remote file management.
+
+        ``relative_path`` is relative to the slskd downloads directory (e.g.
+        ``username/song.flac``).  Requires ``remoteFileManagement: true`` in the
+        slskd configuration.
+        """
+        try:
+            ok = self.client.files.delete_downloaded_file(relative_path)
+            if ok:
+                logger.info(f"Deleted downloaded file via slskd: {relative_path}")
+            else:
+                logger.warning(f"slskd refused to delete downloaded file: {relative_path}")
+            return bool(ok)
+        except Exception:
+            logger.exception(f"Failed to delete downloaded file via slskd: {relative_path}")
+            return False
+
+    def delete_downloaded_directory(self, relative_dir: str) -> bool:
+        """Delete a subdirectory inside slskd's downloads directory via remote file management."""
+        try:
+            ok = self.client.files.delete_downloaded_directory(relative_dir)
+            if ok:
+                logger.info(f"Deleted downloaded directory via slskd: {relative_dir}")
+            return bool(ok)
+        except Exception:
+            logger.debug(f"Failed to delete downloaded directory via slskd: {relative_dir}", exc_info=True)
+            return False
+
     def ping(self) -> bool:
         """Return True if the slskd application API is reachable."""
         try:

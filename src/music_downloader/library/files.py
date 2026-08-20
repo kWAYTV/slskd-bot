@@ -25,6 +25,13 @@ class FileProcessor:
         os.makedirs(self.output_dir, exist_ok=True)
         logger.info(f"File processor initialized: downloads={download_dir}, output={output_dir}")
 
+        with contextlib.suppress(OSError):
+            if os.path.isdir(download_dir) and os.path.samefile(download_dir, output_dir):
+                logger.warning(
+                    "DOWNLOAD_DIR and OUTPUT_DIR resolve to the same directory; "
+                    "originals are removed after saving, but check volume mappings if duplicates appear"
+                )
+
     def find_similar(self, query: str, threshold: float = 0.6) -> list[str]:
         """Find files in the library with names similar to the query."""
         if not os.path.isdir(self.output_dir):
@@ -144,23 +151,37 @@ class FileProcessor:
             return None
 
     def cleanup_download(self, source_path: str) -> bool:
-        """Remove the original downloaded file after successful processing."""
+        """Remove the original downloaded file after successful processing.
+
+        Returns True only when the file was actually deleted; False when it was
+        already gone or could not be removed (e.g. read-only mount).
+        """
         try:
             if os.path.isfile(source_path):
                 os.remove(source_path)
                 logger.info(f"Cleaned up: {source_path}")
 
-                parent = os.path.dirname(source_path)
-                if os.path.isdir(parent) and not os.listdir(parent):
-                    os.rmdir(parent)
-                    logger.debug(f"Removed empty directory: {parent}")
+                with contextlib.suppress(OSError):
+                    parent = os.path.dirname(source_path)
+                    if os.path.isdir(parent) and not os.listdir(parent):
+                        os.rmdir(parent)
+                        logger.debug(f"Removed empty directory: {parent}")
 
                 return True
             return False
 
         except Exception:
-            logger.exception(f"Failed to cleanup: {source_path}")
+            logger.warning(f"Failed to cleanup: {source_path}", exc_info=True)
             return False
+
+    def relative_download_path(self, source_path: str) -> str | None:
+        """Return ``source_path`` relative to the downloads dir (slskd layout), or None if outside it."""
+        real_source = os.path.realpath(source_path)
+        real_download_dir = os.path.realpath(self.download_dir)
+        rel = os.path.relpath(real_source, real_download_dir)
+        if rel.startswith(".."):
+            return None
+        return rel.replace(os.sep, "/")
 
     @staticmethod
     def _dedup_flac_tags(filepath: str) -> None:

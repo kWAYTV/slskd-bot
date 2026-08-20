@@ -457,6 +457,39 @@ class TestSlskdClientGetDownloadsDirectory:
         assert result == []
 
 
+class TestSlskdClientDeleteDownloadedFile:
+    """Test SlskdClient remote file management deletion."""
+
+    @pytest.fixture
+    def client(self):
+        with patch("slskd_api.SlskdClient") as mock_cls:
+            c = SlskdClient("http://localhost:5030", "test-key")
+            c.client = mock_cls.return_value
+            return c
+
+    def test_delete_file_success(self, client):
+        client.client.files.delete_downloaded_file = MagicMock(return_value=True)
+        assert client.delete_downloaded_file("user/song.flac") is True
+        client.client.files.delete_downloaded_file.assert_called_once_with("user/song.flac")
+
+    def test_delete_file_refused(self, client):
+        client.client.files.delete_downloaded_file = MagicMock(return_value=False)
+        assert client.delete_downloaded_file("user/song.flac") is False
+
+    def test_delete_file_exception(self, client):
+        client.client.files.delete_downloaded_file = MagicMock(side_effect=Exception("403"))
+        assert client.delete_downloaded_file("user/song.flac") is False
+
+    def test_delete_directory_success(self, client):
+        client.client.files.delete_downloaded_directory = MagicMock(return_value=True)
+        assert client.delete_downloaded_directory("user") is True
+        client.client.files.delete_downloaded_directory.assert_called_once_with("user")
+
+    def test_delete_directory_exception(self, client):
+        client.client.files.delete_downloaded_directory = MagicMock(side_effect=Exception("boom"))
+        assert client.delete_downloaded_directory("user") is False
+
+
 class TestSlskdClientWaitForDownload:
     """Test SlskdClient.wait_for_download async method."""
 

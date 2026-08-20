@@ -1,6 +1,7 @@
 """Tests for the file processor."""
 
 import os
+import unittest.mock
 
 import mutagen.flac
 import pytest
@@ -125,8 +126,33 @@ class TestFileProcessor:
         source.write_text("data")
 
         assert os.path.exists(str(source))
-        processor.cleanup_download(str(source))
+        assert processor.cleanup_download(str(source)) is True
         assert not os.path.exists(str(source))
+
+    def test_cleanup_download_missing_file(self, processor, tmp_path):
+        assert processor.cleanup_download(str(tmp_path / "nope.flac")) is False
+
+    def test_cleanup_download_remove_fails(self, processor, tmp_path):
+        """A failed delete (e.g. read-only mount) returns False and keeps the file."""
+        source = tmp_path / "readonly.flac"
+        source.write_text("data")
+
+        with unittest.mock.patch(
+            "music_downloader.library.files.os.remove",
+            side_effect=OSError(30, "Read-only file system"),
+        ):
+            assert processor.cleanup_download(str(source)) is False
+        assert os.path.exists(str(source))
+
+    def test_relative_download_path_inside(self, processor, tmp_path):
+        source = tmp_path / "downloads" / "someuser" / "song.flac"
+        source.parent.mkdir(parents=True)
+        source.write_text("data")
+        assert processor.relative_download_path(str(source)) == "someuser/song.flac"
+
+    def test_relative_download_path_outside(self, processor, tmp_path):
+        outside = tmp_path / "elsewhere" / "song.flac"
+        assert processor.relative_download_path(str(outside)) is None
 
     def test_dedup_flac_tags_removes_exact_duplicates(self, tmp_path):
         """Test that exact duplicate tag values are removed."""

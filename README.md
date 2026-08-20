@@ -70,6 +70,8 @@ services:
         max-file: "3"
 ```
 
+> **Note on the read-only downloads mount:** after saving a track to the library, the bot deletes the original file from the downloads directory. With `/downloads` mounted `:ro` it cannot do that locally, so it falls back to slskd's remote file management API — enable it on the slskd side with `SLSKD_REMOTE_FILE_MANAGEMENT=true` (or `remoteFileManagement: true` in `slskd.yml`). Without it, the original file stays behind next to the renamed copy. Alternatively, mount `/downloads` read-write.
+
 ### Local Development
 
 ```bash

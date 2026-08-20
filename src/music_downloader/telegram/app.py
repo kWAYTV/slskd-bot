@@ -134,10 +134,41 @@ class MusicBot:
             )
         except Exception:
             logger.debug("slskd transfer cancel failed for %s", result.basename, exc_info=True)
-        if dl.source_path and os.path.isfile(dl.source_path):
-            with contextlib.suppress(OSError):
-                os.remove(dl.source_path)
-                logger.info("Deleted cancelled download: %s", dl.source_path)
+        await self._remove_download_file(dl.source_path)
+
+    async def _remove_download_file(self, source_path: str | None) -> None:
+        """Delete a downloaded file, falling back to slskd remote file management.
+
+        When DOWNLOAD_DIR is mounted read-only the local delete fails and the
+        original file would linger next to the renamed library copy.  In that
+        case ask slskd (which owns the directory) to delete it instead —
+        requires SLSKD_REMOTE_FILE_MANAGEMENT=true on the slskd side.
+        """
+        if not source_path:
+            return
+        if self.processor.cleanup_download(source_path) or not os.path.isfile(source_path):
+            return
+
+        rel_path = self.processor.relative_download_path(source_path)
+        if not rel_path:
+            logger.warning("Download outside DOWNLOAD_DIR, cannot delete via slskd: %s", source_path)
+            return
+
+        deleted = await asyncio.to_thread(self.slskd.delete_downloaded_file, rel_path)
+        if not deleted:
+            logger.warning(
+                "Could not delete download %s locally or via slskd; the original file will remain. "
+                "Mount DOWNLOAD_DIR read-write or enable remote file management on slskd "
+                "(SLSKD_REMOTE_FILE_MANAGEMENT=true).",
+                source_path,
+            )
+            return
+
+        # Mirror local cleanup: drop the now-empty per-user directory.
+        parent = os.path.dirname(source_path)
+        rel_parent = rel_path.rsplit("/", 1)[0] if "/" in rel_path else ""
+        if rel_parent and os.path.isdir(parent) and not os.listdir(parent):
+            await asyncio.to_thread(self.slskd.delete_downloaded_directory, rel_parent)
 
     def _is_stale(self, chat_id: int, generation: int) -> bool:
         return self._session.is_stale(chat_id, generation)
