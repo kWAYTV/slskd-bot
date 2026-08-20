@@ -251,3 +251,28 @@ def _create_test_flac(path: str, tags: dict[str, list[str]]) -> None:
     for key, values in tags.items():
         audio[key] = values
     audio.save()
+
+
+class TestDeleteLibraryFile:
+    @pytest.fixture
+    def processor(self, tmp_path):
+        download_dir = tmp_path / "downloads"
+        output_dir = tmp_path / "output"
+        download_dir.mkdir()
+        output_dir.mkdir()
+        return FileProcessor(str(download_dir), str(output_dir))
+
+    def test_deletes_file_in_library(self, processor, tmp_path):
+        target = tmp_path / "output" / "Artist - Song.flac"
+        target.write_text("data")
+        assert processor.delete_library_file("Artist - Song.flac") is True
+        assert not target.exists()
+
+    def test_missing_file_returns_false(self, processor):
+        assert processor.delete_library_file("Nope.flac") is False
+
+    def test_refuses_path_traversal(self, processor, tmp_path):
+        outside = tmp_path / "secret.txt"
+        outside.write_text("data")
+        assert processor.delete_library_file("../secret.txt") is False
+        assert outside.exists()

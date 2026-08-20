@@ -137,3 +137,25 @@ class TestFindSuccess:
 
     def test_returns_none_when_missing(self, repo):
         assert repo.find_success("Nope", "Missing") is None
+
+
+class TestUndoSupport:
+    def test_get_last_saved_returns_latest_success(self, repo):
+        repo.add(artist="A", title="One", filename="A - One.flac", source_user="u", status="success", chat_id=5)
+        repo.add(artist="B", title="Two", filename="B - Two.flac", source_user="u", status="success", chat_id=5)
+        repo.add(artist="C", title="Three", filename="C - Three.flac", source_user="u", status="rejected", chat_id=5)
+        entry = repo.get_last_saved(5)
+        assert entry is not None
+        assert entry.filename == "B - Two.flac"
+
+    def test_get_last_saved_scoped_to_chat(self, repo):
+        repo.add(artist="A", title="One", filename="A - One.flac", source_user="u", status="success", chat_id=5)
+        assert repo.get_last_saved(99) is None
+
+    def test_set_status_marks_undone(self, repo):
+        row_id = repo.add(
+            artist="A", title="One", filename="A - One.flac", source_user="u", status="success", chat_id=5
+        )
+        repo.set_status(row_id, "undone")
+        assert repo.get_last_saved(5) is None
+        assert repo.get_recent(1, 5)[0].status == "undone"

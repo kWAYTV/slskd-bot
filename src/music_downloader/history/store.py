@@ -82,6 +82,20 @@ class HistoryRepository:
         row = cursor.fetchone()
         return HistoryRecord(**dict(row)) if row else None
 
+    def get_last_saved(self, chat_id: int) -> HistoryRecord | None:
+        """Most recent library save for this chat (undo target)."""
+        cursor = self._conn.execute(
+            "SELECT * FROM download_history WHERE chat_id = ? AND status = 'success' "
+            "ORDER BY created_at DESC, id DESC LIMIT 1",
+            (chat_id,),
+        )
+        row = cursor.fetchone()
+        return HistoryRecord(**dict(row)) if row else None
+
+    def set_status(self, entry_id: int, status: str) -> None:
+        self._conn.execute("UPDATE download_history SET status = ? WHERE id = ?", (status, entry_id))
+        self._conn.commit()
+
     def count(self, chat_id: int | None = None) -> int:
         if chat_id is None:
             cursor = self._conn.execute("SELECT COUNT(*) FROM download_history")

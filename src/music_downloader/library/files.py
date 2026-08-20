@@ -174,6 +174,23 @@ class FileProcessor:
             logger.warning(f"Failed to cleanup: {source_path}", exc_info=True)
             return False
 
+    def delete_library_file(self, filename: str) -> bool:
+        """Delete a file from the library by name (undo). Refuses paths outside OUTPUT_DIR."""
+        target = os.path.realpath(os.path.join(self.output_dir, filename))
+        real_output = os.path.realpath(self.output_dir)
+        if os.path.dirname(target) != real_output:
+            logger.warning("Refusing to delete outside the library: %s", filename)
+            return False
+        try:
+            if os.path.isfile(target):
+                os.remove(target)
+                logger.info(f"Removed from library: {target}")
+                return True
+            return False
+        except OSError:
+            logger.exception(f"Failed to remove from library: {target}")
+            return False
+
     def relative_download_path(self, source_path: str) -> str | None:
         """Return ``source_path`` relative to the downloads dir (slskd layout), or None if outside it."""
         real_source = os.path.realpath(source_path)
