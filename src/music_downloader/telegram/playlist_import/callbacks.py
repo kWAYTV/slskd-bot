@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.playlist_import.job import JobStatus, TrackStatus
+from music_downloader.telegram.download.approval import save_to_library
 from music_downloader.telegram.ui.editing import safe_query_edit
 from music_downloader.telegram.ui.markdown import md_code_safe
 
@@ -143,11 +143,8 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
         self.downloads[dl_id] = pending_dl
         return
 
-    track = pending_dl.track
-    result = pending_dl.result
-
-    target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
-    if not target_path:
+    target_name = await save_to_library(self, pending_dl, chat_id)
+    if not target_name:
         await self._edit_approval_message(query, ("❌ Failed to save file."))
         await asyncio.to_thread(
             self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "File processing failed"
@@ -155,11 +152,7 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
         await self._process_next_import_track(context, chat_id, job_id, self._chat_generation.get(chat_id, 0))
         return
 
-    await self._remove_download_file(pending_dl.source_path)
-    await self._embed_spotify_artwork(target_path, track)
-    target_name = os.path.basename(target_path)
     await self._edit_approval_message(query, (f"✅ Saved: `{target_name}`"))
-    await self._add_history(track, result, "success", chat_id=chat_id)
     await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.completed)
     await self._process_next_import_track(context, chat_id, job_id, self._chat_generation.get(chat_id, 0))
 

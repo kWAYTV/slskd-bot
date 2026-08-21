@@ -32,6 +32,22 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
         await _reject_download(self, query, chat_id, pending_dl)
 
 
+async def save_to_library(self, pending_dl, chat_id: int) -> str | None:
+    """Shared save sequence: rename into the library, embed artwork, record history.
+
+    Returns the saved basename, or None when file processing failed.
+    """
+    track = pending_dl.track
+    result = pending_dl.result
+    target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
+    if not target_path:
+        return None
+    await self._remove_download_file(pending_dl.source_path)
+    await self._embed_spotify_artwork(target_path, track)
+    await self._add_history(track, result, "success", chat_id=chat_id)
+    return os.path.basename(target_path)
+
+
 async def _approve_download(self, query, context, chat_id: int, dl_id: str, pending_dl):
     """Save an approved download to the library."""
     track = pending_dl.track
@@ -47,17 +63,13 @@ async def _approve_download(self, query, context, chat_id: int, dl_id: str, pend
         await self._add_history(track, result, "file_not_found", chat_id=chat_id)
         return
 
-    target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
-    if not target_path:
+    target_name = await save_to_library(self, pending_dl, chat_id)
+    if not target_name:
         await self._edit_approval_message(query, ("❌ Failed to save file. Check logs."))
         await self._add_history(track, result, "process_failed", chat_id=chat_id)
         return
 
-    await self._remove_download_file(pending_dl.source_path)
-    await self._embed_spotify_artwork(target_path, track)
-    target_name = os.path.basename(target_path)
     await self._edit_approval_message(query, (f"✅ Saved: `{target_name}`"))
-    await self._add_history(track, result, "success", chat_id=chat_id)
     logger.info(f"Approved and saved: {target_name}")
     await self._dismiss_other_downloads(context, chat_id)
 
