@@ -14,6 +14,12 @@ from music_downloader.library.formats import AUDIO_SUFFIXES
 logger = logging.getLogger(__name__)
 
 
+def _word_overlap(query_words: set[str], stem_words: set[str]) -> float:
+    if not query_words or not stem_words:
+        return 0.0
+    return len(query_words & stem_words) / min(len(query_words), len(stem_words))
+
+
 class FileProcessor:
     """Handles file renaming, moving, and cleanup."""
 
@@ -49,12 +55,7 @@ class FileProcessor:
             stem = os.path.splitext(filename)[0].lower()
             stem_words = set(re.findall(r"\w+", stem))
 
-            if query_words and stem_words:
-                common = query_words & stem_words
-                word_ratio = len(common) / min(len(query_words), len(stem_words))
-            else:
-                word_ratio = 0.0
-
+            word_ratio = _word_overlap(query_words, stem_words)
             seq_ratio = SequenceMatcher(None, query_lower, stem).ratio()
             best_ratio = max(word_ratio, seq_ratio)
 
@@ -157,18 +158,19 @@ class FileProcessor:
         already gone or could not be removed (e.g. read-only mount).
         """
         try:
-            if os.path.isfile(source_path):
-                os.remove(source_path)
-                logger.info(f"Cleaned up: {source_path}")
+            if not os.path.isfile(source_path):
+                return False
 
-                with contextlib.suppress(OSError):
-                    parent = os.path.dirname(source_path)
-                    if os.path.isdir(parent) and not os.listdir(parent):
-                        os.rmdir(parent)
-                        logger.debug(f"Removed empty directory: {parent}")
+            os.remove(source_path)
+            logger.info(f"Cleaned up: {source_path}")
 
-                return True
-            return False
+            with contextlib.suppress(OSError):
+                parent = os.path.dirname(source_path)
+                if os.path.isdir(parent) and not os.listdir(parent):
+                    os.rmdir(parent)
+                    logger.debug(f"Removed empty directory: {parent}")
+
+            return True
 
         except Exception:
             logger.warning(f"Failed to cleanup: {source_path}", exc_info=True)
@@ -182,11 +184,11 @@ class FileProcessor:
             logger.warning("Refusing to delete outside the library: %s", filename)
             return False
         try:
-            if os.path.isfile(target):
-                os.remove(target)
-                logger.info(f"Removed from library: {target}")
-                return True
-            return False
+            if not os.path.isfile(target):
+                return False
+            os.remove(target)
+            logger.info(f"Removed from library: {target}")
+            return True
         except OSError:
             logger.exception(f"Failed to remove from library: {target}")
             return False
@@ -208,15 +210,11 @@ class FileProcessor:
             changed = False
             for key in list(audio.keys()):
                 values = audio.get(key, [])
-                if len(values) <= 1:
+                deduped = list(dict.fromkeys(values))
+                if len(deduped) == len(values):
                     continue
-                seen: list[str] = []
-                for v in values:
-                    if v not in seen:
-                        seen.append(v)
-                if len(seen) < len(values):
-                    audio[key] = seen
-                    changed = True
+                audio[key] = deduped
+                changed = True
             if changed:
                 audio.save()
                 logger.info("Deduplicated FLAC tags: %s", os.path.basename(filepath))

@@ -50,6 +50,22 @@ def make_progress_callback(
     return _on_progress
 
 
+def remember_approval_message(self, dl_id: str, message_id: int) -> None:
+    """Attach the approval message to the pending download, if it still exists."""
+    pending_dl = self.downloads.get(dl_id)
+    if pending_dl:
+        pending_dl.approval_message_id = message_id
+
+
+async def abort_transfer(self, dl_id: str, result: SearchResult, transfer_id: str | None = None) -> None:
+    """On task cancellation: clean local artifacts, or cancel the slskd transfer."""
+    pending_dl = self.downloads.pop(dl_id, None)
+    if pending_dl:
+        await self._cleanup_download_artifacts(pending_dl)
+        return
+    await asyncio.to_thread(self.slskd.cancel_transfer, result.username, result.filename, transfer_id)
+
+
 async def fetch_from_peer(self, result: SearchResult, progress_callback) -> TransferOutcome:
     """Enqueue on slskd, wait for completion, and locate the file on disk."""
     success = await asyncio.to_thread(self.slskd.enqueue_download, result)

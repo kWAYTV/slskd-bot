@@ -14,7 +14,7 @@ from music_downloader.playlist_import.job import TrackStatus
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.core.session import PendingDownload
 from music_downloader.telegram.download.delivery import send_audio_or_document
-from music_downloader.telegram.download.transfer import fetch_from_peer, make_progress_callback
+from music_downloader.telegram.download.transfer import abort_transfer, fetch_from_peer, make_progress_callback
 from music_downloader.telegram.ui.editing import safe_edit
 from music_downloader.telegram.ui.formatting import progress_bar
 from music_downloader.telegram.ui.keyboards import build_import_failure_keyboard, build_import_track_keyboard
@@ -93,44 +93,12 @@ async def do_import_download(
 
         await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
 
-        file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
-        quality_line = f"{result.quality_display} | {result.duration_display}"
-        caption = _("📋 Import: {artist} - {title}\n{quality}").format(
-            artist=track.artist, title=track.title, quality=quality_line
+        await _deliver_import_preview(
+            self, context, chat_id, track, result, status_msg, source_path, job_id, track_id, dl_id
         )
 
-        if file_size > self.config.telegram_file_limit:
-            await safe_edit(
-                status_msg,
-                _(
-                    "✅ Downloaded: `{file}` ({size:.0f}MB)\n{quality}\n\nFile too large to preview. Save to library?"
-                ).format(
-                    file=md_code_safe(result.basename),
-                    size=file_size / (1024 * 1024),
-                    quality=quality_line,
-                ),
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
-            )
-        else:
-            await send_audio_or_document(
-                context,
-                chat_id,
-                source_path,
-                filename=self.processor.build_filename(track.artist, track.title, result.extension),
-                title=track.title,
-                performer=track.artist,
-                duration=track.duration_secs,
-                caption=caption,
-                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
-            )
-
     except asyncio.CancelledError:
-        pending_dl = self.downloads.pop(dl_id, None)
-        if pending_dl:
-            await self._cleanup_download_artifacts(pending_dl)
-        else:
-            await asyncio.to_thread(self.slskd.cancel_transfer, result.username, result.filename, None)
+        await abort_transfer(self, dl_id, result)
         raise
     except Exception:
         logger.exception(f"Import download failed for {result.basename}")
@@ -141,3 +109,51 @@ async def do_import_download(
         )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")
         await self._process_next_import_track(context, chat_id, job_id, generation)
+
+
+async def _deliver_import_preview(
+    self,
+    context,
+    chat_id: int,
+    track: TrackInfo,
+    result: SearchResult,
+    status_msg,
+    source_path,
+    job_id,
+    track_id,
+    dl_id,
+):
+    """Send the downloaded audio, or a size notice when it exceeds the Telegram limit."""
+    file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
+    quality_line = f"{result.quality_display} | {result.duration_display}"
+    keyboard = build_import_track_keyboard(job_id, track_id, dl_id)
+
+    if file_size > self.config.telegram_file_limit:
+        await safe_edit(
+            status_msg,
+            _(
+                "✅ Downloaded: `{file}` ({size:.0f}MB)\n{quality}\n\nFile too large to preview. Save to library?"
+            ).format(
+                file=md_code_safe(result.basename),
+                size=file_size / (1024 * 1024),
+                quality=quality_line,
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=keyboard,
+        )
+        return
+
+    caption = _("📋 Import: {artist} - {title}\n{quality}").format(
+        artist=track.artist, title=track.title, quality=quality_line
+    )
+    await send_audio_or_document(
+        context,
+        chat_id,
+        source_path,
+        filename=self.processor.build_filename(track.artist, track.title, result.extension),
+        title=track.title,
+        performer=track.artist,
+        duration=track.duration_secs,
+        caption=caption,
+        reply_markup=keyboard,
+    )

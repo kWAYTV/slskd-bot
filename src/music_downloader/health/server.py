@@ -30,13 +30,16 @@ class HealthHandler(BaseHTTPRequestHandler):
             ok = _slskd_ok()
             body = {"status": "healthy" if ok else "degraded", "slskd": "ok" if ok else "unreachable"}
             self._json_response(200, body)
-        elif self.path == "/ready":
+            return
+
+        if self.path == "/ready":
             ok = _slskd_ok()
             body = {"status": "ready" if ok else "degraded", "slskd": "ok" if ok else "unreachable"}
             self._json_response(200 if ok else 503, body)
-        else:
-            self.send_response(404)
-            self.end_headers()
+            return
+
+        self.send_response(404)
+        self.end_headers()
 
     def _json_response(self, code: int, payload: dict) -> None:
         raw = json.dumps(payload).encode()

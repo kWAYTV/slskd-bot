@@ -26,15 +26,8 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
         await query.edit_message_text(_("Cancelled."))
         return
 
-    if action == "auto":
-        index = 0
-    else:
-        try:
-            index = int(action)
-        except ValueError:
-            return
-
-    if index >= len(pending.results):
+    index = _parse_result_index(action)
+    if index is None or index >= len(pending.results):
         return
 
     result = pending.results[index]
@@ -63,6 +56,16 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
         update=update,
     )
     self._track_task(chat_id, task)
+
+
+def _parse_result_index(action: str) -> int | None:
+    """'auto' picks the top result; otherwise the action is a numeric index."""
+    if action == "auto":
+        return 0
+    try:
+        return int(action)
+    except ValueError:
+        return None
 
 
 def has_next_result(self, chat_id: int, current_index: int) -> bool:

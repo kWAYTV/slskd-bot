@@ -40,6 +40,29 @@ async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAU
     )
 
 
+def _synthetic_track(query: str, display_track: TrackInfo | None) -> TrackInfo:
+    """A duration-free TrackInfo for direct searches (display metadata or parsed query)."""
+    if display_track:
+        return TrackInfo(
+            artist=display_track.artist,
+            title=display_track.title,
+            album=display_track.album,
+            duration_ms=0,
+            spotify_url="",
+            year=display_track.year,
+        )
+
+    artist, title = parse_query_artist_title(query)
+    return TrackInfo(
+        artist=artist,
+        title=title,
+        album="",
+        duration_ms=0,
+        spotify_url="",
+        year="",
+    )
+
+
 async def do_direct_slskd_search(
     self, context, chat_id: int, query: str, searching_msg, generation: int, display_track: TrackInfo | None = None
 ):
@@ -49,26 +72,7 @@ async def do_direct_slskd_search(
         if self._is_stale(chat_id, generation):
             return
 
-        if display_track:
-            synthetic_track = TrackInfo(
-                artist=display_track.artist,
-                title=display_track.title,
-                album=display_track.album,
-                duration_ms=0,
-                spotify_url="",
-                year=display_track.year,
-            )
-        else:
-            artist, title = parse_query_artist_title(query)
-            synthetic_track = TrackInfo(
-                artist=artist,
-                title=title,
-                album="",
-                duration_ms=0,
-                spotify_url="",
-                year="",
-            )
-
+        synthetic_track = _synthetic_track(query, display_track)
         ranked, is_fallback = self._rank_responses(
             raw_responses, synthetic_track, quality_preference=self.quality_pref(chat_id)
         )

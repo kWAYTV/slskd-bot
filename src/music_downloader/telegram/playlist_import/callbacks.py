@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_import_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
-    """Route import-related callbacks (ic/ix/ia/ir/is prefixes)."""
+    """Route import-related callbacks (ic/ix/ia/ir/is/iy/if prefixes)."""
     query = update.callback_query
     prefix, _sep, payload = data.partition(":")
     parts = payload.split(":")
@@ -35,52 +35,61 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
         return
 
     if prefix == "ic":
-        await safe_query_edit(query, _("✅ Import started! Processing tracks one by one..."))
-        await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.active)
-        self._active_import[chat_id] = job_id
-        generation = self._chat_generation.get(chat_id, 0)
-        task = context.application.create_task(
-            self._process_next_import_track(context, chat_id, job_id, generation),
-            update=update,
-        )
-        self._track_task(chat_id, task)
-
-    elif prefix == "ix":
-        await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
-        self._active_import.pop(chat_id, None)
-        await safe_query_edit(query, _("❌ Import cancelled."))
-
-    elif prefix == "ia":
-        track_id = int(parts[1])
-        dl_id = parts[2]
-        await self._handle_import_approve(update, context, chat_id, job_id, track_id, dl_id)
-
-    elif prefix == "ir":
-        track_id = int(parts[1])
-        stale = [k for k, v in self.downloads.items() if v.chat_id == chat_id]
-        for stale_id in stale:
-            await self._cleanup_download_artifacts(self.downloads.pop(stale_id))
-        await asyncio.to_thread(
-            self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Rejected by user"
-        )
-        await safe_query_edit(query, _("🗑 Track discarded."))
-        generation = self._chat_generation.get(chat_id, 0)
-        await self._process_next_import_track(context, chat_id, job_id, generation)
-
-    elif prefix == "is":
-        track_id = int(parts[1])
-        await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.skipped)
-        await safe_query_edit(query, _("⏭ Track skipped."))
-        generation = self._chat_generation.get(chat_id, 0)
-        await self._process_next_import_track(context, chat_id, job_id, generation)
-
-    elif prefix == "iy":
-        track_id = int(parts[1])
-        dl_id = parts[2]
-        await self._handle_import_retry(update, context, chat_id, job_id, track_id, dl_id)
-
-    elif prefix == "if":
+        await _start_job(self, update, context, chat_id, job_id)
+        return
+    if prefix == "ix":
+        await _cancel_job(self, query, chat_id, job_id)
+        return
+    if prefix == "ia":
+        await self._handle_import_approve(update, context, chat_id, job_id, int(parts[1]), parts[2])
+        return
+    if prefix == "ir":
+        await _discard_track(self, query, context, chat_id, job_id, int(parts[1]))
+        return
+    if prefix == "is":
+        await _skip_track(self, query, context, chat_id, job_id, int(parts[1]))
+        return
+    if prefix == "iy":
+        await self._handle_import_retry(update, context, chat_id, job_id, int(parts[1]), parts[2])
+        return
+    if prefix == "if":
         await self._handle_import_retry_failed(update, context, chat_id, job_id)
+
+
+async def _start_job(self, update, context, chat_id: int, job_id: int):
+    query = update.callback_query
+    await safe_query_edit(query, _("✅ Import started! Processing tracks one by one..."))
+    await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.active)
+    self._active_import[chat_id] = job_id
+    generation = self._chat_generation.get(chat_id, 0)
+    task = context.application.create_task(
+        self._process_next_import_track(context, chat_id, job_id, generation),
+        update=update,
+    )
+    self._track_task(chat_id, task)
+
+
+async def _cancel_job(self, query, chat_id: int, job_id: int):
+    await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
+    self._active_import.pop(chat_id, None)
+    await safe_query_edit(query, _("❌ Import cancelled."))
+
+
+async def _discard_track(self, query, context, chat_id: int, job_id: int, track_id: int):
+    stale = [k for k, v in self.downloads.items() if v.chat_id == chat_id]
+    for stale_id in stale:
+        await self._cleanup_download_artifacts(self.downloads.pop(stale_id))
+    await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Rejected by user")
+    await safe_query_edit(query, _("🗑 Track discarded."))
+    generation = self._chat_generation.get(chat_id, 0)
+    await self._process_next_import_track(context, chat_id, job_id, generation)
+
+
+async def _skip_track(self, query, context, chat_id: int, job_id: int, track_id: int):
+    await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.skipped)
+    await safe_query_edit(query, _("⏭ Track skipped."))
+    generation = self._chat_generation.get(chat_id, 0)
+    await self._process_next_import_track(context, chat_id, job_id, generation)
 
 
 async def handle_import_retry(self, update, context, chat_id: int, job_id: int, track_id: int, dl_id: str):
@@ -139,21 +148,21 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
     result = pending_dl.result
 
     target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
-    if target_path:
-        await self._remove_download_file(pending_dl.source_path)
-        await self._embed_spotify_artwork(target_path, track)
-        target_name = os.path.basename(target_path)
-        await self._edit_approval_message(query, _("✅ Saved: `{name}`").format(name=target_name))
-        await self._add_history(track, result, "success", chat_id=chat_id)
-        await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.completed)
-    else:
+    if not target_path:
         await self._edit_approval_message(query, _("❌ Failed to save file."))
         await asyncio.to_thread(
             self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "File processing failed"
         )
+        await self._process_next_import_track(context, chat_id, job_id, self._chat_generation.get(chat_id, 0))
+        return
 
-    generation = self._chat_generation.get(chat_id, 0)
-    await self._process_next_import_track(context, chat_id, job_id, generation)
+    await self._remove_download_file(pending_dl.source_path)
+    await self._embed_spotify_artwork(target_path, track)
+    target_name = os.path.basename(target_path)
+    await self._edit_approval_message(query, _("✅ Saved: `{name}`").format(name=target_name))
+    await self._add_history(track, result, "success", chat_id=chat_id)
+    await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.completed)
+    await self._process_next_import_track(context, chat_id, job_id, self._chat_generation.get(chat_id, 0))
 
 
 async def handle_import_retry_failed(self, update, context, chat_id: int, job_id: int):

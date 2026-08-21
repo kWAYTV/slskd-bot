@@ -49,15 +49,13 @@ def main():
     subparsers.add_parser("run", help="Start the bot and health server")
 
     args = parser.parse_args()
+    command = args.command or "run"
 
-    if args.command is None:
-        args.command = "run"
-
-    if args.command == "run":
-        cmd_run(args)
-    else:
+    if command != "run":
         parser.print_help()
         sys.exit(1)
+
+    cmd_run(args)
 
 
 if __name__ == "__main__":
