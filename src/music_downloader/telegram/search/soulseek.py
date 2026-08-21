@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from telegram.constants import ParseMode
@@ -9,13 +10,37 @@ from telegram.constants import ParseMode
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.soulseek.errors import SlskdUnavailableError
 from music_downloader.soulseek.fallbacks import search_with_fallbacks as soulseek_search_with_fallbacks
-from music_downloader.telegram.search.duplicates import prompt_if_already_owned
 from music_downloader.telegram.search.results import present_search_results
 from music_downloader.telegram.ui.editing import safe_edit
 from music_downloader.telegram.ui.formatting import track_md
 from music_downloader.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
+
+
+async def notify_if_already_owned(self, context, chat_id: int, track: TrackInfo) -> None:
+    """Send a non-blocking heads-up when the track already exists in the library."""
+    exact = self.processor.find_exact(track.artist, track.title)
+    history_hit = await asyncio.to_thread(
+        self.history_repo.find_success,
+        track.artist,
+        track.title,
+        track.spotify_url,
+    )
+    if not exact and not history_hit:
+        return
+
+    lines = [f"⚠️ *Already in the library:* {track_md(track)}"]
+    if exact:
+        lines.append("\n".join(f"• `{f}`" for f in exact[:5]))
+    if history_hit:
+        lines.append(f"Previously saved as `{history_hit.filename}`")
+    lines.append("Searching anyway — pick a result below or ignore.")
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="\n".join(lines),
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
 
 async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation: int, on_tier=None):
@@ -31,16 +56,11 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
     )
 
 
-async def do_slskd_search(
-    self, context, chat_id: int, track: TrackInfo, searching_msg, generation: int, skip_library_check: bool = False
-):
+async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searching_msg, generation: int):
     """Search slskd for a resolved Spotify track."""
     try:
         header = track_md(track)
-        if not skip_library_check:
-            blocked = await prompt_if_already_owned(self, context, chat_id, track, searching_msg)
-            if blocked:
-                return
+        await notify_if_already_owned(self, context, chat_id, track)
 
         await safe_edit(
             searching_msg,

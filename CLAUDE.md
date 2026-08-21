@@ -60,13 +60,13 @@ telegram/
   ui/                # markdown escaping, safe edits, text formatting, inline keyboards
   commands/          # basics (/start /help), preferences (/auto /quality), activity (/status /history /undo /cancel)
   search/            # text entry, pasted links, Spotify pick, Soulseek search, duplicates, direct search, results
-  download/          # selection, run (orchestration), transfer (shared pipeline), delivery, approval, retry, media, history
+  download/          # selection, run (orchestration), transfer (shared pipeline + history), delivery (send/preview/artwork), approval, retry
   playlist_import/   # /import command, callbacks, job queue, per-track search/download, summary, resume
 ```
 
 - `telegram/core/app.py` wires domain services into `MusicBot` and binds the conversation handlers from the feature modules as class attributes (handler functions take the bot as `self`)
 - The shared download pipeline (`download/transfer.py`, `download/delivery.py`) is reused by the playlist import flow — never duplicate enqueue/wait/progress logic
-- Soulseek search policy (FLAC-first ranking, four-tier query fallbacks) lives in `soulseek/ranking.py` and `soulseek/fallbacks.py`, not in the Telegram layer
+- Soulseek search policy (FLAC-first ranking, four-tier query fallbacks) lives in `soulseek/scoring.py` and `soulseek/fallbacks.py`, not in the Telegram layer
 - Domain packages do not import Telegram
 - Audio format allow-list is defined once in `library/formats.py`
 

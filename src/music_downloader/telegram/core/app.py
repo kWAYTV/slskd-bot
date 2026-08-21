@@ -32,7 +32,7 @@ from music_downloader.telegram.playlist_import import download as import_downloa
 from music_downloader.telegram.playlist_import import queue as import_queue
 from music_downloader.telegram.playlist_import import resume as import_resume
 from music_downloader.telegram.playlist_import import search as import_search
-from music_downloader.telegram.search import direct, duplicates, results, soulseek, spotify, text
+from music_downloader.telegram.search import direct, results, soulseek, spotify, text
 from music_downloader.telegram.ui.editing import edit_approval_message
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,6 @@ class MusicBot:
         self.downloads = session.downloads
         self._spotify_candidates = session._spotify_candidates
         self._spotify_page = session._spotify_page
-        self._awaiting_direct_metadata = session._awaiting_direct_metadata
         self._chat_generation = session._chat_generation
         self._active_tasks = session._active_tasks
         self._active_import = session._active_import
@@ -125,7 +124,6 @@ class MusicBot:
     _do_search = spotify.do_search
     _do_slskd_search = soulseek.do_slskd_search
     _search_with_fallbacks = soulseek.search_with_fallbacks
-    _handle_duplicate_response = duplicates.handle_duplicate_response
     _handle_spotify_page = spotify.handle_spotify_page
     _handle_spotify_selection = spotify.handle_spotify_selection
     _handle_results_page = results.handle_results_page

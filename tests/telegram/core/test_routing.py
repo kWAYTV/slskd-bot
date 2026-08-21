@@ -48,30 +48,6 @@ class TestMusicBotCallbackHandler:
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
-    async def test_duplicate_cancel(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.pending[67890] = PendingSearch(query="test")
-        update = _make_callback_update(data="dup:cancel")
-        context = _make_context()
-        await bot.handle_callback(update, context)
-        assert 67890 not in bot.pending
-
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_duplicate_continue(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.pending[67890] = PendingSearch(query="test song")
-        update = _make_callback_update(data="dup:continue")
-        context = _make_context()
-        # Mock _do_search to prevent actual execution
-        bot._do_search = AsyncMock()
-        await bot.handle_callback(update, context)
-        bot._do_search.assert_called_once()
-
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
     async def test_spotify_cancel(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot._spotify_candidates[67890] = [_make_track()]

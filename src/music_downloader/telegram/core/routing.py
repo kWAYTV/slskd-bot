@@ -35,7 +35,6 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         "if": self._handle_import_callback,
         "retry": self._handle_retry,
         "next": self._handle_next_result,
-        "dup": self._handle_duplicate_response,
         "sp_page": self._handle_spotify_page,
         "sp": self._handle_spotify_selection,
         "dl_page": self._handle_results_page,

@@ -52,18 +52,6 @@ def build_approve_keyboard(download_id: str, has_next: bool = False) -> InlineKe
     return InlineKeyboardMarkup(rows)
 
 
-def build_duplicate_keyboard() -> InlineKeyboardMarkup:
-    """Build Continue/Cancel keyboard for duplicate detection."""
-    return InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton("Continue anyway", callback_data="dup:continue"),
-                InlineKeyboardButton("Cancel", callback_data="dup:cancel"),
-            ]
-        ]
-    )
-
-
 def build_spotify_keyboard(
     tracks: list[TrackInfo],
     page: int = 0,
