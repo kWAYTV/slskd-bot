@@ -41,7 +41,7 @@ The package is organized by **what the app does** (Screaming Architecture), not 
 
 ```
 src/music_downloader/
-  catalog/           # Track identity — Spotify lookup, playlists, SoundCloud, TrackInfo
+  catalog/           # Track identity — Spotify lookup, playlists, TrackInfo
   soulseek/          # Find and fetch files — search lifecycle, transfers, ranking, fallbacks
   library/           # Organize the collection — rename, formats, artwork, FLAC, previews
   history/           # Download history records
@@ -107,7 +107,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps) with a `progress_bar()` and update `PendingDownload.progress_percent` for `/status`
 - **Auto mode**: `/auto` toggles are per-chat (`MusicBot.is_auto(chat_id)`, overrides in `ChatSession._auto_overrides`); `AUTO_MODE` env is only the default
 - **Quality preference**: `/quality` toggles CD-vs-Hi-Res ranking per chat (`MusicBot.quality_pref(chat_id)`); `QUALITY_PREFERENCE` env is only the default. Scoring lives in `soulseek/scoring.py` (`_quality_points`)
-- **Pasted links**: `catalog/links.py` detects Spotify track links/URIs and SoundCloud track URLs in free text. Spotify tracks resolve via `SpotifyResolver.get_track`. SoundCloud (`catalog/soundcloud_resolver.py` + `catalog/soundcloud_api.py`; track model/matching in `catalog/soundcloud.py`) tries the official API `/resolve` first when `SOUNDCLOUD_CLIENT_ID`/`SECRET` are set (Client Credentials flow, cached token + refresh grant), else the public oEmbed endpoint (no key — title format "Track by Artist"). Never scrape client_ids from web bundles (community packages do; it breaks). Playlist/album links in plain text get a "use /import" hint
+- **Pasted links**: `catalog/links.py` detects Spotify track links/URIs in free text; tracks resolve via `SpotifyResolver.get_track`
 - **Undo**: `/undo` deletes the last chat save via `FileProcessor.delete_library_file` (refuses paths outside OUTPUT_DIR) and marks the history row `undone`
 - **Large files**: the send limit is `Config.telegram_file_limit`, not a constant — 50MB on the cloud Bot API, 2000MB when `TELEGRAM_API_BASE_URL` points at a self-hosted `telegram-bot-api` server (wired via `base_url`/`base_file_url`/`local_mode` in `create_bot`). Over-limit files fall back to OGG Opus / preview clips in `delivery.send_large_file`
 - **Spotify results cap**: Show 5 results per page to the user; fetch up to 50 from the API for filtering headroom

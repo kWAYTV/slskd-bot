@@ -22,8 +22,8 @@ def track_md(track: TrackInfo) -> str:
 
 def welcome_text() -> str:
     return _(
-        "Send me a song name (e.g., `Nancy Sinatra Bang Bang`), a Spotify track link, "
-        "or a SoundCloud track link and I'll find and download it in FLAC.\n\n"
+        "Send me a song name (e.g., `Nancy Sinatra Bang Bang`) or a Spotify track link "
+        "and I'll find and download it in FLAC.\n\n"
         "Commands:\n"
         "/auto — Toggle auto-download mode\n"
         "/quality — Prefer CD or Hi-Res audio\n"

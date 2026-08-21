@@ -29,7 +29,7 @@ Bot: Downloaded! Nancy Sinatra - Bang Bang (My Baby Shot Me Down).flac -> /music
 
 ### Flow
 
-1. Send a song name — or paste a **Spotify track link** or **SoundCloud track link** — to the Telegram bot
+1. Send a song name — or paste a **Spotify track link** — to the Telegram bot
 2. Bot resolves the track on **Spotify** (artist, title, duration, album)
 3. Bot searches **slskd** (Soulseek) for FLAC files matching the track
 4. Results are **scored** by duration match, audio quality, source reliability, and filename relevance
@@ -105,8 +105,6 @@ python -m music_downloader run
 | `TELEGRAM_API_BASE_URL` | No | — | URL of a [self-hosted Bot API server](#large-files-self-hosted-bot-api-server) (e.g. `http://telegram-bot-api:8081`). Raises the upload limit from 50 MB to 2000 MB, so hi-res FLAC/WAV are sent untouched instead of as OGG previews. |
 | `SPOTIFY_CLIENT_ID` | Yes | — | Spotify Developer app Client ID |
 | `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app Client Secret |
-| `SOUNDCLOUD_CLIENT_ID` | No | — | Official SoundCloud API Client ID ([registration](https://developers.soundcloud.com/docs/api/register-app) requires Artist Pro). Without it, SoundCloud links resolve via the public oEmbed endpoint |
-| `SOUNDCLOUD_CLIENT_SECRET` | No | — | Official SoundCloud API Client Secret |
 | `SLSKD_HOST` | Yes | — | slskd instance URL (e.g., `http://192.168.1.100:5030`) |
 | `SLSKD_API_KEY` | Yes | — | slskd API key (Settings > Security > API Keys) |
 | `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads (container path) |
@@ -140,7 +138,7 @@ The Bot API server needs no published ports and must mount the music volume at t
 | Command | Description |
 |---------|-------------|
 | *(any text)* | Search for a song and show download options |
-| *(Spotify/SoundCloud track link)* | Resolve the link and search for it |
+| *(Spotify track link)* | Resolve the link and search for it |
 | `/auto` | Toggle auto-download mode on/off (per chat) |
 | `/quality` | Prefer CD (16/44.1) or Hi-Res (24-bit) when ranking results (per chat) |
 | `/undo` | Remove the last track saved to the library (library users only) |

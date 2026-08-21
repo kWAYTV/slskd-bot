@@ -16,7 +16,6 @@ from telegram.ext import (
 )
 
 from music_downloader.catalog.playlist import PlaylistResolver
-from music_downloader.catalog.soundcloud_resolver import SoundCloudResolver
 from music_downloader.catalog.spotify import SpotifyResolver
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.history.store import HistoryRepository
@@ -54,10 +53,6 @@ class MusicBot:
     def __init__(self, config: Config):
         self.config = config
         self.spotify = SpotifyResolver(config.spotify_client_id, config.spotify_client_secret)
-        self.soundcloud = SoundCloudResolver(
-            client_id=config.soundcloud_client_id,
-            client_secret=config.soundcloud_client_secret,
-        )
         self.slskd = SlskdClient(config.slskd_host, config.slskd_api_key)
         self.scorer = ResultScorer(
             duration_tolerance_secs=config.duration_tolerance_secs,
