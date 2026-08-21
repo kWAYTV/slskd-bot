@@ -137,6 +137,7 @@ The Bot API server needs no published ports and must mount the music volume at t
 |---------|-------------|
 | *(any text)* | Search for a song and show download options |
 | *(Spotify track link)* | Resolve the link and search for it |
+| *(Spotify playlist/album link)* | Start the import flow directly (library users only) |
 | `/auto` | Toggle auto-download mode on/off (per chat) |
 | `/quality` | Prefer CD (16/44.1) or Hi-Res (24-bit) when ranking results (per chat) |
 | `/undo` | Remove the last track saved to the library (library users only) |

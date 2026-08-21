@@ -59,13 +59,13 @@ telegram/
   core/              # MusicBot composition root (app), callback routing, access, cleanup, session
   ui/                # markdown escaping, safe edits, text formatting, inline keyboards
   commands/          # basics (/start /help), preferences (/auto /quality), activity (/status /history /undo /cancel)
-  search/            # text entry, pasted links, Spotify pick, Soulseek search, duplicates, direct search, results
+  search/            # text entry, pasted links, Spotify pick, Soulseek search, direct search, results
   download/          # selection, run (orchestration), transfer (shared pipeline + history), delivery (send/preview/artwork), approval, retry
   playlist_import/   # /import command, callbacks, job queue, per-track search/download, summary, resume
 ```
 
 - `telegram/core/app.py` wires domain services into `MusicBot` and binds the conversation handlers from the feature modules as class attributes (handler functions take the bot as `self`)
-- The shared download pipeline (`download/transfer.py`, `download/delivery.py`) is reused by the playlist import flow — never duplicate enqueue/wait/progress logic
+- The shared download pipeline (`download/transfer.py`, `download/delivery.py`) and the save sequence (`download/approval.save_to_library`) are reused by the playlist import flow — never duplicate enqueue/wait/progress/save logic
 - Soulseek search policy (FLAC-first ranking, four-tier query fallbacks) lives in `soulseek/scoring.py` and `soulseek/fallbacks.py`, not in the Telegram layer
 - Domain packages do not import Telegram
 - Audio format allow-list is defined once in `library/formats.py`
@@ -103,7 +103,9 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps) with a `progress_bar()` and update `PendingDownload.progress_percent` for `/status`
 - **Auto mode**: `/auto` toggles are per-chat (`MusicBot.is_auto(chat_id)`, overrides in `ChatSession._auto_overrides`); `AUTO_MODE` env is only the default
 - **Quality preference**: `/quality` toggles CD-vs-Hi-Res ranking per chat (`MusicBot.quality_pref(chat_id)`); `QUALITY_PREFERENCE` env is only the default. Scoring lives in `soulseek/scoring.py` (`_quality_points`)
-- **Pasted links**: `catalog/links.py` detects Spotify track links/URIs in free text; tracks resolve via `SpotifyResolver.get_track`
+- **Pasted links**: `catalog/links.py` detects Spotify track links/URIs in free text; tracks resolve via `SpotifyResolver.get_track`. Playlist/album links start the import flow directly (library users only)
+- **Duplicates**: `notify_if_already_owned` (in `search/soulseek.py`) sends a non-blocking "already in the library" notice after Spotify resolve; the search always continues
+- **Direct search**: the "Search Soulseek directly" button searches immediately with artist/title parsed from the query (`parse_query_artist_title`) — no follow-up prompt
 - **Undo**: `/undo` deletes the last chat save via `FileProcessor.delete_library_file` (refuses paths outside OUTPUT_DIR) and marks the history row `undone`
 - **Large files**: the send limit is `Config.telegram_file_limit`, not a constant — 50MB on the cloud Bot API, 2000MB when `TELEGRAM_API_BASE_URL` points at a self-hosted `telegram-bot-api` server (wired via `base_url`/`base_file_url`/`local_mode` in `create_bot`). Over-limit files fall back to OGG Opus / preview clips in `delivery.send_large_file`
 - **Spotify results cap**: Show 5 results per page to the user; fetch up to 50 from the API for filtering headroom
