@@ -51,19 +51,23 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     await self._do_search(update, context, query, generation)
 
 
+def _split_artist_title(query: str, fallback_title: str) -> tuple[str, str]:
+    """Split an 'Artist - Title' answer; a bare answer is the artist, keep the search as title."""
+    if " - " not in query:
+        return query.strip(), fallback_title.strip()
+    artist, title = query.split(" - ", 1)
+    return artist.strip(), title.strip()
+
+
 async def _run_direct_search_with_metadata(self, update, context, chat_id: int, query: str):
     """The user answered the 'Artist - Title' prompt for a direct Soulseek search."""
     search_query = self._awaiting_direct_metadata.pop(chat_id)
     generation = self._chat_generation.get(chat_id, 0)
 
-    if " - " in query:
-        artist, title = query.split(" - ", 1)
-    else:
-        artist, title = query, search_query
-
+    artist, title = _split_artist_title(query, fallback_title=search_query)
     synthetic_track = TrackInfo(
-        artist=artist.strip(),
-        title=title.strip(),
+        artist=artist,
+        title=title,
         album="",
         duration_ms=0,
         spotify_url="",

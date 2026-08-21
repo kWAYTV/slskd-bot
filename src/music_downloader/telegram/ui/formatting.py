@@ -100,6 +100,34 @@ def format_spotify_results(tracks: list[TrackInfo], page: int = 0, page_size: in
     return "\n".join(lines)
 
 
+def _results_header(track: TrackInfo, total: int, is_fallback: bool) -> list[str]:
+    """Header lines for a Soulseek result list: track identity + match count."""
+    matches = _match_count_line(total, is_fallback)
+    artist = escape_md(track.artist)
+    title = escape_md(track.title)
+
+    is_direct = track.duration_ms == 0
+    if not is_direct:
+        album_line = _("Duration: {duration} | Album: {album}").format(
+            duration=track.duration_display, album=escape_md(track.album)
+        )
+        return [f"🎵 *{artist} - {title}*", album_line + "\n", matches + "\n"]
+
+    if track.artist:
+        return [f"🎵 *{artist} - {title}*\n", matches + "\n"]
+    return [_("🔍 *Direct search:* `{query}`").format(query=track.title) + "\n", matches + "\n"]
+
+
+def _match_count_line(total: int, is_fallback: bool) -> str:
+    if is_fallback:
+        return ngettext(
+            "⚠️ No FLAC found — showing all formats ({n} match):",
+            "⚠️ No FLAC found — showing all formats ({n} matches):",
+            total,
+        ).format(n=total)
+    return ngettext("Found {n} FLAC match:", "Found {n} FLAC matches:", total).format(n=total)
+
+
 def format_search_results(
     track: TrackInfo,
     results: list[SearchResult],
@@ -113,40 +141,9 @@ def format_search_results(
     end = min(start + page_size, total)
     total_pages = (total + page_size - 1) // page_size
 
-    artist = escape_md(track.artist)
-    title = escape_md(track.title)
-    album = escape_md(track.album)
-    if is_fallback:
-        matches = ngettext(
-            "⚠️ No FLAC found — showing all formats ({n} match):",
-            "⚠️ No FLAC found — showing all formats ({n} matches):",
-            total,
-        ).format(n=total)
-    else:
-        matches = ngettext("Found {n} FLAC match:", "Found {n} FLAC matches:", total).format(n=total)
-    is_direct = track.duration_ms == 0
-    if is_direct:
-        if track.artist:
-            header = [
-                f"🎵 *{artist} - {title}*\n",
-                matches + "\n",
-            ]
-        else:
-            header = [
-                _("🔍 *Direct search:* `{query}`").format(query=track.title) + "\n",
-                matches + "\n",
-            ]
-    else:
-        header = [
-            f"🎵 *{artist} - {title}*",
-            _("Duration: {duration} | Album: {album}").format(duration=track.duration_display, album=album) + "\n",
-            matches + "\n",
-        ]
-
+    lines = _results_header(track, total, is_fallback)
     if total_pages > 1:
-        header.append(_("📄 Page {page}/{total}").format(page=page + 1, total=total_pages) + "\n")
-
-    lines = header
+        lines.append(_("📄 Page {page}/{total}").format(page=page + 1, total=total_pages) + "\n")
     for i in range(start, end):
         r = results[i]
         slot_icon = "🟢" if r.has_free_slot else "🔴"
