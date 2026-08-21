@@ -22,8 +22,8 @@ class TestCreateBot:
             app = create_bot(config)
             assert app is mock_app
             mock_app.add_handler.assert_called()
-            # 9 command handlers + callback + text message
-            assert mock_app.add_handler.call_count == 11
+            # 8 command handlers (/start+/help share one) + callback + text message
+            assert mock_app.add_handler.call_count == 10
             mock_builder.base_url.assert_not_called()
 
     def test_local_bot_api_server_wiring(self):

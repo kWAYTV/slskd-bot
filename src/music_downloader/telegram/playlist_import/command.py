@@ -53,6 +53,11 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    await start_import_from_url(self, update, context, chat_id, url)
+
+
+async def start_import_from_url(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, url: str):
+    """Resolve a playlist/album URL, create the job, and show the confirm keyboard."""
     active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
     if active:
         await update.message.reply_text(

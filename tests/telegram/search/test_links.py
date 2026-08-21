@@ -42,19 +42,39 @@ class TestLinkQueries:
         assert bot.pending[67890].track is not None
 
     @pytest.mark.asyncio
-    async def test_playlist_link_suggests_import(self):
+    async def test_playlist_link_starts_import(self):
         from music_downloader.telegram.search import links as search_links
 
         bot = self._make_bot()
-        update = _make_update(text="https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M")
+        bot._check_library_auth = AsyncMock(return_value=True)
+        url = "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+        update = _make_update(text=url)
         context = _make_context()
 
-        handled = await search_links.handle_link_query(
-            bot, update, context, 67890, "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
-        )
+        with patch(
+            "music_downloader.telegram.search.links.start_import_from_url", new_callable=AsyncMock
+        ) as mock_start:
+            handled = await search_links.handle_link_query(bot, update, context, 67890, url)
         assert handled is True
-        text = update.message.reply_text.call_args.args[0]
-        assert "/import" in text
+        mock_start.assert_awaited_once()
+        assert mock_start.await_args.args[4] == url
+
+    @pytest.mark.asyncio
+    async def test_playlist_link_requires_library_access(self):
+        from music_downloader.telegram.search import links as search_links
+
+        bot = self._make_bot()
+        bot._check_library_auth = AsyncMock(return_value=False)
+        url = "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+        update = _make_update(text=url)
+        context = _make_context()
+
+        with patch(
+            "music_downloader.telegram.search.links.start_import_from_url", new_callable=AsyncMock
+        ) as mock_start:
+            handled = await search_links.handle_link_query(bot, update, context, 67890, url)
+        assert handled is True
+        mock_start.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_plain_text_is_not_handled(self):

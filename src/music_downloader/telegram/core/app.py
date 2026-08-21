@@ -111,7 +111,6 @@ class MusicBot:
     _remove_download_file = cleanup.remove_download_file
 
     cmd_start = basics.cmd_start
-    cmd_help = basics.cmd_help
     cmd_auto = preferences.cmd_auto
     cmd_quality = preferences.cmd_quality
     cmd_undo = activity.cmd_undo
@@ -176,8 +175,7 @@ def create_bot(config: Config) -> Application:
     app = builder.build()
     app.bot_data["music_bot"] = bot
 
-    app.add_handler(CommandHandler("start", bot.cmd_start))
-    app.add_handler(CommandHandler("help", bot.cmd_help))
+    app.add_handler(CommandHandler(["start", "help"], bot.cmd_start))
     app.add_handler(CommandHandler("auto", bot.cmd_auto))
     app.add_handler(CommandHandler("quality", bot.cmd_quality))
     app.add_handler(CommandHandler("undo", bot.cmd_undo))

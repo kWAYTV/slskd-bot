@@ -50,16 +50,6 @@ class TestMusicBotCommands:
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
-    async def test_cmd_help(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_help(update, context)
-        update.message.reply_text.assert_called()
-
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
     async def test_cmd_auto(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         update = _make_update()

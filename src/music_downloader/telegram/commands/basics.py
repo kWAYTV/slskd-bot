@@ -26,7 +26,7 @@ async def register_bot_commands(application) -> None:
 
 
 async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /start command."""
+    """Handle /start and /help — one welcome card covers both."""
     if not await self._check_auth(update):
         return
 
@@ -34,10 +34,3 @@ async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         welcome_text(),
         parse_mode=ParseMode.MARKDOWN,
     )
-
-
-async def cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /help command."""
-    if not await self._check_auth(update):
-        return
-    await self.cmd_start(update, context)
