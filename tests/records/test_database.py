@@ -19,7 +19,6 @@ class TestDatabaseNormalCreation:
         assert "download_history" in tables
         assert "import_jobs" in tables
         assert "import_tracks" in tables
-        assert "user_locales" in tables
         db.close()
 
     def test_database_schema_version(self, tmp_path):
@@ -133,7 +132,6 @@ class TestDatabaseMigration:
         version = db.connection.execute("PRAGMA user_version").fetchone()[0]
         assert version == 3
         tables = {row[0] for row in db.connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        assert "user_locales" in tables
         db.close()
 
 

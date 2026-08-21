@@ -7,7 +7,6 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.core.session import PendingSearch
 from music_downloader.telegram.search.links import handle_link_query
 from music_downloader.telegram.ui.keyboards import build_duplicate_keyboard
@@ -39,9 +38,7 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if similar:
         existing_list = "\n".join(f"• `{f}`" for f in similar[:5])
         await update.message.reply_text(
-            _("⚠️ *Similar files already in library:*\n\n{files}\n\nContinue searching anyway?").format(
-                files=existing_list
-            ),
+            f"⚠️ *Similar files already in library:*\n\n{existing_list}\n\nContinue searching anyway?",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=build_duplicate_keyboard(),
         )
@@ -82,10 +79,8 @@ async def _run_direct_search_with_metadata(self, update, context, chat_id: int, 
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("🔍 Searching slskd for: `{query}`\nSaving as: *{artist} - {title}*").format(
-            query=search_query,
-            artist=escape_md(synthetic_track.artist),
-            title=escape_md(synthetic_track.title),
+        text=(
+            f"🔍 Searching slskd for: `{search_query}`\nSaving as: *{escape_md(synthetic_track.artist)} - {escape_md(synthetic_track.title)}*"
         ),
         parse_mode=ParseMode.MARKDOWN,
     )

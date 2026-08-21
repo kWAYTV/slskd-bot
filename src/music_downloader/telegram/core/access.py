@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from telegram import Update
 
-from music_downloader.i18n.catalog import gettext as _
-
 
 def is_authorized(self, user_id: int) -> bool:
     if not self.config.telegram_allowed_users:
@@ -31,7 +29,7 @@ def can_save_library(self, user_id: int | None) -> bool:
 
 async def check_auth(self, update: Update) -> bool:
     if not self._is_authorized(update.effective_user.id):
-        await update.message.reply_text(_("You are not authorized to use this bot."))
+        await update.message.reply_text("You are not authorized to use this bot.")
         return False
     return True
 
@@ -41,9 +39,7 @@ async def check_library_auth(self, update: Update) -> bool:
         return False
     if not self._can_save_library(update.effective_user.id):
         await update.message.reply_text(
-            _(
-                "You can search and download files, but only library users can save to the music library or import playlists."
-            )
+            "You can search and download files, but only library users can save to the music library or import playlists."
         )
         return False
     return True

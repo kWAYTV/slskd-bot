@@ -1,12 +1,28 @@
-"""/start and /help — the welcome card."""
+"""/start and /help — the welcome card, plus the command menu."""
 
 from __future__ import annotations
 
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.telegram.ui.formatting import welcome_text
+
+BOT_COMMANDS = [
+    BotCommand("start", "How to search and download"),
+    BotCommand("help", "Show help"),
+    BotCommand("auto", "Toggle auto-download"),
+    BotCommand("quality", "Prefer CD or Hi-Res audio"),
+    BotCommand("status", "Active searches and downloads"),
+    BotCommand("history", "Recent downloads"),
+    BotCommand("undo", "Remove the last saved track"),
+    BotCommand("import", "Import a Spotify playlist or album"),
+    BotCommand("cancel", "Cancel the current operation"),
+]
+
+
+async def register_bot_commands(application) -> None:
+    await application.bot.set_my_commands(BOT_COMMANDS)
 
 
 async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

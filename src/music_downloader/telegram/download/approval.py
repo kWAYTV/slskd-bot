@@ -6,7 +6,6 @@ import contextlib
 import logging
 import os
 
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
@@ -19,7 +18,7 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
 
     pending_dl = self.downloads.pop(dl_id, None)
     if not pending_dl:
-        await self._edit_approval_message(query, _("⏹ Cancelled"))
+        await self._edit_approval_message(query, ("⏹ Cancelled"))
         return
 
     if pending_dl.chat_id != chat_id:
@@ -40,24 +39,24 @@ async def _approve_download(self, query, context, chat_id: int, dl_id: str, pend
 
     if not self._can_save_library(query.from_user.id):
         self.downloads[dl_id] = pending_dl
-        await self._edit_approval_message(query, _("🚫 You are not allowed to save to the library."))
+        await self._edit_approval_message(query, ("🚫 You are not allowed to save to the library."))
         return
 
     if not pending_dl.source_path:
-        await self._edit_approval_message(query, _("❌ Source file not found."))
+        await self._edit_approval_message(query, ("❌ Source file not found."))
         await self._add_history(track, result, "file_not_found", chat_id=chat_id)
         return
 
     target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
     if not target_path:
-        await self._edit_approval_message(query, _("❌ Failed to save file. Check logs."))
+        await self._edit_approval_message(query, ("❌ Failed to save file. Check logs."))
         await self._add_history(track, result, "process_failed", chat_id=chat_id)
         return
 
     await self._remove_download_file(pending_dl.source_path)
     await self._embed_spotify_artwork(target_path, track)
     target_name = os.path.basename(target_path)
-    await self._edit_approval_message(query, _("✅ Saved: `{name}`").format(name=target_name))
+    await self._edit_approval_message(query, (f"✅ Saved: `{target_name}`"))
     await self._add_history(track, result, "success", chat_id=chat_id)
     logger.info(f"Approved and saved: {target_name}")
     await self._dismiss_other_downloads(context, chat_id)
@@ -71,7 +70,7 @@ async def _reject_download(self, query, chat_id: int, pending_dl):
     await self._cleanup_download_artifacts(pending_dl)
     await self._edit_approval_message(
         query,
-        _("🗑 Discarded: {artist} - {title}").format(artist=escape_md(track.artist), title=escape_md(track.title)),
+        (f"🗑 Discarded: {escape_md(track.artist)} - {escape_md(track.title)}"),
     )
     await self._add_history(track, result, "rejected", chat_id=chat_id)
     logger.info(f"Rejected: {track.artist} - {track.title} ({result.basename})")
@@ -104,12 +103,12 @@ async def _mark_message_cancelled(context, chat_id: int, message_id: int):
         await context.bot.edit_message_caption(
             chat_id=chat_id,
             message_id=message_id,
-            caption=_("⏹ Cancelled"),
+            caption=("⏹ Cancelled"),
         )
     except Exception:
         with contextlib.suppress(Exception):
             await context.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
-                text=_("⏹ Cancelled"),
+                text=("⏹ Cancelled"),
             )

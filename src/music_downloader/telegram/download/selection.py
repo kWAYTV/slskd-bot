@@ -7,7 +7,6 @@ import contextlib
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.ui.markdown import escape_md, md_code_safe
 
 
@@ -16,14 +15,14 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     query = update.callback_query
     pending = self.pending.get(chat_id)
     if not pending:
-        await query.edit_message_text(_("Search expired. Send a new query."))
+        await query.edit_message_text("Search expired. Send a new query.")
         return
 
     action = data.split(":", 1)[1]
 
     if action == "cancel":
         del self.pending[chat_id]
-        await query.edit_message_text(_("Cancelled."))
+        await query.edit_message_text("Cancelled.")
         return
 
     index = _parse_result_index(action)
@@ -40,13 +39,7 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=(
-            _("⬇️ *Downloading #{n}...*\n{artist} - {title}\nFrom: `{user}`\nFile: `{file}`").format(
-                n=index + 1,
-                artist=escape_md(track.artist),
-                title=escape_md(track.title),
-                user=md_code_safe(result.username),
-                file=md_code_safe(result.basename),
-            )
+            f"⬇️ *Downloading #{index + 1}...*\n{escape_md(track.artist)} - {escape_md(track.title)}\nFrom: `{md_code_safe(result.username)}`\nFile: `{md_code_safe(result.basename)}`"
         ),
         parse_mode=ParseMode.MARKDOWN,
     )

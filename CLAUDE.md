@@ -48,8 +48,6 @@ src/music_downloader/
   playlist_import/   # Playlist/album import jobs
   records/           # Shared SQLite connection used by history + import
   telegram/          # Conversation delivery (feature subpackages, see below)
-  i18n/              # gettext catalogs + per-user locale (en/es/de/gl)
-  locales/           # .po/.mo translation files (maintained via scripts/i18n.sh)
   settings/          # Environment configuration and logging
   health/            # Process health-check endpoint
 ```
@@ -60,7 +58,7 @@ Telegram is a delivery mechanism, not the domain. The `telegram/` package contai
 telegram/
   core/              # MusicBot composition root (app), callback routing, access, cleanup, session
   ui/                # markdown escaping, safe edits, text formatting, inline keyboards
-  commands/          # basics (/start /help), preferences (/auto /quality), activity (/status /history /undo /cancel), language (/lang)
+  commands/          # basics (/start /help), preferences (/auto /quality), activity (/status /history /undo /cancel)
   search/            # text entry, pasted links, Spotify pick, Soulseek search, duplicates, direct search, results
   download/          # selection, run (orchestration), transfer (shared pipeline), delivery, approval, retry, media, history
   playlist_import/   # /import command, callbacks, job queue, per-track search/download, summary, resume
@@ -97,8 +95,6 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Cleanup**: Stale slskd searches are deleted only when their IDs are not in `_active_search_ids` (serialized with search start)
 - **Import search**: Playlist import uses the same four-tier fallbacks as manual search (`search_with_fallbacks`)
 - **Import resume**: Active jobs auto-resume on startup; `/import resume` continues the chat's pending/active job after resetting `searching` / `awaiting_approval` tracks
-- **i18n**: GNU gettext catalogs in `locales/{lang}/LC_MESSAGES` (Babel extract/update/compile). Never `gettext.install()` — locale is a ContextVar. First authorized update without a stored locale shows the language picker; `/lang` changes it anytime. Update catalogs with `scripts/i18n.sh` then `python scripts/generate_locales.py`
-
 ## Telegram UX Patterns
 
 - **Markdown escaping**: Dynamic text (filenames, paths from Soulseek) must be escaped with `escape_md()` or wrapped in backtick code spans via `code_span()` / `md_code_safe()` (plain backtick wrapping breaks when the value itself contains a backtick) to avoid `BadRequest` from Telegram's Markdown parser
@@ -112,8 +108,6 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Large files**: the send limit is `Config.telegram_file_limit`, not a constant — 50MB on the cloud Bot API, 2000MB when `TELEGRAM_API_BASE_URL` points at a self-hosted `telegram-bot-api` server (wired via `base_url`/`base_file_url`/`local_mode` in `create_bot`). Over-limit files fall back to OGG Opus / preview clips in `delivery.send_large_file`
 - **Spotify results cap**: Show 5 results per page to the user; fetch up to 50 from the API for filtering headroom
 - **Spotify artist filter**: When query contains `artist - title`, filter Spotify results by artist substring match before dedup to remove noise; fall back to unfiltered if the filter empties the list
-- **i18n**: All user-facing strings go through `gettext` (`from music_downloader.i18n.catalog import gettext as _`); after changing strings run `scripts/i18n.sh` and fill in es/de/gl translations
-
 ## Deployment
 
 ### Release Steps

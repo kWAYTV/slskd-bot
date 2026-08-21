@@ -1,8 +1,6 @@
 """Text content for Telegram messages: welcome, progress, result formatting."""
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
-from music_downloader.i18n.catalog import ngettext
 from music_downloader.library.flac import FlacVerdict
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.ui.markdown import code_span, escape_md
@@ -21,7 +19,7 @@ def track_md(track: TrackInfo) -> str:
 
 
 def welcome_text() -> str:
-    return _(
+    return (
         "Send me a song name (e.g., `Nancy Sinatra Bang Bang`) or a Spotify track link "
         "and I'll find and download it in FLAC.\n\n"
         "Commands:\n"
@@ -33,7 +31,6 @@ def welcome_text() -> str:
         "/history — Recent downloads\n"
         "/undo — Remove the last track saved to the library\n"
         "/cancel — Cancel the current search, download, or import\n"
-        "/lang — Change language\n"
         "/help — Show this message"
     )
 
@@ -46,27 +43,27 @@ def format_result_reasons(track: TrackInfo, result: SearchResult) -> str:
     parts = []
     if track.duration_secs > 0 and result.length:
         diff = abs(result.length - track.duration_secs)
-        parts.append(_("⏱ exact duration") if diff == 0 else _("⏱ ±{secs}s").format(secs=diff))
+        parts.append(("⏱ exact duration") if diff == 0 else (f"⏱ ±{diff}s"))
     if result.has_free_slot:
-        parts.append(_("🟢 free slot"))
+        parts.append("🟢 free slot")
     elif result.queue_length:
-        parts.append(_("🔴 queue of {n}").format(n=result.queue_length))
+        parts.append(f"🔴 queue of {result.queue_length}")
     if result.score:
-        parts.append(_("⭐ {score}/100").format(score=f"{result.score:.0f}"))
+        parts.append(("⭐ {score}/100").format(score=f"{result.score:.0f}"))
     return " · ".join(parts)
 
 
 def format_flac_verdict(verdict: FlacVerdict) -> str:
     """Localize a FLAC analysis line (domain `display` stays English)."""
     if verdict.verdict == "AUTHENTIC":
-        return _("{emoji} Lossless OK (spectrum to {khz:.1f}kHz)").format(emoji=verdict.emoji, khz=verdict.cutoff_khz)
+        return f"{verdict.emoji} Lossless OK (spectrum to {verdict.cutoff_khz:.1f}kHz)"
     labels = {
-        "WARNING": _("Possible transcode"),
-        "SUSPICIOUS": _("Likely transcode"),
-        "FAKE": _("Fake lossless"),
+        "WARNING": ("Possible transcode"),
+        "SUSPICIOUS": ("Likely transcode"),
+        "FAKE": ("Fake lossless"),
     }
     label = labels.get(verdict.verdict, verdict.verdict)
-    return _("{emoji} {label} (cutoff {khz:.1f}kHz)").format(emoji=verdict.emoji, label=label, khz=verdict.cutoff_khz)
+    return f"{verdict.emoji} {label} (cutoff {verdict.cutoff_khz:.1f}kHz)"
 
 
 def format_spotify_results(tracks: list[TrackInfo], page: int = 0, page_size: int = 5) -> str:
@@ -76,27 +73,17 @@ def format_spotify_results(tracks: list[TrackInfo], page: int = 0, page_size: in
     end = min(start + page_size, total)
     total_pages = (total + page_size - 1) // page_size
 
-    header = _("🔍 *Multiple matches found on Spotify:*")
+    header = "🔍 *Multiple matches found on Spotify:*"
     if total_pages > 1:
-        header += _(" (page {page}/{total})").format(page=page + 1, total=total_pages)
+        header += f" (page {page + 1}/{total_pages})"
     lines = [header + "\n"]
 
     for i in range(start, end):
         t = tracks[i]
         lines.append(
-            _(
-                "*#{n} {artist} - {title}*\n    Album: {album} ({year}) | {duration}\n    [Listen on Spotify]({url})"
-            ).format(
-                n=i + 1,
-                artist=escape_md(t.artist),
-                title=escape_md(t.title),
-                album=escape_md(t.album),
-                year=escape_md(t.year),
-                duration=t.duration_display,
-                url=t.spotify_url,
-            )
+            f"*#{i + 1} {escape_md(t.artist)} - {escape_md(t.title)}*\n    Album: {escape_md(t.album)} ({escape_md(t.year)}) | {t.duration_display}\n    [Listen on Spotify]({t.spotify_url})"
         )
-    lines.append("\n" + _("Pick the correct version:"))
+    lines.append("\n" + ("Pick the correct version:"))
     return "\n".join(lines)
 
 
@@ -108,24 +95,19 @@ def _results_header(track: TrackInfo, total: int, is_fallback: bool) -> list[str
 
     is_direct = track.duration_ms == 0
     if not is_direct:
-        album_line = _("Duration: {duration} | Album: {album}").format(
-            duration=track.duration_display, album=escape_md(track.album)
-        )
+        album_line = f"Duration: {track.duration_display} | Album: {escape_md(track.album)}"
         return [f"🎵 *{artist} - {title}*", album_line + "\n", matches + "\n"]
 
     if track.artist:
         return [f"🎵 *{artist} - {title}*\n", matches + "\n"]
-    return [_("🔍 *Direct search:* `{query}`").format(query=track.title) + "\n", matches + "\n"]
+    return [(f"🔍 *Direct search:* `{track.title}`") + "\n", matches + "\n"]
 
 
 def _match_count_line(total: int, is_fallback: bool) -> str:
+    noun = "match" if total == 1 else "matches"
     if is_fallback:
-        return ngettext(
-            "⚠️ No FLAC found — showing all formats ({n} match):",
-            "⚠️ No FLAC found — showing all formats ({n} matches):",
-            total,
-        ).format(n=total)
-    return ngettext("Found {n} FLAC match:", "Found {n} FLAC matches:", total).format(n=total)
+        return f"⚠️ No FLAC found — showing all formats ({total} {noun}):"
+    return f"Found {total} FLAC {noun}:"
 
 
 def format_search_results(
@@ -143,7 +125,7 @@ def format_search_results(
 
     lines = _results_header(track, total, is_fallback)
     if total_pages > 1:
-        lines.append(_("📄 Page {page}/{total}").format(page=page + 1, total=total_pages) + "\n")
+        lines.append((f"📄 Page {page + 1}/{total_pages}") + "\n")
     for i in range(start, end):
         r = results[i]
         slot_icon = "🟢" if r.has_free_slot else "🔴"

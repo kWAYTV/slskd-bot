@@ -121,8 +121,6 @@ python -m music_downloader run
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | `HEALTH_PORT` | No | `8080` | Health check HTTP port |
 
-The first time an allowed user talks to the bot they pick a language (English, Spanish, German, or Galician). Change it later with `/lang`. Strings use GNU gettext catalogs; translators can run `scripts/i18n.sh` then `python scripts/generate_locales.py`.
-
 ## Large Files (Self-Hosted Bot API Server)
 
 The Telegram cloud Bot API caps bot uploads at 50 MB, so larger files (hi-res FLAC, WAV) are delivered as OGG Opus previews — only the library copy stays lossless. Running [telegram-bot-api](https://github.com/tdlib/telegram-bot-api) locally raises the limit to 2000 MB and originals are sent untouched.
@@ -147,7 +145,6 @@ The Bot API server needs no published ports and must mount the music volume at t
 | `/status` | Show active searches, downloads (with progress), and imports for this chat |
 | `/history` | Show recent download history for this chat |
 | `/cancel` | Cancel the current search, download, or import |
-| `/lang` | Choose language (English, Spanish, German, Galician). Also `/language` |
 | `/help` | Show help message |
 
 ## Scoring Algorithm

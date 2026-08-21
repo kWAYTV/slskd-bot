@@ -5,13 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from telegram import Update
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
     CommandHandler,
     MessageHandler,
-    TypeHandler,
     filters,
 )
 
@@ -19,7 +17,6 @@ from music_downloader.catalog.playlist import PlaylistResolver
 from music_downloader.catalog.spotify import SpotifyResolver
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.history.store import HistoryRepository
-from music_downloader.i18n.store import LocaleStore
 from music_downloader.library.files import FileProcessor
 from music_downloader.playlist_import.store import ImportRepository
 from music_downloader.records.database import Database
@@ -29,7 +26,7 @@ from music_downloader.soulseek.query import parse_query_artist_title
 from music_downloader.soulseek.ranking import rank_responses
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.soulseek.scoring import ResultScorer
-from music_downloader.telegram.commands import activity, basics, language, preferences
+from music_downloader.telegram.commands import activity, basics, preferences
 from music_downloader.telegram.core import access, cleanup, routing
 from music_downloader.telegram.core.session import ChatSession
 from music_downloader.telegram.download import approval, delivery, media, retry, run, selection
@@ -84,7 +81,6 @@ class MusicBot:
         self.db = Database(f"{config.data_dir}/importer.db")
         self.history_repo = HistoryRepository(self.db)
         self.import_repo = ImportRepository(self.db)
-        self.locale_store = LocaleStore(self.db)
         self.playlist_resolver = PlaylistResolver(self.spotify)
 
     # --- per-chat preferences -------------------------------------------------
@@ -165,9 +161,7 @@ class MusicBot:
     cmd_status = activity.cmd_status
     cmd_history = activity.cmd_history
     cmd_cancel = activity.cmd_cancel
-    cmd_lang = language.cmd_lang
     cmd_import = import_command.cmd_import
-    ensure_locale = language.ensure_locale
 
     handle_text = text.handle_text
     _do_search = spotify.do_search
@@ -212,7 +206,7 @@ def create_bot(config: Config) -> Application:
 
     async def _post_init(application: Application) -> None:
         application.bot_data["music_bot"] = bot
-        await language.register_bot_commands(application)
+        await basics.register_bot_commands(application)
         await bot.resume_stale_imports(application)
 
     builder = Application.builder().token(config.telegram_bot_token).post_init(_post_init)
@@ -226,7 +220,6 @@ def create_bot(config: Config) -> Application:
     app = builder.build()
     app.bot_data["music_bot"] = bot
 
-    app.add_handler(TypeHandler(Update, bot.ensure_locale), group=-1)
     app.add_handler(CommandHandler("start", bot.cmd_start))
     app.add_handler(CommandHandler("help", bot.cmd_help))
     app.add_handler(CommandHandler("auto", bot.cmd_auto))
@@ -234,7 +227,6 @@ def create_bot(config: Config) -> Application:
     app.add_handler(CommandHandler("undo", bot.cmd_undo))
     app.add_handler(CommandHandler("status", bot.cmd_status))
     app.add_handler(CommandHandler("history", bot.cmd_history))
-    app.add_handler(CommandHandler(["lang", "language"], bot.cmd_lang))
     app.add_handler(CommandHandler("import", bot.cmd_import))
     app.add_handler(CommandHandler("cancel", bot.cmd_cancel))
     app.add_handler(CallbackQueryHandler(bot.handle_callback))

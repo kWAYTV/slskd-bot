@@ -7,7 +7,6 @@ import asyncio
 from telegram.constants import ParseMode
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.core.session import PendingSearch
 from music_downloader.telegram.ui.editing import safe_edit
 from music_downloader.telegram.ui.formatting import track_md
@@ -26,12 +25,12 @@ async def prompt_if_already_owned(self, context, chat_id: int, track: TrackInfo,
     if not exact and not history_hit:
         return False
 
-    lines = [_("⚠️ *Already in the library:* {track}").format(track=track_md(track)) + "\n"]
+    lines = [(f"⚠️ *Already in the library:* {track_md(track)}") + "\n"]
     if exact:
-        lines.append(_("On disk:") + "\n" + "\n".join(f"• `{f}`" for f in exact[:5]))
+        lines.append(("On disk:") + "\n" + "\n".join(f"• `{f}`" for f in exact[:5]))
     if history_hit:
-        lines.append(_("Previously saved as `{filename}`").format(filename=history_hit.filename))
-    lines.append("\n" + _("Search Soulseek anyway?"))
+        lines.append(f"Previously saved as `{history_hit.filename}`")
+    lines.append("\n" + ("Search Soulseek anyway?"))
     user_id = None
     existing = self.pending.get(chat_id)
     if existing:
@@ -59,11 +58,11 @@ async def handle_duplicate_response(self, update, context, chat_id: int, data: s
     pending = self.pending.pop(chat_id, None)
 
     if action == "cancel" or not pending:
-        await query.edit_message_text(_("Cancelled."))
+        await query.edit_message_text("Cancelled.")
         return
 
     await query.edit_message_text(
-        _("Continuing with search: `{query}`").format(query=pending.query),
+        (f"Continuing with search: `{pending.query}`"),
         parse_mode=ParseMode.MARKDOWN,
     )
     generation = self._chat_generation.get(chat_id, 0)
@@ -73,7 +72,7 @@ async def handle_duplicate_response(self, update, context, chat_id: int, data: s
         self.pending[chat_id] = pending
         searching_msg = await context.bot.send_message(
             chat_id=chat_id,
-            text=_("🔍 Searching slskd for FLAC..."),
+            text=("🔍 Searching slskd for FLAC..."),
             parse_mode=ParseMode.MARKDOWN,
         )
         await self._do_slskd_search(context, chat_id, pending.track, searching_msg, generation, skip_library_check=True)

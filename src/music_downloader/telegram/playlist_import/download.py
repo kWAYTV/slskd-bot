@@ -9,7 +9,6 @@ import os
 from telegram.constants import ParseMode
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.playlist_import.job import TrackStatus
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.core.session import PendingDownload
@@ -42,7 +41,7 @@ async def do_import_download(
     async def _render_progress(pct: float) -> None:
         await safe_edit(
             status_msg,
-            _("📋 *Import track:* {artist} - {title}\n⬇️ Downloading {pct}%\n{bar}\n`{file}`").format(
+            ("📋 *Import track:* {artist} - {title}\n⬇️ Downloading {pct}%\n{bar}\n`{file}`").format(
                 artist=escape_md(track.artist),
                 title=escape_md(track.title),
                 pct=f"{pct:.0f}",
@@ -57,7 +56,7 @@ async def do_import_download(
         if not outcome.enqueued:
             await safe_edit(
                 status_msg,
-                _("❌ Failed to enqueue from `{user}`").format(user=md_code_safe(result.username)),
+                (f"❌ Failed to enqueue from `{md_code_safe(result.username)}`"),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
             )
@@ -69,10 +68,10 @@ async def do_import_download(
             pending_dl.transfer_id = status.transfer_id
 
         if outcome.failed:
-            state = status.state if status else _("Timeout")
+            state = status.state if status else ("Timeout")
             await safe_edit(
                 status_msg,
-                _("❌ Download failed: {state}\n`{file}`").format(state=state, file=md_code_safe(result.basename)),
+                (f"❌ Download failed: {state}\n`{md_code_safe(result.basename)}`"),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_failure_keyboard(job_id, track_id, dl_id),
             )
@@ -83,7 +82,7 @@ async def do_import_download(
         if not source_path:
             await safe_edit(
                 status_msg,
-                _("❌ Downloaded file not found on disk."),
+                ("❌ Downloaded file not found on disk."),
                 reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
@@ -104,7 +103,7 @@ async def do_import_download(
         logger.exception(f"Import download failed for {result.basename}")
         await safe_edit(
             status_msg,
-            _("❌ Error downloading `{file}`").format(file=md_code_safe(result.basename)),
+            (f"❌ Error downloading `{md_code_safe(result.basename)}`"),
             parse_mode=ParseMode.MARKDOWN,
         )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")
@@ -131,21 +130,15 @@ async def _deliver_import_preview(
     if file_size > self.config.telegram_file_limit:
         await safe_edit(
             status_msg,
-            _(
-                "✅ Downloaded: `{file}` ({size:.0f}MB)\n{quality}\n\nFile too large to preview. Save to library?"
-            ).format(
-                file=md_code_safe(result.basename),
-                size=file_size / (1024 * 1024),
-                quality=quality_line,
+            (
+                f"✅ Downloaded: `{md_code_safe(result.basename)}` ({file_size / (1024 * 1024):.0f}MB)\n{quality_line}\n\nFile too large to preview. Save to library?"
             ),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=keyboard,
         )
         return
 
-    caption = _("📋 Import: {artist} - {title}\n{quality}").format(
-        artist=track.artist, title=track.title, quality=quality_line
-    )
+    caption = f"📋 Import: {track.artist} - {track.title}\n{quality_line}"
     await send_audio_or_document(
         context,
         chat_id,

@@ -8,7 +8,6 @@ import logging
 from telegram.constants import ParseMode
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.playlist_import.job import TrackStatus
 from music_downloader.soulseek.errors import SlskdUnavailableError
 from music_downloader.soulseek.query import clean_search_title
@@ -33,8 +32,8 @@ async def do_import_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                _("📋 *Import track:* {artist} - {title}\n\nNo results found on Soulseek.").format(
-                    artist=escape_md(track.artist), title=escape_md(track.title)
+                (
+                    f"📋 *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n\nNo results found on Soulseek."
                 ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_skip_keyboard(job_id, track_id),
@@ -64,12 +63,8 @@ async def do_import_slskd_search(
 
         await safe_edit(
             searching_msg,
-            _("📋 *Import track:* {artist} - {title}\n⬇️ Downloading: `{file}`\nFrom: `{user}` | {quality}").format(
-                artist=escape_md(track.artist),
-                title=escape_md(track.title),
-                file=md_code_safe(best.basename),
-                user=md_code_safe(best.username),
-                quality=best.quality_display,
+            (
+                f"📋 *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n⬇️ Downloading: `{md_code_safe(best.basename)}`\nFrom: `{md_code_safe(best.username)}` | {best.quality_display}"
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
@@ -84,7 +79,7 @@ async def do_import_slskd_search(
         logger.exception("slskd unreachable during import search for: %s - %s", track.artist, track.title)
         await safe_edit(
             searching_msg,
-            _("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
+            ("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=build_import_skip_keyboard(job_id, track_id),
         )
@@ -93,7 +88,7 @@ async def do_import_slskd_search(
         logger.exception(f"Import search failed for: {track.artist} - {track.title}")
         await safe_edit(
             searching_msg,
-            _("❌ Search failed for {artist} - {title}").format(artist=track.artist, title=track.title),
+            (f"❌ Search failed for {track.artist} - {track.title}"),
         )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Search error")
         await self._process_next_import_track(context, chat_id, job_id, generation)

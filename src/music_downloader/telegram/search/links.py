@@ -11,7 +11,6 @@ from telegram.ext import ContextTypes
 
 from music_downloader.catalog.links import extract_spotify_track_id
 from music_downloader.catalog.playlist import PlaylistResolver
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.core.session import PendingSearch
 from music_downloader.telegram.ui.editing import safe_edit
 
@@ -22,9 +21,7 @@ async def handle_link_query(self, update: Update, context: ContextTypes.DEFAULT_
     """Handle pasted Spotify links. Returns True when the message was a link."""
     if PlaylistResolver.is_spotify_url(query):
         await update.message.reply_text(
-            _("That looks like a playlist or album link.\nUse `/import {url}` to import it.").format(
-                url=query.split()[0]
-            ),
+            f"That looks like a playlist or album link.\nUse `/import {query.split()[0]}` to import it.",
             parse_mode=ParseMode.MARKDOWN,
         )
         return True
@@ -44,14 +41,14 @@ async def _search_from_spotify_link(self, update, context, chat_id: int, track_i
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("🔗 Resolving Spotify track link..."),
+        text="🔗 Resolving Spotify track link...",
     )
 
     track = await asyncio.to_thread(self.spotify.get_track, track_id)
     if self._is_stale(chat_id, generation):
         return
     if not track:
-        await safe_edit(searching_msg, _("Could not resolve that Spotify track link. Try the song name instead."))
+        await safe_edit(searching_msg, "Could not resolve that Spotify track link. Try the song name instead.")
         return
 
     self.pending[chat_id] = PendingSearch(

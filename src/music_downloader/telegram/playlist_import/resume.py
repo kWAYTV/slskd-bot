@@ -7,8 +7,6 @@ import logging
 
 from telegram.constants import ParseMode
 
-from music_downloader.i18n.catalog import gettext as _
-from music_downloader.i18n.catalog import set_locale
 from music_downloader.playlist_import.job import JobStatus
 from music_downloader.telegram.ui.markdown import escape_md
 
@@ -37,22 +35,18 @@ async def resume_stale_imports(self, application) -> None:
 
 async def resume_import_job(self, context, chat_id: int, notify: bool = False, job=None) -> None:
     """Continue a persisted import job in its original chat."""
-    locale = self.locale_store.get(chat_id)
-    if locale:
-        set_locale(locale)
-
     if job is None:
         job = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
     if not job:
         if notify:
-            await context.bot.send_message(chat_id=chat_id, text=_("Nothing to resume."))
+            await context.bot.send_message(chat_id=chat_id, text="Nothing to resume.")
         return
 
     if self._active_import.get(chat_id) == job.id:
         if notify:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=_("Import of *{name}* is already running.").format(name=escape_md(job.name)),
+                text=f"Import of *{escape_md(job.name)}* is already running.",
                 parse_mode=ParseMode.MARKDOWN,
             )
         return
@@ -72,11 +66,7 @@ async def resume_import_job(self, context, chat_id: int, notify: bool = False, j
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=(
-                    _("Resuming import of *{name}* ({remaining} remaining, {done} done).").format(
-                        name=escape_md(job.name),
-                        remaining=remaining,
-                        done=job.completed_tracks,
-                    )
+                    f"Resuming import of *{escape_md(job.name)}* ({remaining} remaining, {job.completed_tracks} done)."
                 ),
                 parse_mode=ParseMode.MARKDOWN,
             )
