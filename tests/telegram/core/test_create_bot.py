@@ -24,3 +24,24 @@ class TestCreateBot:
             mock_app.add_handler.assert_called()
             # locale middleware + 10 command handlers + callback + text message
             assert mock_app.add_handler.call_count == 13
+            mock_builder.base_url.assert_not_called()
+
+    def test_local_bot_api_server_wiring(self):
+        config = _make_config()
+        config.telegram_api_base_url = "http://telegram-bot-api:8081"
+        with patch("music_downloader.telegram.core.app.Application") as mock_app_cls:
+            mock_builder = MagicMock()
+            mock_app = MagicMock()
+            mock_builder.token.return_value = mock_builder
+            mock_builder.post_init.return_value = mock_builder
+            mock_builder.base_url.return_value = mock_builder
+            mock_builder.base_file_url.return_value = mock_builder
+            mock_builder.local_mode.return_value = mock_builder
+            mock_builder.build.return_value = mock_app
+            mock_app_cls.builder.return_value = mock_builder
+
+            app = create_bot(config)
+            assert app is mock_app
+            mock_builder.base_url.assert_called_once_with("http://telegram-bot-api:8081/bot")
+            mock_builder.base_file_url.assert_called_once_with("http://telegram-bot-api:8081/file/bot")
+            mock_builder.local_mode.assert_called_once_with(True)

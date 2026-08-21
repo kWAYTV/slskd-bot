@@ -220,7 +220,15 @@ def create_bot(config: Config) -> Application:
         await language.register_bot_commands(application)
         await bot.resume_stale_imports(application)
 
-    app = Application.builder().token(config.telegram_bot_token).post_init(_post_init).build()
+    builder = Application.builder().token(config.telegram_bot_token).post_init(_post_init)
+    if config.telegram_api_base_url:
+        # Self-hosted Bot API server: 2000 MB uploads instead of the cloud 50 MB.
+        builder = (
+            builder.base_url(f"{config.telegram_api_base_url}/bot")
+            .base_file_url(f"{config.telegram_api_base_url}/file/bot")
+            .local_mode(True)
+        )
+    app = builder.build()
     app.bot_data["music_bot"] = bot
 
     app.add_handler(TypeHandler(Update, bot.ensure_locale), group=-1)

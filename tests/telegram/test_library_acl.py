@@ -34,6 +34,8 @@ def _make_config(*, library_users=None):
     config.filename_template = "{artist} - {title}"
     config.search_timeout_secs = 30
     config.download_timeout_secs = 600
+    config.telegram_api_base_url = ""
+    config.telegram_file_limit = 50 * 1024 * 1024
     return config
 
 

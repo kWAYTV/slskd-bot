@@ -13,7 +13,7 @@ from music_downloader.i18n.catalog import gettext as _
 from music_downloader.playlist_import.job import TrackStatus
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.core.session import PendingDownload
-from music_downloader.telegram.download.delivery import TELEGRAM_FILE_LIMIT, send_audio_or_document
+from music_downloader.telegram.download.delivery import send_audio_or_document
 from music_downloader.telegram.download.transfer import fetch_from_peer, make_progress_callback
 from music_downloader.telegram.ui.editing import safe_edit
 from music_downloader.telegram.ui.formatting import progress_bar
@@ -99,7 +99,7 @@ async def do_import_download(
             artist=track.artist, title=track.title, quality=quality_line
         )
 
-        if file_size > TELEGRAM_FILE_LIMIT:
+        if file_size > self.config.telegram_file_limit:
             await safe_edit(
                 status_msg,
                 _(

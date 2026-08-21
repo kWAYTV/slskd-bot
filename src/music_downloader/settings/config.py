@@ -17,6 +17,13 @@ class Config:
         """Initialize configuration from environment variables."""
         self.telegram_bot_token = self._get_required_env("TELEGRAM_BOT_TOKEN")
 
+        # Optional: self-hosted Bot API server (github.com/tdlib/telegram-bot-api),
+        # e.g. "http://telegram-bot-api:8081". Raises the upload limit from
+        # 50 MB (cloud Bot API) to 2000 MB, so originals are sent untouched.
+        self.telegram_api_base_url = os.getenv("TELEGRAM_API_BASE_URL", "").strip().rstrip("/")
+        limit_mb = 2000 if self.telegram_api_base_url else 50
+        self.telegram_file_limit = limit_mb * 1024 * 1024
+
         allowed_users_str = os.getenv("TELEGRAM_ALLOWED_USERS", "")
         self.telegram_allowed_users = self._parse_id_set(allowed_users_str)
 
@@ -63,6 +70,8 @@ class Config:
         self.health_port = int(os.getenv("HEALTH_PORT", "8080"))
 
         logger.info("Configuration loaded successfully")
+        if self.telegram_api_base_url:
+            logger.info(f"Using local Bot API server at {self.telegram_api_base_url} (file limit {limit_mb}MB)")
         if self.auto_mode:
             logger.info("AUTO_MODE enabled — best match will be downloaded automatically")
         if self.telegram_allowed_users:
