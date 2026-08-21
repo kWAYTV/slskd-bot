@@ -41,23 +41,39 @@ The package is organized by **what the app does** (Screaming Architecture), not 
 
 ```
 src/music_downloader/
-  catalog/           # Track identity — Spotify lookup, playlists, TrackInfo
-  soulseek/          # Find and fetch files — search, scoring, slskd client
-  library/           # Organize the collection — rename, artwork, FLAC, previews
+  catalog/           # Track identity — Spotify lookup, playlists, SoundCloud, TrackInfo
+  soulseek/          # Find and fetch files — search lifecycle, transfers, ranking, fallbacks
+  library/           # Organize the collection — rename, formats, artwork, FLAC, previews
   history/           # Download history records
   playlist_import/   # Playlist/album import jobs
   records/           # Shared SQLite connection used by history + import
-  telegram/          # Conversation delivery — commands, search, download, import
+  telegram/          # Conversation delivery (feature subpackages, see below)
   i18n/              # gettext catalogs + per-user locale (en/es/de/gl)
   locales/           # .po/.mo translation files (maintained via scripts/i18n.sh)
   settings/          # Environment configuration and logging
   health/            # Process health-check endpoint
 ```
 
-Telegram is a delivery mechanism, not the domain. `telegram/app.py` composes `MusicBot` from focused conversation modules (`commands`, `search_flow`, `download_flow`, `import_flow`). Domain packages do not import Telegram.
+Telegram is a delivery mechanism, not the domain. The `telegram/` package contains only feature subpackages, each made of small single-purpose modules:
+
+```
+telegram/
+  core/              # MusicBot composition root (app), callback routing, access, cleanup, session
+  ui/                # markdown escaping, safe edits, text formatting, inline keyboards
+  commands/          # basics (/start /help), preferences (/auto /quality), activity (/status /history /undo /cancel), language (/lang)
+  search/            # text entry, pasted links, Spotify pick, Soulseek search, duplicates, direct search, results
+  download/          # selection, run (orchestration), transfer (shared pipeline), delivery, approval, retry, media, history
+  playlist_import/   # /import command, callbacks, job queue, per-track search/download, summary, resume
+```
+
+- `telegram/core/app.py` wires domain services into `MusicBot` and binds the conversation handlers from the feature modules as class attributes (handler functions take the bot as `self`)
+- The shared download pipeline (`download/transfer.py`, `download/delivery.py`) is reused by the playlist import flow — never duplicate enqueue/wait/progress logic
+- Soulseek search policy (FLAC-first ranking, four-tier query fallbacks) lives in `soulseek/ranking.py` and `soulseek/fallbacks.py`, not in the Telegram layer
+- Domain packages do not import Telegram
+- Audio format allow-list is defined once in `library/formats.py`
 
 - `scripts/` — utility scripts
-- `tests/` — test suite
+- `tests/` — test suite (mirrors `src/`: `tests/<package>/…`, `tests/telegram/<feature>/…`; shared mock builders live in `helpers.py` modules)
 - `docker-compose.yml` — full stack deployment
 - `Dockerfile` — container build
 - `.pre-commit-config.yaml` — code quality hooks
@@ -91,7 +107,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps) with a `progress_bar()` and update `PendingDownload.progress_percent` for `/status`
 - **Auto mode**: `/auto` toggles are per-chat (`MusicBot.is_auto(chat_id)`, overrides in `ChatSession._auto_overrides`); `AUTO_MODE` env is only the default
 - **Quality preference**: `/quality` toggles CD-vs-Hi-Res ranking per chat (`MusicBot.quality_pref(chat_id)`); `QUALITY_PREFERENCE` env is only the default. Scoring lives in `soulseek/scoring.py` (`_quality_points`)
-- **Pasted links**: `catalog/links.py` detects Spotify track links/URIs and SoundCloud track URLs in free text. Spotify tracks resolve via `SpotifyResolver.get_track`. SoundCloud (`catalog/soundcloud.py`) tries the official API `/resolve` first when `SOUNDCLOUD_CLIENT_ID`/`SECRET` are set (Client Credentials flow, cached token + refresh grant), else the public oEmbed endpoint (no key — title format "Track by Artist"). Never scrape client_ids from web bundles (community packages do; it breaks). Playlist/album links in plain text get a "use /import" hint
+- **Pasted links**: `catalog/links.py` detects Spotify track links/URIs and SoundCloud track URLs in free text. Spotify tracks resolve via `SpotifyResolver.get_track`. SoundCloud (`catalog/soundcloud_resolver.py` + `catalog/soundcloud_api.py`; track model/matching in `catalog/soundcloud.py`) tries the official API `/resolve` first when `SOUNDCLOUD_CLIENT_ID`/`SECRET` are set (Client Credentials flow, cached token + refresh grant), else the public oEmbed endpoint (no key — title format "Track by Artist"). Never scrape client_ids from web bundles (community packages do; it breaks). Playlist/album links in plain text get a "use /import" hint
 - **Undo**: `/undo` deletes the last chat save via `FileProcessor.delete_library_file` (refuses paths outside OUTPUT_DIR) and marks the history row `undone`
 - **Spotify results cap**: Show 5 results per page to the user; fetch up to 50 from the API for filtering headroom
 - **Spotify artist filter**: When query contains `artist - title`, filter Spotify results by artist substring match before dedup to remove noise; fall back to unfiltered if the filter empties the list

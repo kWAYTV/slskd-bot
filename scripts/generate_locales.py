@@ -97,10 +97,15 @@ TRANSLATIONS: dict[str | tuple[str, str], tuple[str | tuple[str, str], ...]] = {
         "❌ Fehler beim Herunterladen von `{file}`. Prüfe die Logs.",
         "❌ Erro ao descargar `{file}`. Revisa os logs.",
     ),
-    "🎧 {label} Converted to OGG (original: {size:.0f}MB {fmt})\n{quality}\n": (
-        "🎧 {label} Convertido a OGG (original: {size:.0f}MB {fmt})\n{quality}\n",
-        "🎧 {label} Nach OGG konvertiert (Original: {size:.0f}MB {fmt})\n{quality}\n",
-        "🎧 {label} Convertido a OGG (orixinal: {size:.0f}MB {fmt})\n{quality}\n",
+    "🎧 {label} OGG preview — Telegram only sends up to {limit}MB\n{quality}\n": (
+        "🎧 {label} Vista previa en OGG — Telegram solo envía hasta {limit}MB\n{quality}\n",
+        "🎧 {label} OGG-Vorschau — Telegram sendet höchstens {limit}MB\n{quality}\n",
+        "🎧 {label} Vista previa en OGG — Telegram só envía ata {limit}MB\n{quality}\n",
+    ),
+    "Save the untouched {size:.0f}MB {fmt} to the library?": (
+        "¿Guardar el {fmt} original de {size:.0f}MB (sin modificar) en la biblioteca?",
+        "Das unveränderte Original ({size:.0f}MB {fmt}) in der Bibliothek speichern?",
+        "Gardar o {fmt} orixinal de {size:.0f}MB (sen modificar) na biblioteca?",
     ),
     "Save to library?": (
         "¿Guardar en la biblioteca?",
