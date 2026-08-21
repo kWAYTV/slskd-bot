@@ -102,6 +102,7 @@ python -m music_downloader run
 | `TELEGRAM_BOT_TOKEN` | Yes | — | Telegram bot token from @BotFather |
 | `TELEGRAM_ALLOWED_USERS` | Yes | — | Comma-separated Telegram user IDs allowed to use the bot. Empty denies everyone. |
 | `TELEGRAM_LIBRARY_USERS` | No | — | Comma-separated Telegram user IDs allowed to save into the music library and run `/import`. Empty means all allowed users can save. Other allowed users still get the file via Telegram; the local copy is then deleted. |
+| `TELEGRAM_API_BASE_URL` | No | — | URL of a [self-hosted Bot API server](#large-files-self-hosted-bot-api-server) (e.g. `http://telegram-bot-api:8081`). Raises the upload limit from 50 MB to 2000 MB, so hi-res FLAC/WAV are sent untouched instead of as OGG previews. |
 | `SPOTIFY_CLIENT_ID` | Yes | — | Spotify Developer app Client ID |
 | `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app Client Secret |
 | `SOUNDCLOUD_CLIENT_ID` | No | — | Official SoundCloud API Client ID ([registration](https://developers.soundcloud.com/docs/api/register-app) requires Artist Pro). Without it, SoundCloud links resolve via the public oEmbed endpoint |
@@ -123,6 +124,16 @@ python -m music_downloader run
 | `HEALTH_PORT` | No | `8080` | Health check HTTP port |
 
 The first time an allowed user talks to the bot they pick a language (English, Spanish, German, or Galician). Change it later with `/lang`. Strings use GNU gettext catalogs; translators can run `scripts/i18n.sh` then `python scripts/generate_locales.py`.
+
+## Large Files (Self-Hosted Bot API Server)
+
+The Telegram cloud Bot API caps bot uploads at 50 MB, so larger files (hi-res FLAC, WAV) are delivered as OGG Opus previews — only the library copy stays lossless. Running [telegram-bot-api](https://github.com/tdlib/telegram-bot-api) locally raises the limit to 2000 MB and originals are sent untouched.
+
+1. Get an `api_id`/`api_hash` at [my.telegram.org](https://my.telegram.org) → API development tools.
+2. Add the server to your compose stack (see the `local-api` profile in `docker-compose.yml`) and set `TELEGRAM_API_BASE_URL=http://telegram-bot-api:8081` on the bot.
+3. Log the bot out of the cloud API once before first start: `curl https://api.telegram.org/bot<TOKEN>/logOut`.
+
+The Bot API server needs no published ports and must mount the music volume at the same container path as the bot so local-mode file handoff works.
 
 ## Telegram Bot Commands
 

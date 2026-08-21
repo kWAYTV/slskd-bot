@@ -155,19 +155,19 @@ class TestDoImportDownload:
         dl_id = "dl_3"
         bot.downloads[dl_id] = PendingDownload(track=_make_track(), result=result, chat_id=chat_id)
         context = _make_context()
-        # Patch TELEGRAM_FILE_LIMIT to be smaller than our file
-        with patch("music_downloader.telegram.playlist_import.download.TELEGRAM_FILE_LIMIT", 50):
-            await bot._do_import_download(
-                context,
-                chat_id,
-                _make_track(),
-                result,
-                status_msg,
-                generation=0,
-                job_id=1,
-                track_id=5,
-                dl_id=dl_id,
-            )
+        # Set the file limit smaller than our file
+        bot.config.telegram_file_limit = 50
+        await bot._do_import_download(
+            context,
+            chat_id,
+            _make_track(),
+            result,
+            status_msg,
+            generation=0,
+            job_id=1,
+            track_id=5,
+            dl_id=dl_id,
+        )
         mock_edit.assert_awaited()
         assert "too large" in mock_edit.call_args[0][1]
         os.unlink(source.name)

@@ -19,6 +19,10 @@ services:
       SLSKD_HOST: ${SLSKD_HOST}
       SLSKD_API_KEY: ${SLSKD_API_KEY}
 
+      # Optional: self-hosted Bot API server for 2000MB uploads
+      # (start it with: docker compose --profile local-api up -d)
+      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-}
+
       # Paths (container paths)
       DOWNLOAD_DIR: /downloads
       OUTPUT_DIR: /music
@@ -63,3 +67,24 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+
+  # Optional: self-hosted Telegram Bot API server. Lifts the bot upload limit
+  # from 50 MB (cloud) to 2000 MB so originals are sent instead of OGG previews.
+  # Requires TELEGRAM_API_ID / TELEGRAM_API_HASH from https://my.telegram.org
+  # and TELEGRAM_API_BASE_URL=http://telegram-bot-api:8081 on the bot.
+  # Start with: docker compose --profile local-api up -d
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:latest
+    container_name: telegram-bot-api
+    restart: unless-stopped
+    profiles: ["local-api"]
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_LOCAL: "true"
+    volumes:
+      - ${BOT_API_DATA_PATH:-./telegram-bot-api}:/var/lib/telegram-bot-api
+      # Must see the music tree at the same path as the bot container so
+      # local-mode file handoff works without re-uploading.
+      - ${MUSIC_OUTPUT_PATH:-./music}:/music:ro
+      - ${SLSKD_DOWNLOAD_PATH:-./downloads}:/downloads:ro

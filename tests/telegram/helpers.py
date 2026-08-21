@@ -32,6 +32,8 @@ def _make_config():
     config.search_timeout_secs = 30
     config.download_timeout_secs = 600
     config.telegram_library_users = set()
+    config.telegram_api_base_url = ""
+    config.telegram_file_limit = 50 * 1024 * 1024
     return config
 
 

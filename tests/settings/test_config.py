@@ -104,6 +104,25 @@ class TestConfig:
             config = Config()
             assert config.exclude_keywords == ["live", "remix", "demo"]
 
+    def test_file_limit_default_cloud(self, env_vars):
+        """Without a local Bot API server, the upload limit is the cloud 50 MB."""
+        with patch.dict(os.environ, env_vars, clear=False):
+            from music_downloader.settings import Config
+
+            config = Config()
+            assert config.telegram_api_base_url == ""
+            assert config.telegram_file_limit == 50 * 1024 * 1024
+
+    def test_file_limit_with_local_api_server(self, env_vars):
+        """A local Bot API server raises the upload limit to 2000 MB."""
+        env_vars["TELEGRAM_API_BASE_URL"] = "http://telegram-bot-api:8081/"
+        with patch.dict(os.environ, env_vars, clear=False):
+            from music_downloader.settings import Config
+
+            config = Config()
+            assert config.telegram_api_base_url == "http://telegram-bot-api:8081"
+            assert config.telegram_file_limit == 2000 * 1024 * 1024
+
     def test_custom_filename_template(self, env_vars):
         """Config accepts custom filename template."""
         env_vars["FILENAME_TEMPLATE"] = "{title} by {artist}"

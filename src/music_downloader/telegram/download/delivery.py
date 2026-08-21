@@ -14,8 +14,6 @@ from music_downloader.soulseek.result import SearchResult
 
 logger = logging.getLogger(__name__)
 
-TELEGRAM_FILE_LIMIT = 50 * 1024 * 1024
-
 
 async def send_audio_or_document(
     context,
@@ -68,22 +66,23 @@ async def send_large_file(
     reply_markup=None,
     can_save: bool = True,
 ) -> bool:
-    """Convert a >50 MB file to OGG and send. Trim only as last resort.
+    """Convert an over-limit file to OGG and send. Trim only as last resort.
 
     Returns True when audio (full OGG or preview) was actually sent to the user.
     """
+    file_limit = self.config.telegram_file_limit
     ogg_path = await self._convert_to_ogg(source_path)
 
     if ogg_path:
         ogg_size = os.path.getsize(ogg_path)
-        if ogg_size <= TELEGRAM_FILE_LIMIT:
+        if ogg_size <= file_limit:
             try:
                 target_name = self.processor.build_filename(track.artist, track.title, "ogg")
                 # The OGG is only the in-chat preview: Telegram bots cannot send
-                # files above TELEGRAM_FILE_LIMIT. Approval saves the original.
+                # files above the configured limit. Approval saves the original.
                 caption = _("🎧 {label} OGG preview — Telegram only sends up to {limit}MB\n{quality}\n").format(
                     label=label,
-                    limit=TELEGRAM_FILE_LIMIT // (1024 * 1024),
+                    limit=file_limit // (1024 * 1024),
                     quality=quality_line,
                 ) + (
                     _("Save the untouched {size:.0f}MB {fmt} to the library?").format(
