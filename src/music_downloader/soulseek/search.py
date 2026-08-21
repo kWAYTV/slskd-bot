@@ -136,23 +136,25 @@ class SearchLifecycle:
             includeResponses=True,
         )
         responses: list[dict] = final_state.get("responses", [])
+        if responses:
+            return responses
 
-        if not responses:
-            resp_count = final_state.get("responseCount", 0)
-            file_count = final_state.get("fileCount", 0)
-            if resp_count > 0 or file_count > 0:
-                logger.info(
-                    "state(includeResponses) empty despite %d peers / %d files — "
-                    "falling back to search_responses endpoint",
-                    resp_count,
-                    file_count,
-                )
-                with contextlib.suppress(requests.exceptions.RequestException):
-                    responses = await asyncio.to_thread(
-                        self._api.searches.search_responses,
-                        id=search_id,
-                    )
-                logger.info("search_responses returned %d responses", len(responses))
+        resp_count = final_state.get("responseCount", 0)
+        file_count = final_state.get("fileCount", 0)
+        if resp_count == 0 and file_count == 0:
+            return responses
+
+        logger.info(
+            "state(includeResponses) empty despite %d peers / %d files — falling back to search_responses endpoint",
+            resp_count,
+            file_count,
+        )
+        with contextlib.suppress(requests.exceptions.RequestException):
+            responses = await asyncio.to_thread(
+                self._api.searches.search_responses,
+                id=search_id,
+            )
+        logger.info("search_responses returned %d responses", len(responses))
         return responses
 
     async def _stop_and_collect(self, search_id: str) -> list[dict]:

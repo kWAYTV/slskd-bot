@@ -69,15 +69,20 @@ class Config:
 
         self.health_port = int(os.getenv("HEALTH_PORT", "8080"))
 
+        self._log_summary(limit_mb)
+
+    def _log_summary(self, limit_mb: int) -> None:
         logger.info("Configuration loaded successfully")
         if self.telegram_api_base_url:
             logger.info(f"Using local Bot API server at {self.telegram_api_base_url} (file limit {limit_mb}MB)")
         if self.auto_mode:
             logger.info("AUTO_MODE enabled — best match will be downloaded automatically")
+
         if self.telegram_allowed_users:
             logger.info(f"Bot restricted to {len(self.telegram_allowed_users)} allowed user(s)")
         else:
             logger.warning("TELEGRAM_ALLOWED_USERS is empty — bot will deny all commands until configured")
+
         if self.telegram_library_users:
             logger.info(f"Library save restricted to {len(self.telegram_library_users)} user(s)")
         else:

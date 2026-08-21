@@ -22,6 +22,7 @@ SAMPLE_RATE_CD_POINTS = 5.0
 SLOT_AVAILABLE_POINTS = 7.5
 SPEED_MAX_POINTS = 7.5
 QUEUE_MAX_POINTS = 5.0
+FILENAME_PART_POINTS = 7.5
 
 QUALITY_PREFER_HIRES = "hires"
 QUALITY_PREFER_CD = "cd"
@@ -60,22 +61,15 @@ class ResultScorer:
         Filters out unwanted results and sorts by score (highest first).
         """
         scored = []
-
         for result in results:
             score = self._calculate_score(result, track, max_duration_diff, quality_preference)
-            if score is not None:
-                result.score = score
-                scored.append(result)
+            if score is None:
+                continue
+            result.score = score
+            scored.append(result)
 
         scored.sort(key=lambda r: r.score, reverse=True)
-
-        seen_basenames = set()
-        deduplicated = []
-        for result in scored:
-            basename_key = result.basename.lower()
-            if basename_key not in seen_basenames:
-                seen_basenames.add(basename_key)
-                deduplicated.append(result)
+        deduplicated = _dedup_by_basename(scored)
 
         logger.info(f"Scored {len(scored)} results, {len(deduplicated)} after dedup (from {len(results)} total)")
         return deduplicated
@@ -88,88 +82,119 @@ class ResultScorer:
         quality_preference: str = QUALITY_PREFER_HIRES,
     ) -> float | None:
         """Calculate a score for a single result, or None to exclude it."""
-        score = 0.0
+        excluded = self._excluded_keyword(result, track)
+        if excluded:
+            logger.debug(f"Excluded (keyword '{excluded}'): {result.basename}")
+            return None
 
-        filename_lower = result.filename.lower()
+        duration = self._duration_points(result, track, max_duration_diff)
+        if duration is None:
+            logger.debug(f"Excluded (duration {result.length}s vs {track.duration_secs}s): {result.basename}")
+            return None
+
+        score = (
+            duration
+            + _quality_points(result, quality_preference)
+            + _source_points(result)
+            + _filename_points(result, track)
+        )
+        return round(score, 2)
+
+    def _excluded_keyword(self, result: SearchResult, track: TrackInfo) -> str | None:
+        """Return the exclude keyword that disqualifies this result, if any."""
         basename_lower = result.basename.lower()
-
+        title_lower = track.title.lower()
         for keyword in self.exclude_keywords:
-            if keyword in basename_lower:
-                if keyword.lower() not in track.title.lower():
-                    logger.debug(f"Excluded (keyword '{keyword}'): {result.basename}")
-                    return None
+            if keyword in basename_lower and keyword.lower() not in title_lower:
+                return keyword
+        return None
 
+    def _duration_points(
+        self,
+        result: SearchResult,
+        track: TrackInfo,
+        max_duration_diff: int | None,
+    ) -> float | None:
+        """Duration points (40 max), or None to exclude the result."""
         target_secs = track.duration_secs
         if target_secs == 0:
-            score += DURATION_FLAT_POINTS
-        elif result.length is not None and result.length > 0:
-            diff = abs(result.length - target_secs)
+            return DURATION_FLAT_POINTS
+        if result.length is None or result.length <= 0:
+            return DURATION_FLAT_POINTS
 
-            if diff <= self.duration_tolerance:
-                score += DURATION_MAX_POINTS - (diff * 2)
-            elif diff <= 10:
-                score += DURATION_CLOSE_POINTS - (diff - self.duration_tolerance) * 3
-            elif diff <= 30:
-                score += max(0.0, 10.0 - (diff - 10) * 0.5)
-            elif max_duration_diff is not None and diff <= max_duration_diff:
-                pass
-            else:
-                logger.debug(f"Excluded (duration {result.length}s vs {target_secs}s): {result.basename}")
-                return None
-        else:
-            score += DURATION_FLAT_POINTS
+        diff = abs(result.length - target_secs)
+        if diff <= self.duration_tolerance:
+            return DURATION_MAX_POINTS - (diff * 2)
+        if diff <= 10:
+            return DURATION_CLOSE_POINTS - (diff - self.duration_tolerance) * 3
+        if diff <= 30:
+            return max(0.0, 10.0 - (diff - 10) * 0.5)
+        if max_duration_diff is not None and diff <= max_duration_diff:
+            return 0.0
+        return None
 
-        score += _quality_points(result, quality_preference)
 
-        if result.has_free_slot:
-            score += SLOT_AVAILABLE_POINTS
-
-        if result.upload_speed > 0:
-            speed_score = min(result.upload_speed / 1_000_000, 10) * (SPEED_MAX_POINTS / 10)
-            score += speed_score
-
-        if result.queue_length == 0:
-            score += QUEUE_MAX_POINTS
-        elif result.queue_length < 5:
-            score += 2.0
-
-        artist_lower = track.artist.lower()
-        title_lower = track.title.lower()
-
-        artist_words = set(re.findall(r"\w+", artist_lower))
-        title_words = set(re.findall(r"\w+", title_lower))
-        filename_words = set(re.findall(r"\w+", filename_lower))
-
-        artist_match = len(artist_words & filename_words) / max(len(artist_words), 1)
-        title_match = len(title_words & filename_words) / max(len(title_words), 1)
-
-        score += artist_match * SPEED_MAX_POINTS
-        score += title_match * SPEED_MAX_POINTS
-
-        return round(score, 2)
+def _dedup_by_basename(results: list[SearchResult]) -> list[SearchResult]:
+    """Keep the first (highest-scored) result per lowercased basename."""
+    seen: set[str] = set()
+    deduplicated = []
+    for result in results:
+        key = result.basename.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduplicated.append(result)
+    return deduplicated
 
 
 def _quality_points(result: SearchResult, preference: str) -> float:
     """Audio-quality points (25 max). ``cd`` preference favors 16/44.1 over hi-res."""
     prefer_cd = preference == QUALITY_PREFER_CD
+    return _bit_depth_points(result.bit_depth, prefer_cd) + _sample_rate_points(result.sample_rate, prefer_cd)
+
+
+def _bit_depth_points(bit_depth: int | None, prefer_cd: bool) -> float:
+    if not bit_depth:
+        return 0.0
+    if bit_depth >= 24:
+        return QUALITY_CD_POINTS if prefer_cd else QUALITY_HIRES_POINTS
+    if bit_depth == 16:
+        return QUALITY_HIRES_POINTS if prefer_cd else QUALITY_CD_POINTS
+    return SAMPLE_RATE_CD_POINTS
+
+
+def _sample_rate_points(sample_rate: int | None, prefer_cd: bool) -> float:
+    if not sample_rate:
+        return 0.0
+    if sample_rate >= 88200:
+        return SAMPLE_RATE_CD_POINTS if prefer_cd else SAMPLE_RATE_HIRES_POINTS
+    if sample_rate == 48000:
+        return 7.0
+    if sample_rate == 44100:
+        return SAMPLE_RATE_HIRES_POINTS if prefer_cd else 6.0
+    return 3.0
+
+
+def _source_points(result: SearchResult) -> float:
+    """Source reliability points (20 max): free slots, upload speed, queue length."""
     points = 0.0
-
-    if result.bit_depth:
-        if result.bit_depth >= 24:
-            points += QUALITY_CD_POINTS if prefer_cd else QUALITY_HIRES_POINTS
-        elif result.bit_depth == 16:
-            points += QUALITY_HIRES_POINTS if prefer_cd else QUALITY_CD_POINTS
-        else:
-            points += SAMPLE_RATE_CD_POINTS
-
-    if result.sample_rate:
-        if result.sample_rate >= 88200:
-            points += SAMPLE_RATE_CD_POINTS if prefer_cd else SAMPLE_RATE_HIRES_POINTS
-        elif result.sample_rate == 48000:
-            points += 7.0
-        elif result.sample_rate == 44100:
-            points += SAMPLE_RATE_HIRES_POINTS if prefer_cd else 6.0
-        else:
-            points += 3.0
-
+    if result.has_free_slot:
+        points += SLOT_AVAILABLE_POINTS
+    if result.upload_speed > 0:
+        points += min(result.upload_speed / 1_000_000, 10) * (SPEED_MAX_POINTS / 10)
+    if result.queue_length == 0:
+        points += QUEUE_MAX_POINTS
+    elif result.queue_length < 5:
+        points += 2.0
     return points
+
+
+def _filename_points(result: SearchResult, track: TrackInfo) -> float:
+    """Filename relevance points (15 max): artist/title word overlap."""
+    filename_words = set(re.findall(r"\w+", result.filename.lower()))
+    artist_words = set(re.findall(r"\w+", track.artist.lower()))
+    title_words = set(re.findall(r"\w+", track.title.lower()))
+
+    artist_match = len(artist_words & filename_words) / max(len(artist_words), 1)
+    title_match = len(title_words & filename_words) / max(len(title_words), 1)
+    return (artist_match + title_match) * FILENAME_PART_POINTS

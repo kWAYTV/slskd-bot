@@ -62,10 +62,10 @@ class SoundCloudResolver:
             return None
 
         track = parse_oembed(payload)
-        if track:
-            logger.info("SoundCloud resolved via oEmbed: %s - %s", track.artist, track.title)
-        else:
+        if not track:
             logger.warning("SoundCloud oEmbed response had no usable title for %s", original_url)
+            return None
+        logger.info("SoundCloud resolved via oEmbed: %s - %s", track.artist, track.title)
         return track
 
     @staticmethod

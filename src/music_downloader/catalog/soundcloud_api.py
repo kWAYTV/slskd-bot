@@ -82,10 +82,11 @@ class SoundCloudApi:
         if self._access_token and time.time() < self._expires_at - _TOKEN_EXPIRY_MARGIN_SECS:
             return self._access_token
 
-        if self._refresh_token:
-            grant = {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
-        else:
-            grant = {"grant_type": "client_credentials"}
+        grant = (
+            {"grant_type": "refresh_token", "refresh_token": self._refresh_token}
+            if self._refresh_token
+            else {"grant_type": "client_credentials"}
+        )
         try:
             response = requests.post(
                 _TOKEN_ENDPOINT,

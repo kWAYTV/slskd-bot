@@ -36,28 +36,38 @@ def embed_artwork_into_file(filepath: str, image_data: bytes) -> bool:
     ext = filepath.rsplit(".", 1)[-1].lower() if "." in filepath else ""
     try:
         if ext == "flac":
-            f = mutagen.flac.FLAC(filepath)
-            if f.pictures:
-                return False
-            pic = mutagen.flac.Picture()
-            pic.type = 3  # Cover (front)
-            pic.mime = "image/jpeg"
-            pic.desc = "Cover"
-            pic.data = image_data
-            f.clear_pictures()
-            f.add_picture(pic)
-            f.save()
-            return True
-        elif ext in ("m4a", "mp4", "alac", "aac"):
-            f = mutagen.mp4.MP4(filepath)
-            if f.tags and f.tags.get("covr"):
-                return False
-            f.tags["covr"] = [mutagen.mp4.MP4Cover(image_data, imageformat=mutagen.mp4.MP4Cover.FORMAT_JPEG)]
-            f.save()
-            return True
-        else:
-            logger.debug("Unsupported format for artwork embedding: %s", ext)
-            return False
+            return _embed_flac(filepath, image_data)
+        if ext in ("m4a", "mp4", "alac", "aac"):
+            return _embed_mp4(filepath, image_data)
+        logger.debug("Unsupported format for artwork embedding: %s", ext)
+        return False
     except Exception:
         logger.debug("Failed to embed artwork into %s", filepath, exc_info=True)
         return False
+
+
+def _embed_flac(filepath: str, image_data: bytes) -> bool:
+    f = mutagen.flac.FLAC(filepath)
+    if f.pictures:
+        return False
+
+    pic = mutagen.flac.Picture()
+    pic.type = 3  # Cover (front)
+    pic.mime = "image/jpeg"
+    pic.desc = "Cover"
+    pic.data = image_data
+
+    f.clear_pictures()
+    f.add_picture(pic)
+    f.save()
+    return True
+
+
+def _embed_mp4(filepath: str, image_data: bytes) -> bool:
+    f = mutagen.mp4.MP4(filepath)
+    if f.tags and f.tags.get("covr"):
+        return False
+
+    f.tags["covr"] = [mutagen.mp4.MP4Cover(image_data, imageformat=mutagen.mp4.MP4Cover.FORMAT_JPEG)]
+    f.save()
+    return True

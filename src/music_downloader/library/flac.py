@@ -62,89 +62,87 @@ def analyze_flac(filepath: str, sample_duration: float = 30.0) -> FlacVerdict | 
     """Analyze a FLAC file for losslessness via spectral cutoff detection."""
     if not HAS_ANALYSIS:
         return None
-
     try:
-        info = sf.info(filepath)
-        sr = info.samplerate
-        nyquist = sr / 2
-
-        bit_match = re.search(r"\d+", info.subtype or "")
-        bit_depth = int(bit_match.group()) if bit_match else 0
-
-        total_frames = info.frames
-        start_frame = max(0, total_frames // 3)
-        frames_to_read = min(int(sr * sample_duration), total_frames - start_frame)
-
-        data, _ = sf.read(filepath, start=start_frame, frames=frames_to_read, dtype="float32")
-
-        if data.ndim > 1:
-            data = data.mean(axis=1)
-
-        rms = np.sqrt(np.mean(data**2))
-        if rms < 0.001:
-            return FlacVerdict(
-                verdict="AUTHENTIC",
-                cutoff_khz=nyquist / 1000,
-                nyquist_khz=nyquist / 1000,
-                sample_rate=sr,
-                bit_depth=bit_depth,
-            )
-
-        nperseg = min(8192, len(data))
-        freqs, psd = signal.welch(data, fs=sr, nperseg=nperseg, noverlap=nperseg // 2)
-        psd_db = 10 * np.log10(psd + 1e-30)
-
-        high_freq_mask = freqs >= 14000
-        high_freqs = freqs[high_freq_mask]
-        high_psd = psd_db[high_freq_mask]
-
-        if len(high_freqs) < 10:
-            return FlacVerdict(
-                verdict="AUTHENTIC",
-                cutoff_khz=nyquist / 1000,
-                nyquist_khz=nyquist / 1000,
-                sample_rate=sr,
-                bit_depth=bit_depth,
-            )
-
-        mid_mask = (freqs >= 2000) & (freqs <= 8000)
-        mid_energy = np.mean(psd_db[mid_mask]) if np.any(mid_mask) else -60
-
-        threshold = mid_energy - 30
-        cutoff_idx = np.where(high_psd < threshold)[0]
-
-        cutoff_freq = float(nyquist)
-        if len(cutoff_idx) > 0:
-            consecutive = 0
-            for i in range(len(cutoff_idx) - 1):
-                if cutoff_idx[i + 1] - cutoff_idx[i] == 1:
-                    consecutive += 1
-                    if consecutive >= 3:
-                        cutoff_freq = float(high_freqs[cutoff_idx[i - 2]])
-                        break
-                else:
-                    consecutive = 0
-
-        cutoff_khz = cutoff_freq / 1000
-        nyquist_khz = nyquist / 1000
-
-        if cutoff_khz >= nyquist_khz * 0.92:
-            verdict = "AUTHENTIC"
-        elif cutoff_khz >= 19.0:
-            verdict = "WARNING"
-        elif cutoff_khz >= 17.0:
-            verdict = "SUSPICIOUS"
-        else:
-            verdict = "FAKE"
-
-        return FlacVerdict(
-            verdict=verdict,
-            cutoff_khz=round(cutoff_khz, 2),
-            nyquist_khz=round(nyquist_khz, 2),
-            sample_rate=sr,
-            bit_depth=bit_depth,
-        )
-
+        return _analyze(filepath, sample_duration)
     except Exception:
         logger.exception("Failed to analyze FLAC: %s", filepath)
         return None
+
+
+def _analyze(filepath: str, sample_duration: float) -> FlacVerdict:
+    info = sf.info(filepath)
+    sample_rate = info.samplerate
+    nyquist = sample_rate / 2
+
+    data = _read_mono_sample(filepath, info, sample_duration)
+    cutoff_khz = _spectral_cutoff(data, sample_rate, nyquist) / 1000
+    nyquist_khz = nyquist / 1000
+
+    return FlacVerdict(
+        verdict=_classify(cutoff_khz, nyquist_khz),
+        cutoff_khz=round(cutoff_khz, 2),
+        nyquist_khz=round(nyquist_khz, 2),
+        sample_rate=sample_rate,
+        bit_depth=_bit_depth(info),
+    )
+
+
+def _bit_depth(info) -> int:
+    match = re.search(r"\d+", info.subtype or "")
+    return int(match.group()) if match else 0
+
+
+def _read_mono_sample(filepath: str, info, sample_duration: float):
+    """Read a mono sample starting a third of the way into the file."""
+    start_frame = max(0, info.frames // 3)
+    frames_to_read = min(int(info.samplerate * sample_duration), info.frames - start_frame)
+
+    data, _ = sf.read(filepath, start=start_frame, frames=frames_to_read, dtype="float32")
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+    return data
+
+
+def _spectral_cutoff(data, sample_rate: int, nyquist: float) -> float:
+    """Frequency (Hz) where high-band energy drops off; Nyquist when it doesn't."""
+    rms = np.sqrt(np.mean(data**2))
+    if rms < 0.001:
+        # Near-silence: nothing to measure, assume the spectrum is intact.
+        return float(nyquist)
+
+    nperseg = min(8192, len(data))
+    freqs, psd = signal.welch(data, fs=sample_rate, nperseg=nperseg, noverlap=nperseg // 2)
+    psd_db = 10 * np.log10(psd + 1e-30)
+
+    high_freqs = freqs[freqs >= 14000]
+    high_psd = psd_db[freqs >= 14000]
+    if len(high_freqs) < 10:
+        return float(nyquist)
+
+    mid_mask = (freqs >= 2000) & (freqs <= 8000)
+    mid_energy = np.mean(psd_db[mid_mask]) if np.any(mid_mask) else -60
+    dropout_idx = np.where(high_psd < mid_energy - 30)[0]
+    return _first_sustained_dropout(high_freqs, dropout_idx, nyquist)
+
+
+def _first_sustained_dropout(high_freqs, dropout_idx, nyquist: float) -> float:
+    """First frequency where at least 4 consecutive bins fall below threshold."""
+    consecutive = 0
+    for i in range(len(dropout_idx) - 1):
+        if dropout_idx[i + 1] - dropout_idx[i] != 1:
+            consecutive = 0
+            continue
+        consecutive += 1
+        if consecutive >= 3:
+            return float(high_freqs[dropout_idx[i - 2]])
+    return float(nyquist)
+
+
+def _classify(cutoff_khz: float, nyquist_khz: float) -> str:
+    if cutoff_khz >= nyquist_khz * 0.92:
+        return "AUTHENTIC"
+    if cutoff_khz >= 19.0:
+        return "WARNING"
+    if cutoff_khz >= 17.0:
+        return "SUSPICIOUS"
+    return "FAKE"

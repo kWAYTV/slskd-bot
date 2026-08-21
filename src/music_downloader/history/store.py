@@ -49,11 +49,12 @@ class HistoryRepository:
                 "SELECT * FROM download_history ORDER BY created_at DESC, id DESC LIMIT ?",
                 (limit,),
             )
-        else:
-            cursor = self._conn.execute(
-                "SELECT * FROM download_history WHERE chat_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
-                (chat_id, limit),
-            )
+            return [HistoryRecord(**dict(row)) for row in cursor.fetchall()]
+
+        cursor = self._conn.execute(
+            "SELECT * FROM download_history WHERE chat_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+            (chat_id, limit),
+        )
         return [HistoryRecord(**dict(row)) for row in cursor.fetchall()]
 
     def find_success(
@@ -98,7 +99,5 @@ class HistoryRepository:
 
     def count(self, chat_id: int | None = None) -> int:
         if chat_id is None:
-            cursor = self._conn.execute("SELECT COUNT(*) FROM download_history")
-        else:
-            cursor = self._conn.execute("SELECT COUNT(*) FROM download_history WHERE chat_id = ?", (chat_id,))
-        return cursor.fetchone()[0]
+            return self._conn.execute("SELECT COUNT(*) FROM download_history").fetchone()[0]
+        return self._conn.execute("SELECT COUNT(*) FROM download_history WHERE chat_id = ?", (chat_id,)).fetchone()[0]
