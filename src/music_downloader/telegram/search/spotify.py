@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.telegram.core.session import PendingSearch
 from music_downloader.telegram.ui.editing import safe_edit
-from music_downloader.telegram.ui.formatting import track_md
+from music_downloader.telegram.ui.formatting import format_spotify_results, track_md
 from music_downloader.telegram.ui.keyboards import build_direct_search_keyboard, build_spotify_keyboard
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
         await safe_edit(
             searching_msg,
-            self._format_spotify_results(unique_tracks, page=0),
+            format_spotify_results(unique_tracks, page=0),
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=True,
             reply_markup=build_spotify_keyboard(unique_tracks, page=0),
@@ -126,7 +126,7 @@ async def handle_spotify_page(self, update, context, chat_id: int, data: str):
 
     self._spotify_page[chat_id] = page
     await query.edit_message_text(
-        self._format_spotify_results(candidates, page=page),
+        format_spotify_results(candidates, page=page),
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
         reply_markup=build_spotify_keyboard(candidates, page=page),

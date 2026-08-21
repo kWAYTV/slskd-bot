@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 from music_downloader.catalog.track import TrackInfo
 from music_downloader.soulseek.errors import SlskdUnavailableError
 from music_downloader.soulseek.query import parse_query_artist_title
+from music_downloader.soulseek.scoring import rank_responses
 from music_downloader.telegram.search.results import present_search_results
 from music_downloader.telegram.ui.editing import safe_edit
 
@@ -72,8 +73,8 @@ async def do_direct_slskd_search(
             return
 
         synthetic_track = _synthetic_track(query, display_track)
-        ranked, is_fallback = self._rank_responses(
-            raw_responses, synthetic_track, quality_preference=self.quality_pref(chat_id)
+        ranked, is_fallback = rank_responses(
+            raw_responses, synthetic_track, self.scorer, quality_preference=self.quality_pref(chat_id)
         )
 
         if self._is_stale(chat_id, generation):

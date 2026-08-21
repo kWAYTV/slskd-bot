@@ -8,7 +8,7 @@ from music_downloader.catalog.track import TrackInfo
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.core.session import PendingSearch
 from music_downloader.telegram.ui.editing import safe_edit
-from music_downloader.telegram.ui.formatting import format_result_reasons, track_md
+from music_downloader.telegram.ui.formatting import format_result_reasons, format_search_results, track_md
 from music_downloader.telegram.ui.keyboards import build_results_keyboard
 from music_downloader.telegram.ui.markdown import md_code_safe
 
@@ -58,7 +58,9 @@ async def present_search_results(
         self._track_task(chat_id, task)
         return
 
-    results_text = self._format_results(track, ranked, is_fallback, page=0, page_size=self.config.max_results)
+    results_text = format_search_results(
+        track, ranked, is_fallback=is_fallback, page=0, page_size=self.config.max_results
+    )
     await safe_edit(
         searching_msg,
         results_text,
@@ -81,10 +83,10 @@ async def handle_results_page(self, update, context, chat_id: int, data: str):
         return
 
     pending.page = page
-    results_text = self._format_results(
+    results_text = format_search_results(
         pending.track,
         pending.results,
-        pending.is_fallback,
+        is_fallback=pending.is_fallback,
         page=page,
         page_size=self.config.max_results,
     )

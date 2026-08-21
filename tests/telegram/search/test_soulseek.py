@@ -18,7 +18,6 @@ class TestDoSlskdSearch:
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[])
-        bot.slskd.parse_results = MagicMock(return_value=[])
         bot.scorer = MagicMock()
         bot.scorer.score_results = MagicMock(return_value=[])
         bot._chat_generation[123] = 0
@@ -39,7 +38,6 @@ class TestDoSlskdSearch:
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[{"responses": []}])
         results = [_make_result(0), _make_result(1)]
-        bot.slskd.parse_results = MagicMock(return_value=results)
         bot.scorer = MagicMock()
         bot.scorer.score_results = MagicMock(return_value=results)
         bot._chat_generation[123] = 0
@@ -59,16 +57,6 @@ class TestDoSlskdSearch:
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[])
-        call_count = 0
-
-        def parse_side_effect(responses, flac_only=True):
-            nonlocal call_count
-            call_count += 1
-            if not flac_only and call_count >= 2:
-                return [_make_result(0, "mp3")]
-            return []
-
-        bot.slskd.parse_results = MagicMock(side_effect=parse_side_effect)
         score_count = 0
 
         def score_side_effect(results, track, **kwargs):
@@ -94,7 +82,6 @@ class TestDoSlskdSearch:
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[])
-        bot.slskd.parse_results = MagicMock(return_value=[])
         bot.scorer = MagicMock()
         bot.scorer.score_results = MagicMock(return_value=[])
         bot._chat_generation[123] = 5  # generation is ahead
@@ -135,7 +122,6 @@ class TestDoSlskdSearch:
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[{"responses": []}])
         results = [_make_result(0), _make_result(1)]
-        bot.slskd.parse_results = MagicMock(return_value=results)
         bot.scorer = MagicMock()
         bot.scorer.score_results = MagicMock(return_value=results)
         bot._chat_generation[123] = 0

@@ -8,7 +8,6 @@ from music_downloader.playlist_import import TrackStatus
 from tests.telegram.playlist_import.helpers import (
     _fake_to_thread,
     _make_context,
-    _make_result,
     _make_track,
     _setup_bot,
 )
@@ -37,14 +36,12 @@ class TestDoImportSlskdSearch:
     async def test_import_search_success(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
-        results = [_make_result(0)]
         # Return results from first search call
         bot.slskd.search = AsyncMock(
             return_value=[
                 {"username": "user0", "files": [{"filename": "\\Music\\track0.flac", "size": 30000000, "length": 162}]}
             ]
         )
-        bot._rank_responses = MagicMock(return_value=(results, False))
         bot.slskd.enqueue_download = MagicMock(return_value=True)
         bot.slskd.wait_for_download = AsyncMock()
         track = _make_track()

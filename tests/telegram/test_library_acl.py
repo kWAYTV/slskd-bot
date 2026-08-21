@@ -192,7 +192,6 @@ class TestUserIdThreading:
         bot = MusicBot(_make_config(library_users={12345}))
         bot.spotify.search_multiple = MagicMock(return_value=[_make_track()])
         bot.slskd.search = AsyncMock(return_value=[])
-        bot.slskd.parse_results = MagicMock(return_value=[])
 
         update = MagicMock()
         update.effective_chat.id = 1

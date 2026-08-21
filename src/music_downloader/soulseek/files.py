@@ -34,12 +34,3 @@ def delete_downloaded_directory(api, relative_dir: str) -> bool:
     except Exception:
         logger.debug(f"Failed to delete downloaded directory via slskd: {relative_dir}", exc_info=True)
         return False
-
-
-def list_downloads_directory(api) -> list[dict]:
-    """Get the contents of the slskd downloads directory."""
-    try:
-        return api.files.get_downloads_dir()
-    except Exception:
-        logger.exception("Failed to list downloads directory")
-        return []

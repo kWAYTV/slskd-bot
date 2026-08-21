@@ -44,25 +44,25 @@ class TestHandleDirectSearch:
 
 
 class TestDoDirectSlskdSearch:
+    @patch("music_downloader.telegram.search.direct.rank_responses", return_value=([], False))
     @patch("music_downloader.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)
-    async def test_direct_search_no_results(self, mock_edit):
+    async def test_direct_search_no_results(self, mock_edit, mock_rank):
         bot = _setup_bot()
         chat_id = 67890
         bot.slskd.search = AsyncMock(return_value=[])
-        bot._rank_responses = MagicMock(return_value=([], False))
         searching_msg = MagicMock(message_id=100)
         await bot._do_direct_slskd_search(_make_context(), chat_id, "test query", searching_msg, generation=0)
         mock_edit.assert_awaited()
         assert "No results" in mock_edit.call_args[0][1]
 
+    @patch("music_downloader.telegram.search.direct.rank_responses")
     @patch("music_downloader.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)
-    async def test_direct_search_finds_results(self, mock_edit):
+    async def test_direct_search_finds_results(self, mock_edit, mock_rank):
         bot = _setup_bot()
         chat_id = 67890
         results = [_make_result(0), _make_result(1)]
         bot.slskd.search = AsyncMock(return_value=[{"username": "u", "files": []}])
-        bot._rank_responses = MagicMock(return_value=(results, False))
-        bot._format_results = MagicMock(return_value="Results text")
+        mock_rank.return_value = (results, False)
         searching_msg = MagicMock(message_id=100)
         await bot._do_direct_slskd_search(_make_context(), chat_id, "test query", searching_msg, generation=0)
         assert chat_id in bot.pending

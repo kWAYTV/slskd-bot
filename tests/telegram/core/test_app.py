@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.soulseek.scoring import rank_responses
 from music_downloader.telegram.core.app import MusicBot
+from music_downloader.telegram.ui.formatting import format_search_results, format_spotify_results
 from tests.telegram.helpers import (
     _make_config,
     _make_context,
@@ -30,47 +32,34 @@ class TestMusicBotInit:
 
 
 class TestMusicBotHelpers:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_format_results(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
+    def test_format_results(self):
         track = _make_track()
         results = [_make_search_result(i) for i in range(3)]
-        text = bot._format_results(track, results)
+        text = format_search_results(track, results)
         assert "Nancy Sinatra" in text
         assert "Bang Bang" in text
         assert "#1" in text
         assert "#3" in text
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_format_results_fallback(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
+    def test_format_results_fallback(self):
         track = _make_track()
         results = [_make_search_result()]
-        text = bot._format_results(track, results, is_fallback=True)
+        text = format_search_results(track, results, is_fallback=True)
         assert "No FLAC found" in text
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_format_results_pagination(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
+    def test_format_results_pagination(self):
         track = _make_track()
         results = [_make_search_result(i) for i in range(15)]
-        text = bot._format_results(track, results, page=0, page_size=5)
+        text = format_search_results(track, results, page=0, page_size=5)
         assert "Page 1/" in text
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_format_spotify_results(self, mock_slskd, mock_spotify):
+    def test_format_spotify_results(self):
         tracks = [_make_track() for _ in range(3)]
-        text = MusicBot._format_spotify_results(tracks)
+        text = format_spotify_results(tracks)
         assert "Multiple matches" in text
         assert "Nancy Sinatra" in text
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_format_spotify_results_escapes_markdown(self, mock_slskd, mock_spotify):
+    def test_format_spotify_results_escapes_markdown(self):
         tracks = [
             TrackInfo(
                 artist="AC_DC",
@@ -81,17 +70,15 @@ class TestMusicBotHelpers:
                 year="1980",
             )
         ]
-        text = MusicBot._format_spotify_results(tracks)
+        text = format_spotify_results(tracks)
         assert "AC\\_DC" in text
         assert "Hells\\*Bells" in text
         # ']' is not special in Markdown V1; only '[' needs the escape.
         assert "Back\\[in]Black" in text
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_format_spotify_results_pagination(self, mock_slskd, mock_spotify):
+    def test_format_spotify_results_pagination(self):
         tracks = [_make_track() for _ in range(12)]
-        text = MusicBot._format_spotify_results(tracks, page=0, page_size=5)
+        text = format_spotify_results(tracks, page=0, page_size=5)
         assert "page 1/" in text
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
@@ -129,55 +116,43 @@ class TestMusicBotHelpers:
 
 
 class TestRankResponses:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_flac_found(self, mock_slskd, mock_spotify):
+    def test_flac_found(self):
         """When FLAC results exist, returns them with is_fallback=False."""
-        bot = MusicBot(_make_config())
         track = _make_track()
         flac_result = [_make_search_result()]
-        bot.slskd.parse_results = MagicMock(side_effect=[flac_result])
-        bot.scorer.score_results = MagicMock(return_value=flac_result)
-        ranked, is_fallback = bot._rank_responses([], track)
+        scorer = MagicMock()
+        scorer.score_results = MagicMock(return_value=flac_result)
+        ranked, is_fallback = rank_responses([], track, scorer)
         assert len(ranked) == 1
         assert is_fallback is False
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_non_flac_fallback(self, mock_slskd, mock_spotify):
+    def test_non_flac_fallback(self):
         """When only non-FLAC exists, returns with is_fallback=True."""
-        bot = MusicBot(_make_config())
         track = _make_track()
         mp3_result = [_make_search_result()]
+        scorer = MagicMock()
         # First call (flac_only=True) returns nothing scored, second call returns results
-        bot.slskd.parse_results = MagicMock(side_effect=[[], mp3_result])
-        bot.scorer.score_results = MagicMock(side_effect=[[], mp3_result])
-        ranked, is_fallback = bot._rank_responses([], track)
+        scorer.score_results = MagicMock(side_effect=[[], mp3_result])
+        ranked, is_fallback = rank_responses([], track, scorer)
         assert len(ranked) == 1
         assert is_fallback is True
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_no_results(self, mock_slskd, mock_spotify):
+    def test_no_results(self):
         """When no results match, returns empty list."""
-        bot = MusicBot(_make_config())
         track = _make_track()
-        bot.slskd.parse_results = MagicMock(return_value=[])
-        bot.scorer.score_results = MagicMock(return_value=[])
-        ranked, is_fallback = bot._rank_responses([], track)
+        scorer = MagicMock()
+        scorer.score_results = MagicMock(return_value=[])
+        ranked, is_fallback = rank_responses([], track, scorer)
         assert ranked == []
         assert is_fallback is False
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_max_duration_diff_passed(self, mock_slskd, mock_spotify):
+    def test_max_duration_diff_passed(self):
         """max_duration_diff should be forwarded to score_results."""
-        bot = MusicBot(_make_config())
         track = _make_track()
-        bot.slskd.parse_results = MagicMock(return_value=[_make_search_result()])
-        bot.scorer.score_results = MagicMock(return_value=[_make_search_result()])
-        bot._rank_responses([], track, max_duration_diff=120)
-        call_kwargs = bot.scorer.score_results.call_args[1]
+        scorer = MagicMock()
+        scorer.score_results = MagicMock(return_value=[_make_search_result()])
+        rank_responses([], track, scorer, max_duration_diff=120)
+        call_kwargs = scorer.score_results.call_args[1]
         assert call_kwargs["max_duration_diff"] == 120
 
 

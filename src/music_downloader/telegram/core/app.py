@@ -15,22 +15,17 @@ from telegram.ext import (
 
 from music_downloader.catalog.playlist import PlaylistResolver
 from music_downloader.catalog.spotify import SpotifyResolver
-from music_downloader.catalog.track import TrackInfo
 from music_downloader.history.store import HistoryRepository
 from music_downloader.library.files import FileProcessor
 from music_downloader.playlist_import.store import ImportRepository
 from music_downloader.records.database import Database
 from music_downloader.settings.config import Config
 from music_downloader.soulseek.client import SlskdClient
-from music_downloader.soulseek.query import parse_query_artist_title
-from music_downloader.soulseek.ranking import rank_responses
-from music_downloader.soulseek.result import SearchResult
 from music_downloader.soulseek.scoring import ResultScorer
 from music_downloader.telegram.commands import activity, basics, preferences
 from music_downloader.telegram.core import access, cleanup, routing
 from music_downloader.telegram.core.session import ChatSession
-from music_downloader.telegram.download import approval, delivery, media, retry, run, selection
-from music_downloader.telegram.download import history as download_history
+from music_downloader.telegram.download import approval, delivery, retry, run, selection, transfer
 from music_downloader.telegram.playlist_import import callbacks as import_callbacks
 from music_downloader.telegram.playlist_import import command as import_command
 from music_downloader.telegram.playlist_import import download as import_download
@@ -39,7 +34,6 @@ from music_downloader.telegram.playlist_import import resume as import_resume
 from music_downloader.telegram.playlist_import import search as import_search
 from music_downloader.telegram.search import direct, duplicates, results, soulseek, spotify, text
 from music_downloader.telegram.ui.editing import edit_approval_message
-from music_downloader.telegram.ui.formatting import format_search_results, format_spotify_results
 
 logger = logging.getLogger(__name__)
 
@@ -104,42 +98,6 @@ class MusicBot:
     def _next_dl_id(self) -> str:
         return self._session.next_dl_id()
 
-    # --- domain shims (bound here so conversation modules share one entry) -----
-
-    def _rank_responses(
-        self,
-        raw_responses,
-        track: TrackInfo,
-        max_duration_diff: int | None = None,
-        quality_preference: str | None = None,
-    ) -> tuple[list[SearchResult], bool]:
-        """Parse raw slskd responses and rank: try FLAC first, fall back to all audio."""
-        return rank_responses(
-            raw_responses,
-            track,
-            self.scorer,
-            max_duration_diff=max_duration_diff,
-            quality_preference=quality_preference,
-        )
-
-    @staticmethod
-    def _format_spotify_results(tracks: list[TrackInfo], page: int = 0, page_size: int = 5) -> str:
-        return format_spotify_results(tracks, page=page, page_size=page_size)
-
-    def _format_results(
-        self,
-        track: TrackInfo,
-        results: list[SearchResult],
-        is_fallback: bool = False,
-        page: int = 0,
-        page_size: int = 10,
-    ) -> str:
-        return format_search_results(track, results, is_fallback=is_fallback, page=page, page_size=page_size)
-
-    @staticmethod
-    def _parse_query_artist_title(query: str) -> tuple[str, str]:
-        return parse_query_artist_title(query)
-
     # --- conversation handlers, composed from feature modules ------------------
 
     handle_callback = routing.handle_callback
@@ -183,11 +141,11 @@ class MusicBot:
     _edit_approval_message = staticmethod(edit_approval_message)
     _handle_retry = retry.handle_retry
     _handle_next_result = retry.handle_next_result
-    _analyze_flac = staticmethod(media.analyze_flac_async)
-    _convert_to_ogg = staticmethod(media.convert_to_ogg_async)
-    _create_preview = staticmethod(media.create_preview_async)
-    _embed_spotify_artwork = media.embed_spotify_artwork
-    _add_history = download_history.add_history
+    _analyze_flac = staticmethod(delivery.analyze_flac_async)
+    _convert_to_ogg = staticmethod(delivery.convert_to_ogg_async)
+    _create_preview = staticmethod(delivery.create_preview_async)
+    _embed_spotify_artwork = delivery.embed_spotify_artwork
+    _add_history = transfer.add_history
 
     _handle_import_callback = import_callbacks.handle_import_callback
     _handle_import_approve = import_callbacks.handle_import_approve

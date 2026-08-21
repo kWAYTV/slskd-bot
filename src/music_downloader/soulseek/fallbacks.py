@@ -16,9 +16,8 @@ from music_downloader.soulseek.query import (
     extract_latin_keywords,
     has_non_latin_script,
 )
-from music_downloader.soulseek.ranking import rank_responses
 from music_downloader.soulseek.result import SearchResult
-from music_downloader.soulseek.scoring import ResultScorer
+from music_downloader.soulseek.scoring import ResultScorer, rank_responses
 
 logger = logging.getLogger(__name__)
 
