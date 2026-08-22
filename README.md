@@ -1,57 +1,36 @@
-<p align="center"><img src="https://raw.githubusercontent.com/GeiserX/telegram-slskd-local-bot/main/docs/images/banner.svg" alt="telegram-slskd-local-bot banner" width="900"/></p>
-
-<h1 align="center">telegram-slskd-local-bot</h1>
+<h1 align="center">slskd-bot</h1>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/GeiserX/telegram-slskd-local-bot" alt="License"/></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.x-3776AB?logo=python&logoColor=white" alt="Python"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="License"/></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python"/></a>
   <a href="https://github.com/kWAYTV/slskd-bot/pkgs/container/slskd-bot"><img src="https://img.shields.io/badge/ghcr.io-kwaytv%2Fslskd--bot-blue?logo=github" alt="GHCR"/></a>
-  <a href="https://pypi.org/project/telegram-slskd-local-bot/"><img src="https://img.shields.io/pypi/v/telegram-slskd-local-bot?style=flat-square" alt="PyPI"/></a>
-  <a href="https://codecov.io/gh/GeiserX/telegram-slskd-local-bot"><img src="https://codecov.io/gh/GeiserX/telegram-slskd-local-bot/graph/badge.svg" alt="codecov"/></a>
 </p>
 
-<p align="center"><strong>Automated music discovery and download via Telegram bot. Resolves track metadata from Spotify, searches and downloads FLAC files from Soulseek (via <a href="https://github.com/slskd/slskd">slskd</a>), renames them to <code>Artist - Title.flac</code>, and places them in your music library. Docker-ready.</strong></p>
+<p align="center"><strong>Telegram bot that finds music on Soulseek. Send a song name or Spotify link, get a scored list of FLAC matches from <a href="https://github.com/slskd/slskd">slskd</a>, and save the best one to your library as <code>Artist - Title.flac</code>.</strong></p>
 
----
+> This is a fork of [GeiserX/telegram-slskd-local-bot](https://github.com/GeiserX/telegram-slskd-local-bot), heavily reworked since. Credit for the original idea and foundation goes upstream.
 
-## How It Works
+## Features
 
-```
-You: "Nancy Sinatra Bang Bang"
-Bot: Found: Nancy Sinatra - Bang Bang (My Baby Shot Me Down) (2:42)
-     Searching slskd for FLAC...
-     #1 [free] 2:42 | 16bit/44.1kHz | 30MB
-     #2 [free] 2:41 | 16bit/44.1kHz | 28MB
-     [Download #1] [Download #2] [Auto-pick best] [Cancel]
-You: (taps Download #1)
-Bot: Downloaded! Nancy Sinatra - Bang Bang (My Baby Shot Me Down).flac -> /music/
-```
-
-### Flow
-
-1. Send a song name — or paste a **Spotify track link** — to the Telegram bot
-2. Bot resolves the track on **Spotify** (artist, title, duration, album)
-3. Bot searches **slskd** (Soulseek) for FLAC files matching the track
-4. Results are **scored** by duration match, audio quality, source reliability, and filename relevance
-5. Bot presents the top matches — you **pick one** (or enable auto-mode)
-6. File is downloaded, **renamed** to `Artist - Title.flac`, and placed in your output directory
-7. Your existing tools (e.g., [audio-transcode-watcher](https://github.com/GeiserX/audio-transcode-watcher), Navidrome) pick it up from there
+- **Search by text or link** — free-text queries resolve via Spotify metadata; pasted Spotify track links resolve directly, and playlist/album links start an import
+- **Smart ranking** — results scored by duration match, audio quality, source reliability, and filename relevance; live/remix noise filtered out
+- **Quality preference** — `/quality` picks CD (16/44.1) or Hi-Res (24-bit) ranking per chat
+- **Auto mode** — `/auto` per chat downloads the best match without asking
+- **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, with progress, per-track retry/skip, and resume after restart
+- **Live progress** — download messages update with a progress bar; `/status` shows everything in flight for the chat
+- **Library hygiene** — duplicate detection before searching, `/undo` to remove the last save, `/history` per chat
+- **Large files** — files over Telegram's 50 MB limit fall back to OGG Opus previews, or upload untouched (up to 2000 MB) via a self-hosted Bot API server
+- **Access control** — bot usage restricted to allowed user IDs; library writes optionally restricted further via `TELEGRAM_LIBRARY_USERS`
+- **Docker-ready** — image published to `ghcr.io/kwaytv/slskd-bot` on every push to `main`
 
 ## Quick Start
 
-### Prerequisites
-
-- A running [slskd](https://github.com/slskd/slskd) instance with an API key
-- A [Spotify Developer](https://developer.spotify.com/dashboard) app (free — Client ID + Secret)
-- A [Telegram bot](https://core.telegram.org/bots#botfather) token (via @BotFather)
-
-### Docker Compose
+You need a running [slskd](https://github.com/slskd/slskd) instance with an API key, a free [Spotify Developer](https://developer.spotify.com/dashboard) app, and a Telegram bot token from [@BotFather](https://core.telegram.org/bots#botfather).
 
 ```yaml
 services:
-  slskd-importer:
+  slskd-bot:
     image: ghcr.io/kwaytv/slskd-bot:latest
-    container_name: slskd_importer
     restart: unless-stopped
     environment:
       TELEGRAM_BOT_TOKEN: "your-bot-token"
@@ -63,148 +42,60 @@ services:
     volumes:
       - /path/to/slskd/downloads:/downloads:ro
       - /path/to/music/library:/music
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
 ```
 
-> **Note on the read-only downloads mount:** after saving a track to the library, the bot deletes the original file from the downloads directory. With `/downloads` mounted `:ro` it cannot do that locally, so it falls back to slskd's remote file management API — enable it on the slskd side with `SLSKD_REMOTE_FILE_MANAGEMENT=true` (or `remoteFileManagement: true` in `slskd.yml`). Without it, the original file stays behind next to the renamed copy. Alternatively, mount `/downloads` read-write.
+> With `/downloads` mounted read-only the bot cleans up originals through slskd's remote file management API — enable it with `SLSKD_REMOTE_FILE_MANAGEMENT=true` on the slskd side, or mount the volume read-write.
 
-### Local Development
+### Local development
 
 ```bash
-# Clone the repo
-git clone https://github.com/GeiserX/telegram-slskd-local-bot.git
-cd telegram-slskd-local-bot
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-pip install -e ".[dev]"
-
-# Copy and configure environment
-cp .env.example .env
-# Edit .env with your credentials
-
-# Run
-python -m music_downloader run
+git clone https://github.com/kWAYTV/slskd-bot.git && cd slskd-bot
+uv sync
+cp .env.example .env  # fill in credentials
+uv run python -m music_downloader run
 ```
 
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `TELEGRAM_BOT_TOKEN` | Yes | — | Telegram bot token from @BotFather |
-| `TELEGRAM_ALLOWED_USERS` | Yes | — | Comma-separated Telegram user IDs allowed to use the bot. Empty denies everyone. |
-| `TELEGRAM_LIBRARY_USERS` | No | — | Comma-separated Telegram user IDs allowed to save into the music library and run `/import`. Empty means all allowed users can save. Other allowed users still get the file via Telegram; the local copy is then deleted. |
-| `TELEGRAM_API_BASE_URL` | No | — | URL of a [self-hosted Bot API server](#large-files-self-hosted-bot-api-server) (e.g. `http://telegram-bot-api:8081`). Raises the upload limit from 50 MB to 2000 MB, so hi-res FLAC/WAV are sent untouched instead of as OGG previews. |
-| `SPOTIFY_CLIENT_ID` | Yes | — | Spotify Developer app Client ID |
-| `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app Client Secret |
-| `SLSKD_HOST` | Yes | — | slskd instance URL (e.g., `http://192.168.1.100:5030`) |
-| `SLSKD_API_KEY` | Yes | — | slskd API key (Settings > Security > API Keys) |
-| `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads (container path) |
-| `OUTPUT_DIR` | No | `/music` | Where to place renamed FLAC files (container path) |
-| `DATA_DIR` | No | `/data` | SQLite directory for history and playlist imports |
-| `AUTO_MODE` | No | `false` | Auto-download best match without asking |
-| `QUALITY_PREFERENCE` | No | `hires` | `hires` or `cd` — which audio quality ranks higher (per-chat `/quality` overrides) |
-| `MAX_RESULTS` | No | `5` | Maximum search results shown to user |
-| `DURATION_TOLERANCE_SECS` | No | `5` | Duration match tolerance in seconds |
-| `SEARCH_TIMEOUT_SECS` | No | `30` | slskd search timeout |
-| `DOWNLOAD_TIMEOUT_SECS` | No | `600` | Download completion timeout |
-| `EXCLUDE_KEYWORDS` | No | `live,remix,...` | Comma-separated keywords to filter out |
-| `FILENAME_TEMPLATE` | No | `{artist} - {title}` | Output filename template |
-| `LOG_LEVEL` | No | `INFO` | Logging level |
-| `HEALTH_PORT` | No | `8080` | Health check HTTP port |
-
-## Large Files (Self-Hosted Bot API Server)
-
-The Telegram cloud Bot API caps bot uploads at 50 MB, so larger files (hi-res FLAC, WAV) are delivered as OGG Opus previews — only the library copy stays lossless. Running [telegram-bot-api](https://github.com/tdlib/telegram-bot-api) locally raises the limit to 2000 MB and originals are sent untouched.
-
-1. Get an `api_id`/`api_hash` at [my.telegram.org](https://my.telegram.org) → API development tools.
-2. Add the server to your compose stack (see the `local-api` profile in `docker-compose.yml`) and set `TELEGRAM_API_BASE_URL=http://telegram-bot-api:8081` on the bot.
-3. Log the bot out of the cloud API once before first start: `curl https://api.telegram.org/bot<TOKEN>/logOut`.
-
-The Bot API server needs no published ports and must mount the music volume at the same container path as the bot so local-mode file handoff works.
-
-## Telegram Bot Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
 | *(any text)* | Search for a song and show download options |
 | *(Spotify track link)* | Resolve the link and search for it |
-| *(Spotify playlist/album link)* | Start the import flow directly (library users only) |
-| `/auto` | Toggle auto-download mode on/off (per chat) |
-| `/quality` | Prefer CD (16/44.1) or Hi-Res (24-bit) when ranking results (per chat) |
-| `/undo` | Remove the last track saved to the library (library users only) |
+| *(Spotify playlist/album link)* | Start the import flow (library users only) |
+| `/auto` | Toggle auto-download of the best match (per chat) |
+| `/quality` | Prefer CD or Hi-Res when ranking results (per chat) |
 | `/import <url>` | Import a Spotify playlist or album (library users only) |
-| `/import resume` | Continue a paused import after a bot restart |
-| `/status` | Show active searches, downloads (with progress), and imports for this chat |
-| `/history` | Show recent download history for this chat |
+| `/import resume` | Continue a paused import after a restart |
+| `/undo` | Remove the last track saved to the library |
+| `/status` | Active searches, downloads (with progress), and imports |
+| `/history` | Recent download history for this chat |
 | `/cancel` | Cancel the current search, download, or import |
-| `/help` | Show help message |
 
-## Scoring Algorithm
+## Configuration
 
-Search results are ranked by:
-
-1. **Duration match** (40 pts): Compared to Spotify duration. Within ±5s = perfect, ±10s = acceptable, >30s = excluded
-2. **Audio quality** (25 pts): Higher bit depth and sample rate score more (24-bit / 96 kHz beats CD 16/44.1)
-3. **Source reliability** (20 pts): Free upload slots, fast upload speed, short queue
-4. **Filename relevance** (15 pts): Artist and title words found in the filename
-
-Results containing excluded keywords (live, remix, etc.) are automatically filtered out, unless the original track title also contains that keyword.
-
-## Architecture
-
-```
-┌──────────────────┐     ┌──────────────┐     ┌──────────────────┐
-│  Telegram Bot    │────▶│  Spotify API │     │  slskd (Soulseek)│
-│  (user input)    │     │  (metadata)  │     │  (search/download)│
-└──────────────────┘     └──────────────┘     └──────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Music Downloader Service                      │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐│
-│  │ Resolver │─▶│ Searcher │─▶│  Scorer  │─▶│ File Processor   ││
-│  │(Spotify) │  │ (slskd)  │  │(ranking) │  │(rename + move)   ││
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
-                                                      │
-                                                      ▼
-                                              ┌──────────────┐
-                                              │ Music Library │
-                                              │  (FLAC files) │
-                                              └──────────────┘
-```
-
-## Related Projects
-
-**Music Pipeline:**
-
-- [slskd-transform](https://github.com/GeiserX/slskd-transform) — Bulk upgrade lossy to lossless FLAC via Soulseek
-- [audio-transcode-watcher](https://github.com/GeiserX/audio-transcode-watcher) — Automated multi-format audio transcoding
-- [jellyfin-encoder](https://github.com/GeiserX/jellyfin-encoder) — Automatic 720p HEVC/AV1 transcoding for Jellyfin
-
-**Telegram Bots:**
-
-- [paperless-telegram-bot](https://github.com/GeiserX/paperless-telegram-bot) — Manage Paperless-NGX documents through Telegram
-- [AskePub](https://github.com/GeiserX/AskePub) — Telegram bot for ePub annotation with GPT-4
-- [telegram-delay-channel-cloner](https://github.com/GeiserX/telegram-delay-channel-cloner) — Relay messages between channels with delay
-- [jellyfin-telegram-channel-sync](https://github.com/GeiserX/jellyfin-telegram-channel-sync) — Sync Jellyfin access with Telegram membership
-- [Telegram-Archive](https://github.com/GeiserX/Telegram-Archive) — Automated Telegram backup with local web viewer
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Yes | — | Bot token from @BotFather |
+| `TELEGRAM_ALLOWED_USERS` | Yes | — | Comma-separated user IDs allowed to use the bot (empty denies everyone) |
+| `TELEGRAM_LIBRARY_USERS` | No | — | User IDs allowed to save to the library and run `/import` (empty = all allowed users) |
+| `TELEGRAM_API_BASE_URL` | No | — | Self-hosted [telegram-bot-api](https://github.com/tdlib/telegram-bot-api) URL; raises the upload limit to 2000 MB |
+| `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app credentials |
+| `SLSKD_HOST` | Yes | — | slskd instance URL |
+| `SLSKD_API_KEY` | Yes | — | slskd API key (Settings > Security > API Keys) |
+| `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads |
+| `OUTPUT_DIR` | No | `/music` | Where renamed files are placed |
+| `DATA_DIR` | No | `/data` | SQLite directory (history, imports) |
+| `AUTO_MODE` | No | `false` | Default for the per-chat `/auto` toggle |
+| `QUALITY_PREFERENCE` | No | `hires` | Default for the per-chat `/quality` toggle (`hires` or `cd`) |
+| `MAX_RESULTS` | No | `5` | Search results shown per query |
+| `DURATION_TOLERANCE_SECS` | No | `5` | Duration match tolerance |
+| `SEARCH_TIMEOUT_SECS` | No | `30` | slskd search timeout |
+| `DOWNLOAD_TIMEOUT_SECS` | No | `600` | Download completion timeout |
+| `EXCLUDE_KEYWORDS` | No | `live,remix,...` | Keywords filtered from results |
+| `FILENAME_TEMPLATE` | No | `{artist} - {title}` | Output filename template |
+| `LOG_LEVEL` | No | `INFO` | Logging level |
+| `HEALTH_PORT` | No | `8080` | Health check HTTP port (`/health`, `/ready`) |
 
 ## License
 
-[GPL-3.0](LICENSE)
-
-## Links
-
-- **Repository**: https://github.com/GeiserX/telegram-slskd-local-bot
-- **Telegram Bot**: [@slskdimporterbot](https://t.me/slskdimporterbot)
-- **Changelog**: [docs/CHANGELOG.md](docs/CHANGELOG.md)
+[GPL-3.0](LICENSE) — same as the [original project](https://github.com/GeiserX/telegram-slskd-local-bot).
