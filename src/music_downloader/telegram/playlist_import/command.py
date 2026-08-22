@@ -9,7 +9,6 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.catalog.playlist import PlaylistResolver
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.playlist_import.resume import resume_import_job
 from music_downloader.telegram.ui.editing import safe_edit
 from music_downloader.telegram.ui.keyboards import build_import_confirm_keyboard
@@ -33,19 +32,15 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
         if active:
             await update.message.reply_text(
-                _(
-                    "You have an unfinished import: *{name}* ({done}/{total}).\n"
+                (
+                    f"You have an unfinished import: *{escape_md(active.name)}* ({active.completed_tracks}/{active.total_tracks}).\n"
                     "Send `/import resume` to continue, or /cancel to stop it."
-                ).format(
-                    name=escape_md(active.name),
-                    done=active.completed_tracks,
-                    total=active.total_tracks,
                 ),
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
         await update.message.reply_text(
-            _("Usage: `/import <spotify_playlist_or_album_url>` or `/import resume`"),
+            ("Usage: `/import <spotify_playlist_or_album_url>` or `/import resume`"),
             parse_mode=ParseMode.MARKDOWN,
         )
         return
@@ -54,30 +49,31 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not PlaylistResolver.is_spotify_url(url):
         await update.message.reply_text(
-            _("Please provide a valid Spotify playlist or album URL."),
+            ("Please provide a valid Spotify playlist or album URL."),
         )
         return
 
+    await start_import_from_url(self, update, context, chat_id, url)
+
+
+async def start_import_from_url(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, url: str):
+    """Resolve a playlist/album URL, create the job, and show the confirm keyboard."""
     active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
     if active:
         await update.message.reply_text(
-            _(
-                "You already have an active import: *{name}* ({done}/{total})\n"
+            (
+                f"You already have an active import: *{escape_md(active.name)}* ({active.completed_tracks}/{active.total_tracks})\n"
                 "Send `/import resume` to continue, or /cancel to stop it first."
-            ).format(
-                name=escape_md(active.name),
-                done=active.completed_tracks,
-                total=active.total_tracks,
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
         return
 
-    status_msg = await update.message.reply_text(_("🔍 Resolving playlist..."))
+    status_msg = await update.message.reply_text("🔍 Resolving playlist...")
 
     playlist_info = await asyncio.to_thread(self.playlist_resolver.resolve, url)
     if not playlist_info:
-        await safe_edit(status_msg, _("Failed to resolve playlist. Check the URL and try again."))
+        await safe_edit(status_msg, ("Failed to resolve playlist. Check the URL and try again."))
         return
 
     job_id = await asyncio.to_thread(
@@ -102,14 +98,11 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     await asyncio.to_thread(self.import_repo.add_tracks, job_id, track_dicts)
 
-    type_label = _("album") if playlist_info.is_album else _("playlist")
+    type_label = ("album") if playlist_info.is_album else ("playlist")
     await safe_edit(
         status_msg,
-        _("📋 Found {kind}: *{name}*\nBy: {owner}\nTracks: {total}\n\nImport all tracks one by one?").format(
-            kind=type_label,
-            name=escape_md(playlist_info.name),
-            owner=escape_md(playlist_info.owner),
-            total=playlist_info.total_tracks,
+        (
+            f"📋 Found {type_label}: *{escape_md(playlist_info.name)}*\nBy: {escape_md(playlist_info.owner)}\nTracks: {playlist_info.total_tracks}\n\nImport all tracks one by one?"
         ),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=build_import_confirm_keyboard(job_id),

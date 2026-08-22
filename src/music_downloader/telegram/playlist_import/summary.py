@@ -6,7 +6,6 @@ import asyncio
 
 from telegram.constants import ParseMode
 
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.playlist_import.job import JobStatus
 from music_downloader.telegram.ui.keyboards import build_import_summary_keyboard
 from music_downloader.telegram.ui.markdown import escape_md
@@ -19,21 +18,19 @@ async def send_import_summary(self, context, chat_id: int, job_id: int):
     self._active_import.pop(chat_id, None)
 
     lines = [
-        _("🏁 *Import complete!*") + "\n",
-        _("✅ Saved: {saved}\n❌ Failed: {failed}\n⏭ Skipped: {skipped}\n📊 Total: {total}").format(
-            saved=completed, failed=failed, skipped=skipped, total=total
-        ),
+        ("🏁 *Import complete!*") + "\n",
+        (f"✅ Saved: {completed}\n❌ Failed: {failed}\n⏭ Skipped: {skipped}\n📊 Total: {total}"),
     ]
 
     reply_markup = None
     if failed:
         failed_tracks = await asyncio.to_thread(self.import_repo.get_failed_tracks, job_id)
         if failed_tracks:
-            lines.append("\n" + _("*Failed tracks:*"))
+            lines.append("\n" + ("*Failed tracks:*"))
             for t in failed_tracks[:5]:
                 lines.append(f"• {escape_md(t.artist)} - {escape_md(t.title)}")
             if len(failed_tracks) > 5:
-                lines.append(_("…and {n} more").format(n=len(failed_tracks) - 5))
+                lines.append(f"…and {len(failed_tracks) - 5} more")
             reply_markup = build_import_summary_keyboard(job_id, len(failed_tracks))
 
     await context.bot.send_message(

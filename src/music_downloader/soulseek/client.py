@@ -5,7 +5,6 @@ import logging
 import slskd_api
 
 from music_downloader.soulseek import files, transfers
-from music_downloader.soulseek.parsing import parse_search_responses
 from music_downloader.soulseek.result import DownloadStatus, SearchResult
 from music_downloader.soulseek.search import SearchLifecycle
 
@@ -23,10 +22,6 @@ class SlskdClient:
     async def search(self, query: str, timeout_secs: int = 30, response_limit: int = 500) -> list[dict]:
         """Start a search on slskd and wait for (possibly partial) results."""
         return await self.searches.run(query, timeout_secs=timeout_secs, response_limit=response_limit)
-
-    def parse_results(self, responses: list[dict], flac_only: bool = True) -> list[SearchResult]:
-        """Parse raw slskd search responses into SearchResult objects."""
-        return parse_search_responses(responses, flac_only=flac_only)
 
     def enqueue_download(self, result: SearchResult) -> bool:
         """Enqueue a file for download via slskd."""
@@ -63,10 +58,6 @@ class SlskdClient:
     def delete_downloaded_directory(self, relative_dir: str) -> bool:
         """Delete a subdirectory inside slskd's downloads directory."""
         return files.delete_downloaded_directory(self.client, relative_dir)
-
-    def get_downloads_directory(self) -> list[dict]:
-        """Get the contents of the slskd downloads directory."""
-        return files.list_downloads_directory(self.client)
 
     def ping(self) -> bool:
         """Return True if the slskd application API is reachable."""

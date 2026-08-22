@@ -5,18 +5,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from music_downloader.soulseek.client import SlskdClient
+from music_downloader.soulseek.parsing import parse_search_responses
 from music_downloader.soulseek.result import DownloadStatus, SearchResult
 
 
-class TestSlskdClientParseResults:
-    """Test SlskdClient.parse_results."""
+class TestParseSearchResponses:
+    """Test parsing raw slskd responses into SearchResult objects."""
 
-    @pytest.fixture
-    def client(self):
-        with patch("slskd_api.SlskdClient"):
-            return SlskdClient("http://localhost:5030", "test-key")
-
-    def test_parse_flac_only(self, client):
+    def test_parse_flac_only(self):
         responses = [
             {
                 "username": "user1",
@@ -35,11 +31,11 @@ class TestSlskdClientParseResults:
                 ],
             }
         ]
-        results = client.parse_results(responses, flac_only=True)
+        results = parse_search_responses(responses, flac_only=True)
         assert len(results) == 1
         assert results[0].extension == "flac"
 
-    def test_parse_all_audio(self, client):
+    def test_parse_all_audio(self):
         responses = [
             {
                 "username": "user1",
@@ -54,15 +50,15 @@ class TestSlskdClientParseResults:
                 ],
             }
         ]
-        results = client.parse_results(responses, flac_only=False)
+        results = parse_search_responses(responses, flac_only=False)
         assert len(results) == 3
         exts = {r.extension for r in results}
         assert "jpg" not in exts
 
-    def test_parse_empty_responses(self, client):
-        assert client.parse_results([], flac_only=True) == []
+    def test_parse_empty_responses(self):
+        assert parse_search_responses([], flac_only=True) == []
 
-    def test_parse_preserves_user_info(self, client):
+    def test_parse_preserves_user_info(self):
         responses = [
             {
                 "username": "cooluser",
@@ -74,20 +70,20 @@ class TestSlskdClientParseResults:
                 ],
             }
         ]
-        results = client.parse_results(responses, flac_only=True)
+        results = parse_search_responses(responses, flac_only=True)
         assert results[0].username == "cooluser"
         assert results[0].has_free_slot is True
         assert results[0].upload_speed == 9_000_000
         assert results[0].queue_length == 3
 
-    def test_parse_missing_fields(self, client):
+    def test_parse_missing_fields(self):
         responses = [
             {
                 "username": "u",
                 "files": [{"filename": "\\Song.flac", "size": 0}],
             }
         ]
-        results = client.parse_results(responses, flac_only=True)
+        results = parse_search_responses(responses, flac_only=True)
         assert len(results) == 1
         assert results[0].has_free_slot is False
         assert results[0].upload_speed == 0
@@ -278,27 +274,6 @@ class TestSlskdClientSearch:
         results = await client.search("query", timeout_secs=1)
 
         assert results == []
-
-
-class TestSlskdClientGetDownloadsDirectory:
-    """Test SlskdClient.get_downloads_directory."""
-
-    @pytest.fixture
-    def client(self):
-        with patch("slskd_api.SlskdClient") as mock_cls:
-            c = SlskdClient("http://localhost:5030", "test-key")
-            c.client = mock_cls.return_value
-            return c
-
-    def test_returns_list(self, client):
-        client.client.files.get_downloads_dir = MagicMock(return_value=[{"name": "file.flac"}])
-        result = client.get_downloads_directory()
-        assert result == [{"name": "file.flac"}]
-
-    def test_exception_returns_empty(self, client):
-        client.client.files.get_downloads_dir = MagicMock(side_effect=Exception("err"))
-        result = client.get_downloads_directory()
-        assert result == []
 
 
 class TestSlskdClientDeleteDownloadedFile:

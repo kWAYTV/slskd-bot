@@ -5,19 +5,12 @@ import logging
 import os
 import re
 import shutil
-from difflib import SequenceMatcher
 
 import mutagen.flac
 
 from music_downloader.library.formats import AUDIO_SUFFIXES
 
 logger = logging.getLogger(__name__)
-
-
-def _word_overlap(query_words: set[str], stem_words: set[str]) -> float:
-    if not query_words or not stem_words:
-        return 0.0
-    return len(query_words & stem_words) / min(len(query_words), len(stem_words))
 
 
 class FileProcessor:
@@ -37,33 +30,6 @@ class FileProcessor:
                     "DOWNLOAD_DIR and OUTPUT_DIR resolve to the same directory; "
                     "originals are removed after saving, but check volume mappings if duplicates appear"
                 )
-
-    def find_similar(self, query: str, threshold: float = 0.6) -> list[str]:
-        """Find files in the library with names similar to the query."""
-        if not os.path.isdir(self.output_dir):
-            return []
-
-        query_lower = query.lower()
-        query_words = set(re.findall(r"\w+", query_lower))
-
-        matches = []
-        for filename in os.listdir(self.output_dir):
-            _, ext = os.path.splitext(filename)
-            if ext.lower() not in AUDIO_SUFFIXES:
-                continue
-
-            stem = os.path.splitext(filename)[0].lower()
-            stem_words = set(re.findall(r"\w+", stem))
-
-            word_ratio = _word_overlap(query_words, stem_words)
-            seq_ratio = SequenceMatcher(None, query_lower, stem).ratio()
-            best_ratio = max(word_ratio, seq_ratio)
-
-            if best_ratio >= threshold:
-                matches.append((filename, best_ratio))
-
-        matches.sort(key=lambda x: x[1], reverse=True)
-        return [m[0] for m in matches]
 
     def find_exact(self, artist: str, title: str) -> list[str]:
         """Return library files whose stem matches the configured filename template."""

@@ -5,11 +5,10 @@ from __future__ import annotations
 from telegram.constants import ParseMode
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.core.session import PendingSearch
 from music_downloader.telegram.ui.editing import safe_edit
-from music_downloader.telegram.ui.formatting import format_result_reasons, track_md
+from music_downloader.telegram.ui.formatting import format_result_reasons, format_search_results, track_md
 from music_downloader.telegram.ui.keyboards import build_results_keyboard
 from music_downloader.telegram.ui.markdown import md_code_safe
 
@@ -39,13 +38,11 @@ async def present_search_results(
         header = track_md(track)
         await safe_edit(
             searching_msg,
-            _("⚡ Auto-downloading best match for {track}...").format(track=header),
+            (f"⚡ Auto-downloading best match for {header}..."),
             parse_mode=ParseMode.MARKDOWN,
         )
         result = ranked[0]
-        text = _("⬇️ *Downloading #{n}...*\n{track}\nFrom: `{user}`\nFile: `{file}`").format(
-            n=1, track=header, user=md_code_safe(result.username), file=md_code_safe(result.basename)
-        )
+        text = f"⬇️ *Downloading #{1}...*\n{header}\nFrom: `{md_code_safe(result.username)}`\nFile: `{md_code_safe(result.basename)}`"
         reasons = format_result_reasons(track, result)
         if reasons:
             text += f"\n{reasons}"
@@ -61,7 +58,9 @@ async def present_search_results(
         self._track_task(chat_id, task)
         return
 
-    results_text = self._format_results(track, ranked, is_fallback, page=0, page_size=self.config.max_results)
+    results_text = format_search_results(
+        track, ranked, is_fallback=is_fallback, page=0, page_size=self.config.max_results
+    )
     await safe_edit(
         searching_msg,
         results_text,
@@ -75,7 +74,7 @@ async def handle_results_page(self, update, context, chat_id: int, data: str):
     query = update.callback_query
     pending = self.pending.get(chat_id)
     if not pending or not pending.track:
-        await query.edit_message_text(_("Search expired. Send a new query."))
+        await query.edit_message_text("Search expired. Send a new query.")
         return
 
     try:
@@ -84,10 +83,10 @@ async def handle_results_page(self, update, context, chat_id: int, data: str):
         return
 
     pending.page = page
-    results_text = self._format_results(
+    results_text = format_search_results(
         pending.track,
         pending.results,
-        pending.is_fallback,
+        is_fallback=pending.is_fallback,
         page=page,
         page_size=self.config.max_results,
     )

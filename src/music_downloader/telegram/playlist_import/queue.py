@@ -7,7 +7,6 @@ import asyncio
 from telegram.constants import ParseMode
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.playlist_import.job import TrackStatus
 from music_downloader.telegram.playlist_import.summary import send_import_summary
 from music_downloader.telegram.ui.markdown import escape_md
@@ -41,13 +40,8 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("📋 *Import [{position}/{total}]*\n🔍 Searching: *{artist} - {title}*\nAlbum: {album} ({year})").format(
-            position=position,
-            total=total,
-            artist=escape_md(track_info.artist),
-            title=escape_md(track_info.title),
-            album=escape_md(track_info.album),
-            year=escape_md(track_info.year),
+        text=(
+            f"📋 *Import [{position}/{total}]*\n🔍 Searching: *{escape_md(track_info.artist)} - {escape_md(track_info.title)}*\nAlbum: {escape_md(track_info.album)} ({escape_md(track_info.year)})"
         ),
         parse_mode=ParseMode.MARKDOWN,
     )

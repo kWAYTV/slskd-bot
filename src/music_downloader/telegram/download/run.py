@@ -9,7 +9,6 @@ import os
 from telegram.constants import ParseMode
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.core.session import PendingDownload
 from music_downloader.telegram.download.delivery import send_audio_or_document
@@ -71,7 +70,7 @@ async def do_download(
         pending_dl.transfer_id = transfer_id
 
         if outcome.failed:
-            state = status.state if status else _("Timeout")
+            state = status.state if status else ("Timeout")
             await _report_download_failure(self, status_msg, chat_id, result, result_index, dl_id, state)
             await self._add_history(track, result, "failed", chat_id=chat_id)
             return
@@ -81,7 +80,7 @@ async def do_download(
             self.downloads.pop(dl_id, None)
             await safe_edit(
                 status_msg,
-                _("❌ Downloaded file not found on disk.\nCheck DOWNLOAD_DIR configuration."),
+                ("❌ Downloaded file not found on disk.\nCheck DOWNLOAD_DIR configuration."),
             )
             await self._add_history(track, result, "file_not_found", chat_id=chat_id)
             return
@@ -92,9 +91,7 @@ async def do_download(
         quality_line = await _build_quality_line(self, track, result, source_path)
         await safe_edit(
             status_msg,
-            _("✅ *{label} Downloaded!* Sending preview...\n`{file}`\n{quality}").format(
-                label=label, file=md_code_safe(result.basename), quality=quality_line
-            ),
+            (f"✅ *{label} Downloaded!* Sending preview...\n`{md_code_safe(result.basename)}`\n{quality_line}"),
             parse_mode=ParseMode.MARKDOWN,
         )
 
@@ -115,7 +112,7 @@ async def do_download(
         logger.exception(f"Download failed for {result.basename}")
         await safe_edit(
             status_msg,
-            _("❌ Error downloading `{file}`. Check logs.").format(file=md_code_safe(result.basename)),
+            (f"❌ Error downloading `{md_code_safe(result.basename)}`. Check logs."),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
         )
@@ -125,7 +122,7 @@ def _progress_renderer(status_msg, label: str, track: TrackInfo, result: SearchR
     async def _render(pct: float) -> None:
         await safe_edit(
             status_msg,
-            _("⬇️ *Downloading {label}...* {pct}%\n{bar}\n{artist} - {title}\nFile: `{file}`").format(
+            ("⬇️ *Downloading {label}...* {pct}%\n{bar}\n{artist} - {title}\nFile: `{file}`").format(
                 label=label,
                 pct=f"{pct:.0f}",
                 bar=progress_bar(pct),
@@ -148,9 +145,7 @@ def _retry_keyboard(self, chat_id: int, result_index: int, dl_id: str):
 async def _report_enqueue_failure(self, status_msg, chat_id: int, result: SearchResult, result_index: int, dl_id: str):
     await safe_edit(
         status_msg,
-        _("❌ Failed to enqueue download from `{user}`.\nThe user might be offline.").format(
-            user=md_code_safe(result.username)
-        ),
+        (f"❌ Failed to enqueue download from `{md_code_safe(result.username)}`.\nThe user might be offline."),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
     )
@@ -161,16 +156,14 @@ async def _report_download_failure(
 ):
     await safe_edit(
         status_msg,
-        _("❌ Download failed: {state}\nFile: `{file}`").format(state=state, file=md_code_safe(result.basename)),
+        (f"❌ Download failed: {state}\nFile: `{md_code_safe(result.basename)}`"),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
     )
 
 
 async def _build_quality_line(self, track: TrackInfo, result: SearchResult, source_path: str) -> str:
-    quality_line = _("Quality: {quality} | {duration}").format(
-        quality=result.quality_display, duration=result.duration_display
-    )
+    quality_line = f"Quality: {result.quality_display} | {result.duration_display}"
     reasons = format_result_reasons(track, result)
     if reasons:
         quality_line += f"\n{reasons}"
@@ -216,9 +209,9 @@ async def _deliver_preview(
         )
 
     caption = (
-        _("{label} {quality}\nSave to library?").format(label=label, quality=quality_line)
+        (f"{label} {quality_line}\nSave to library?")
         if can_save
-        else _("{label} {quality}\nSent to you — not saved to the library.").format(label=label, quality=quality_line)
+        else (f"{label} {quality_line}\nSent to you — not saved to the library.")
     )
     sent = await send_audio_or_document(
         context,

@@ -5,7 +5,6 @@ from __future__ import annotations
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.ui.editing import safe_query_edit
 from music_downloader.telegram.ui.markdown import md_code_safe
 
@@ -17,7 +16,7 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
 
     pending_dl = self.downloads.pop(dl_id, None)
     if not pending_dl:
-        await safe_query_edit(query, _("⏹ Download expired. Send a new search."))
+        await safe_query_edit(query, "⏹ Download expired. Send a new search.")
         return
 
     if pending_dl.chat_id != chat_id:
@@ -31,13 +30,13 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
 
     await safe_query_edit(
         query,
-        _("🔄 Retrying {label}: `{file}`...").format(label=label, file=md_code_safe(result.basename)),
+        f"🔄 Retrying {label}: `{md_code_safe(result.basename)}`...",
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("⬇️ Re-downloading {label} from `{user}`...").format(label=label, user=md_code_safe(result.username)),
+        text=f"⬇️ Re-downloading {label} from `{md_code_safe(result.username)}`...",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -57,7 +56,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
     pending_dl = self.downloads.pop(dl_id, None)
 
     if not pending or not pending.results or not pending_dl:
-        await safe_query_edit(query, _("⏹ No more results available. Try a new search."))
+        await safe_query_edit(query, "⏹ No more results available. Try a new search.")
         return
 
     if pending_dl.chat_id != chat_id:
@@ -66,7 +65,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
 
     next_idx = pending_dl.result_index + 1
     if next_idx >= len(pending.results):
-        await safe_query_edit(query, _("⏹ No more results to try."))
+        await safe_query_edit(query, "⏹ No more results to try.")
         return
 
     if pending_dl.source_path:
@@ -78,13 +77,13 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
 
     await safe_query_edit(
         query,
-        _("⏭ Trying next result {label}: `{file}`").format(label=label, file=md_code_safe(next_result.basename)),
+        f"⏭ Trying next result {label}: `{md_code_safe(next_result.basename)}`",
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("⬇️ Downloading {label} from `{user}`...").format(label=label, user=md_code_safe(next_result.username)),
+        text=f"⬇️ Downloading {label} from `{md_code_safe(next_result.username)}`...",
         parse_mode=ParseMode.MARKDOWN,
     )
 

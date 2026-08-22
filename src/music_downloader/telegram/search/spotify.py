@@ -9,10 +9,9 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.core.session import PendingSearch
 from music_downloader.telegram.ui.editing import safe_edit
-from music_downloader.telegram.ui.formatting import track_md
+from music_downloader.telegram.ui.formatting import format_spotify_results, track_md
 from music_downloader.telegram.ui.keyboards import build_direct_search_keyboard, build_spotify_keyboard
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("🔍 Looking up: `{query}`").format(query=query),
+        text=(f"🔍 Looking up: `{query}`"),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -36,9 +35,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         if not tracks:
             await safe_edit(
                 searching_msg,
-                _("Could not find `{query}` on Spotify.\nYou can search Soulseek directly instead.").format(
-                    query=query
-                ),
+                (f"Could not find `{query}` on Spotify.\nYou can search Soulseek directly instead."),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_direct_search_keyboard(),
             )
@@ -61,7 +58,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
         await safe_edit(
             searching_msg,
-            self._format_spotify_results(unique_tracks, page=0),
+            format_spotify_results(unique_tracks, page=0),
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=True,
             reply_markup=build_spotify_keyboard(unique_tracks, page=0),
@@ -71,7 +68,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         logger.exception(f"Unexpected error in _do_search for: {query}")
         self._spotify_candidates.pop(chat_id, None)
         self._spotify_page.pop(chat_id, None)
-        await safe_edit(searching_msg, _("Something went wrong. Please try again."))
+        await safe_edit(searching_msg, ("Something went wrong. Please try again."))
 
 
 def _filter_candidates(query: str, tracks: list[TrackInfo]) -> list[TrackInfo]:
@@ -119,7 +116,7 @@ async def handle_spotify_page(self, update, context, chat_id: int, data: str):
     query = update.callback_query
     candidates = self._spotify_candidates.get(chat_id)
     if not candidates:
-        await query.edit_message_text(_("Search expired. Send a new query."))
+        await query.edit_message_text("Search expired. Send a new query.")
         return
 
     try:
@@ -129,7 +126,7 @@ async def handle_spotify_page(self, update, context, chat_id: int, data: str):
 
     self._spotify_page[chat_id] = page
     await query.edit_message_text(
-        self._format_spotify_results(candidates, page=page),
+        format_spotify_results(candidates, page=page),
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
         reply_markup=build_spotify_keyboard(candidates, page=page),
@@ -145,7 +142,7 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
     self._spotify_page.pop(chat_id, None)
 
     if action == "cancel" or not candidates:
-        await query.edit_message_text(_("Cancelled."))
+        await query.edit_message_text("Cancelled.")
         return
 
     try:
@@ -158,13 +155,13 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
 
     track = candidates[index]
     await query.edit_message_text(
-        _("Selected: {track} ({duration})").format(track=track_md(track), duration=track.duration_display),
+        (f"Selected: {track_md(track)} ({track.duration_display})"),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=_("🔍 Searching slskd for FLAC..."),
+        text=("🔍 Searching slskd for FLAC..."),
         parse_mode=ParseMode.MARKDOWN,
     )
     generation = self._chat_generation.get(chat_id, 0)

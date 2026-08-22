@@ -1,1 +1,1 @@
-"""Slash-command handlers: basics, preferences, activity, language."""
+"""Slash-command handlers: basics, preferences, activity."""

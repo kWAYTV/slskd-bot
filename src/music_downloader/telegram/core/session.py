@@ -20,7 +20,6 @@ class PendingSearch:
     is_fallback: bool = False
     page: int = 0
     user_id: int | None = None
-    skip_library_check: bool = False
 
 
 @dataclass
@@ -48,7 +47,6 @@ class ChatSession:
         self._dl_counter = 0
         self._spotify_candidates: dict[int, list[TrackInfo]] = {}
         self._spotify_page: dict[int, int] = {}
-        self._awaiting_direct_metadata: dict[int, str] = {}
         self._chat_generation: dict[int, int] = {}
         self._active_tasks: dict[int, set[asyncio.Task]] = {}
         self._active_import: dict[int, int] = {}
@@ -79,7 +77,6 @@ class ChatSession:
         self._import_pending.pop(chat_id, None)
         self._spotify_candidates.pop(chat_id, None)
         self._spotify_page.pop(chat_id, None)
-        self._awaiting_direct_metadata.pop(chat_id, None)
 
         stale = [v for k, v in list(self.downloads.items()) if v.chat_id == chat_id]
         if stale:

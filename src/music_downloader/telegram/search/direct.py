@@ -9,34 +9,38 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.soulseek.errors import SlskdUnavailableError
 from music_downloader.soulseek.query import parse_query_artist_title
+from music_downloader.soulseek.scoring import rank_responses
 from music_downloader.telegram.search.results import present_search_results
 from music_downloader.telegram.ui.editing import safe_edit
+from music_downloader.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
 
 
 async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
-    """Handle 'Search Soulseek directly' button — asks for Artist - Title, then searches slskd."""
+    """Handle 'Search Soulseek directly' button — search slskd with metadata parsed from the query."""
     query = update.callback_query
 
     pending = self.pending.get(chat_id)
     if not pending:
-        await query.edit_message_text(_("Search expired. Send a new query."))
+        await query.edit_message_text("Search expired. Send a new query.")
         return
 
     search_query = pending.query
-    self._awaiting_direct_metadata[chat_id] = search_query
+    generation = self._chat_generation.get(chat_id, 0)
+    display_track = _synthetic_track(search_query, None)
 
     await query.edit_message_text(
-        _(
-            "🎵 How should this track be saved?\n\n"
-            "Send the name as: `Artist - Title`\n"
-            "(This will be used for the filename and tags)"
-        ),
+        f"🔍 Searching slskd for: `{escape_md(search_query)}`\n"
+        f"Saving as: *{escape_md(display_track.artist)} - {escape_md(display_track.title)}*",
         parse_mode=ParseMode.MARKDOWN,
+    )
+    searching_msg = query.message
+
+    await self._do_direct_slskd_search(
+        context, chat_id, search_query, searching_msg, generation, display_track=display_track
     )
 
 
@@ -73,8 +77,8 @@ async def do_direct_slskd_search(
             return
 
         synthetic_track = _synthetic_track(query, display_track)
-        ranked, is_fallback = self._rank_responses(
-            raw_responses, synthetic_track, quality_preference=self.quality_pref(chat_id)
+        ranked, is_fallback = rank_responses(
+            raw_responses, synthetic_track, self.scorer, quality_preference=self.quality_pref(chat_id)
         )
 
         if self._is_stale(chat_id, generation):
@@ -83,7 +87,7 @@ async def do_direct_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                _("🔍 Direct search: `{query}`\n\nNo results found on Soulseek.").format(query=query),
+                (f"🔍 Direct search: `{query}`\n\nNo results found on Soulseek."),
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
@@ -96,9 +100,9 @@ async def do_direct_slskd_search(
         logger.exception("slskd unreachable during direct search for: %s", query)
         await safe_edit(
             searching_msg,
-            _("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
+            ("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
             parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
         logger.exception(f"Direct search failed for: {query}")
-        await safe_edit(searching_msg, _("Something went wrong. Please try again."))
+        await safe_edit(searching_msg, ("Something went wrong. Please try again."))

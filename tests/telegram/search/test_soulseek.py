@@ -7,7 +7,36 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from music_downloader.telegram.core.app import MusicBot
+from music_downloader.telegram.search.soulseek import notify_if_already_owned
 from tests.telegram.download.helpers import _make_config, _make_context, _make_result, _make_track
+
+
+class TestNotifyIfAlreadyOwned:
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_not_owned_sends_nothing(self, mock_slskd_cls, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.processor.find_exact = MagicMock(return_value=[])
+        bot.history_repo.find_success = MagicMock(return_value=None)
+        context = _make_context()
+        await notify_if_already_owned(bot, context, 123, _make_track())
+        context.bot.send_message.assert_not_called()
+
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_owned_sends_notice_without_blocking(self, mock_slskd_cls, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.processor.find_exact = MagicMock(return_value=["Nancy Sinatra - Bang Bang.flac"])
+        bot.history_repo.find_success = MagicMock(return_value=None)
+        context = _make_context()
+        await notify_if_already_owned(bot, context, 123, _make_track())
+        context.bot.send_message.assert_called_once()
+        text = context.bot.send_message.call_args.kwargs["text"]
+        assert "Already in the library" in text
+        # No keyboard — purely informational.
+        assert "reply_markup" not in context.bot.send_message.call_args.kwargs
 
 
 class TestDoSlskdSearch:
@@ -18,7 +47,6 @@ class TestDoSlskdSearch:
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[])
-        bot.slskd.parse_results = MagicMock(return_value=[])
         bot.scorer = MagicMock()
         bot.scorer.score_results = MagicMock(return_value=[])
         bot._chat_generation[123] = 0
@@ -39,7 +67,6 @@ class TestDoSlskdSearch:
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[{"responses": []}])
         results = [_make_result(0), _make_result(1)]
-        bot.slskd.parse_results = MagicMock(return_value=results)
         bot.scorer = MagicMock()
         bot.scorer.score_results = MagicMock(return_value=results)
         bot._chat_generation[123] = 0
@@ -59,16 +86,6 @@ class TestDoSlskdSearch:
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[])
-        call_count = 0
-
-        def parse_side_effect(responses, flac_only=True):
-            nonlocal call_count
-            call_count += 1
-            if not flac_only and call_count >= 2:
-                return [_make_result(0, "mp3")]
-            return []
-
-        bot.slskd.parse_results = MagicMock(side_effect=parse_side_effect)
         score_count = 0
 
         def score_side_effect(results, track, **kwargs):
@@ -94,7 +111,6 @@ class TestDoSlskdSearch:
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[])
-        bot.slskd.parse_results = MagicMock(return_value=[])
         bot.scorer = MagicMock()
         bot.scorer.score_results = MagicMock(return_value=[])
         bot._chat_generation[123] = 5  # generation is ahead
@@ -135,7 +151,6 @@ class TestDoSlskdSearch:
         bot.slskd = AsyncMock()
         bot.slskd.search = AsyncMock(return_value=[{"responses": []}])
         results = [_make_result(0), _make_result(1)]
-        bot.slskd.parse_results = MagicMock(return_value=results)
         bot.scorer = MagicMock()
         bot.scorer.score_results = MagicMock(return_value=results)
         bot._chat_generation[123] = 0

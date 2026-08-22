@@ -8,6 +8,7 @@ import logging
 import re
 
 from music_downloader.catalog.track import TrackInfo
+from music_downloader.soulseek.parsing import parse_search_responses
 from music_downloader.soulseek.result import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -198,3 +199,26 @@ def _filename_points(result: SearchResult, track: TrackInfo) -> float:
     artist_match = len(artist_words & filename_words) / max(len(artist_words), 1)
     title_match = len(title_words & filename_words) / max(len(title_words), 1)
     return (artist_match + title_match) * FILENAME_PART_POINTS
+
+
+def rank_responses(
+    raw_responses: list[dict],
+    track: TrackInfo,
+    scorer: ResultScorer,
+    max_duration_diff: int | None = None,
+    quality_preference: str | None = None,
+) -> tuple[list[SearchResult], bool]:
+    """Parse and score responses: FLAC first, any audio as fallback.
+
+    Returns (ranked results, used-non-FLAC-fallback).
+    """
+    score_kwargs = {"max_duration_diff": max_duration_diff} if max_duration_diff else {}
+    if quality_preference:
+        score_kwargs["quality_preference"] = quality_preference
+    flac_results = parse_search_responses(raw_responses, flac_only=True)
+    ranked = scorer.score_results(flac_results, track, **score_kwargs)
+    if ranked:
+        return ranked, False
+    all_audio = parse_search_responses(raw_responses, flac_only=False)
+    ranked = scorer.score_results(all_audio, track, **score_kwargs)
+    return ranked, bool(ranked)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -28,17 +28,14 @@ class TestMusicBotHandleText:
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
-    async def test_similar_files_found(self, mock_slskd, mock_spotify):
+    async def test_text_query_starts_search(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot.processor = MagicMock()
-        bot.processor.find_similar = MagicMock(return_value=["Artist - Song.flac"])
+        bot._do_search = AsyncMock()
         update = _make_update(text="Artist Song")
         context = _make_context()
         await bot.handle_text(update, context)
-        # Should show duplicate warning
-        update.message.reply_text.assert_called_once()
-        call_text = update.message.reply_text.call_args[0][0]
-        assert "Similar files" in call_text
+        bot._do_search.assert_awaited_once()
+        assert bot._do_search.await_args.args[2] == "Artist Song"
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")

@@ -5,7 +5,6 @@ from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.ui.keyboards import (
     build_approve_keyboard,
     build_auto_mode_keyboard,
-    build_duplicate_keyboard,
     build_import_failure_keyboard,
     build_results_keyboard,
     build_spotify_keyboard,
@@ -106,15 +105,6 @@ class TestBuildApproveKeyboard:
         kb = build_approve_keyboard("42", has_next=True)
         assert len(kb.inline_keyboard) == 2
         assert kb.inline_keyboard[1][0].callback_data == "next:42"
-
-
-class TestBuildDuplicateKeyboard:
-    def test_has_continue_and_cancel(self):
-        kb = build_duplicate_keyboard()
-        buttons = kb.inline_keyboard[0]
-        assert len(buttons) == 2
-        assert buttons[0].callback_data == "dup:continue"
-        assert buttons[1].callback_data == "dup:cancel"
 
 
 class TestBuildSpotifyKeyboard:

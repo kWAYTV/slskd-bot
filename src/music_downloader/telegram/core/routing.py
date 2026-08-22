@@ -8,7 +8,6 @@ from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
-from music_downloader.i18n.catalog import gettext as _
 from music_downloader.telegram.ui.editing import safe_query_edit
 
 
@@ -36,7 +35,6 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         "if": self._handle_import_callback,
         "retry": self._handle_retry,
         "next": self._handle_next_result,
-        "dup": self._handle_duplicate_response,
         "sp_page": self._handle_spotify_page,
         "sp": self._handle_spotify_selection,
         "dl_page": self._handle_results_page,
@@ -60,10 +58,10 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
 
 async def _toggle_auto_mode(self, query, chat_id: int, data: str) -> None:
     self._auto_overrides[chat_id] = data == "auto:on"
-    mode_str = _("ON") if self.is_auto(chat_id) else _("OFF")
+    mode_str = ("ON") if self.is_auto(chat_id) else ("OFF")
     await safe_query_edit(
         query,
-        _("Auto-download mode: *{mode}*").format(mode=mode_str),
+        (f"Auto-download mode: *{mode_str}*"),
         parse_mode="Markdown",
     )
 
@@ -72,9 +70,9 @@ async def _switch_quality_preference(self, query, chat_id: int, data: str) -> No
     pref = data.split(":", 1)[1]
     if pref in ("cd", "hires"):
         self._quality_overrides[chat_id] = pref
-    label = _("CD quality (16/44.1)") if self.quality_pref(chat_id) == "cd" else _("Hi-Res (24-bit)")
+    label = ("CD quality (16/44.1)") if self.quality_pref(chat_id) == "cd" else ("Hi-Res (24-bit)")
     await safe_query_edit(
         query,
-        _("Audio quality preference: *{label}*").format(label=label),
+        (f"Audio quality preference: *{label}*"),
         parse_mode="Markdown",
     )

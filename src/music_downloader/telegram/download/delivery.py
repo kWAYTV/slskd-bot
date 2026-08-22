@@ -1,7 +1,8 @@
-"""Sending audio to Telegram: document fallback, OGG conversion, previews."""
+"""Sending audio to Telegram: document fallback, OGG conversion, previews, artwork."""
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -9,11 +10,55 @@ import os
 from telegram.error import BadRequest
 
 from music_downloader.catalog.track import TrackInfo
-from music_downloader.i18n.catalog import gettext as _
+from music_downloader.library.artwork import embed_artwork_into_file, fetch_spotify_artwork
+from music_downloader.library.flac import FlacVerdict, analyze_flac
+from music_downloader.library.preview import convert_to_ogg, create_preview_clip
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.download.transfer import remember_approval_message
 
 logger = logging.getLogger(__name__)
+
+
+async def analyze_flac_async(filepath: str) -> FlacVerdict | None:
+    """Run spectral analysis on a FLAC file in a thread to avoid blocking."""
+    try:
+        verdict = await asyncio.to_thread(analyze_flac, filepath)
+        if verdict:
+            logger.info("FLAC analysis for %s: %s (cutoff=%.1fkHz)", filepath, verdict.verdict, verdict.cutoff_khz)
+        return verdict
+    except Exception:
+        logger.exception("FLAC analysis failed for %s", filepath)
+        return None
+
+
+async def convert_to_ogg_async(filepath: str) -> str | None:
+    """Convert a full audio file to OGG Opus in a thread."""
+    try:
+        return await asyncio.to_thread(convert_to_ogg, filepath)
+    except Exception:
+        logger.exception("OGG conversion failed for %s", filepath)
+        return None
+
+
+async def create_preview_async(filepath: str, duration_secs: float = 60.0) -> str | None:
+    """Create a trimmed audio preview clip in a thread to avoid blocking."""
+    try:
+        return await asyncio.to_thread(create_preview_clip, filepath, duration_secs)
+    except Exception:
+        logger.exception("Preview clip creation failed for %s", filepath)
+        return None
+
+
+async def embed_spotify_artwork(self, filepath: str, track: TrackInfo) -> None:
+    """Fetch album artwork from Spotify and embed into the saved file."""
+    try:
+        art = await asyncio.to_thread(fetch_spotify_artwork, self.spotify.sp, track.artist, track.title)
+        if art:
+            ok = await asyncio.to_thread(embed_artwork_into_file, filepath, art)
+            if ok:
+                logger.info("Embedded Spotify artwork into %s (%d KB)", filepath, len(art) // 1024)
+    except Exception:
+        logger.debug("Artwork embedding failed for %s", filepath, exc_info=True)
 
 
 async def send_audio_or_document(
@@ -111,17 +156,12 @@ async def _send_full_ogg(
 
         # The OGG is only the in-chat preview: Telegram bots cannot send
         # files above the configured limit. Approval saves the original.
-        caption = _("🎧 {label} OGG preview — Telegram only sends up to {limit}MB\n{quality}\n").format(
-            label=label,
-            limit=file_limit // (1024 * 1024),
-            quality=quality_line,
+        caption = (
+            f"🎧 {label} OGG preview — Telegram only sends up to {file_limit // (1024 * 1024)}MB\n{quality_line}\n"
         ) + (
-            _("Save the untouched {size:.0f}MB {fmt} to the library?").format(
-                size=file_size / (1024 * 1024),
-                fmt=result.extension.upper(),
-            )
+            (f"Save the untouched {file_size / (1024 * 1024):.0f}MB {result.extension.upper()} to the library?")
             if can_save
-            else _("Sent to you — not saved to the library.")
+            else ("Sent to you — not saved to the library.")
         )
         with open(ogg_path, "rb") as f:
             sent = await context.bot.send_audio(
@@ -157,12 +197,8 @@ async def _report_preview_failure(
     sent = await context.bot.send_message(
         chat_id=chat_id,
         text=(
-            _("❌ {label} Could not create preview for {size:.0f}MB file.\n{quality}\n\n").format(
-                label=label,
-                size=file_size / (1024 * 1024),
-                quality=quality_line,
-            )
-            + (_("Save to library anyway?") if can_save else _("Could not create a preview."))
+            (f"❌ {label} Could not create preview for {file_size / (1024 * 1024):.0f}MB file.\n{quality_line}\n\n")
+            + (("Save to library anyway?") if can_save else ("Could not create a preview."))
         ),
         reply_markup=reply_markup,
     )
@@ -185,11 +221,9 @@ async def _send_minute_preview(
     """Send a ~1 minute trimmed preview. Always removes the preview file."""
     try:
         preview_ext = os.path.splitext(preview_path)[1].lstrip(".")
-        caption = _("🎧 {label} ~1 min preview (full file: {size:.0f}MB)\n{quality}\n").format(
-            label=label,
-            size=file_size / (1024 * 1024),
-            quality=quality_line,
-        ) + (_("Save to library?") if can_save else _("Sent to you — not saved to the library."))
+        caption = (f"🎧 {label} ~1 min preview (full file: {file_size / (1024 * 1024):.0f}MB)\n{quality_line}\n") + (
+            ("Save to library?") if can_save else ("Sent to you — not saved to the library.")
+        )
         with open(preview_path, "rb") as f:
             sent = await context.bot.send_audio(
                 chat_id=chat_id,

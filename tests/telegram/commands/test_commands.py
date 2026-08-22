@@ -34,7 +34,6 @@ class TestMusicBotCommands:
         assert "Send me a song name" in call_args[0][0]
         assert "/import" in call_args[0][0]
         assert "/cancel" in call_args[0][0]
-        assert "/lang" in call_args[0][0]
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
@@ -47,16 +46,6 @@ class TestMusicBotCommands:
         context = _make_context()
         await bot.cmd_start(update, context)
         update.message.reply_text.assert_called_once_with("You are not authorized to use this bot.")
-
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cmd_help(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_help(update, context)
-        update.message.reply_text.assert_called()
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")

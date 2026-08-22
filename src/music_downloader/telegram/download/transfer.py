@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from music_downloader.catalog.track import TrackInfo
 from music_downloader.soulseek.result import DownloadStatus, SearchResult
 from music_downloader.telegram.core.session import PendingDownload
 
@@ -83,3 +84,21 @@ async def fetch_from_peer(self, result: SearchResult, progress_callback) -> Tran
 
     source_path = self.processor.find_downloaded_file(result.username, result.filename)
     return TransferOutcome(enqueued=True, status=status, source_path=source_path)
+
+
+async def add_history(self, track: TrackInfo, result: SearchResult, status: str, chat_id: int | None = None):
+    """Record a download outcome in the history store."""
+    await asyncio.to_thread(
+        self.history_repo.add,
+        artist=track.artist,
+        title=track.title,
+        album=track.album,
+        filename=f"{track.artist} - {track.title}.{result.extension}",
+        source_user=result.username,
+        remote_path=result.filename,
+        status=status,
+        duration_secs=track.duration_secs,
+        file_size=result.size,
+        chat_id=chat_id,
+        spotify_url=track.spotify_url,
+    )
