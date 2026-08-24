@@ -106,6 +106,31 @@ class TestFileProcessor:
         # Legitimate multi-value preserved
         assert audio["genre"] == ["Punk", "Electronic"]
 
+    def test_process_file_writes_canonical_tags(self, processor, tmp_path):
+        source = tmp_path / "downloads" / "junk.flac"
+        _create_test_flac(
+            str(source),
+            {"artist": ["TRACK01"], "title": ["TRACK01"], "album": ["CD"]},
+        )
+        result = processor.process_file(
+            str(source), "Nancy Sinatra", "Bang Bang", album="How Does That Grab You?", year="1966"
+        )
+        assert result is not None
+        audio = mutagen.flac.FLAC(result)
+        assert audio["artist"] == ["Nancy Sinatra"]
+        assert audio["title"] == ["Bang Bang"]
+        assert audio["album"] == ["How Does That Grab You?"]
+        assert audio["date"] == ["1966"]
+
+    def test_library_stats(self, processor, tmp_path):
+        output = tmp_path / "output"
+        (output / "A - T.flac").write_bytes(b"x" * 100)
+        (output / "B - U.mp3").write_bytes(b"y" * 50)
+        (output / "readme.txt").write_text("nope")
+        count, nbytes = processor.library_stats()
+        assert count == 2
+        assert nbytes == 150
+
     def test_process_file_avoids_overwrite(self, processor, tmp_path):
         """Test that existing files are not overwritten."""
         source1 = tmp_path / "source1.flac"

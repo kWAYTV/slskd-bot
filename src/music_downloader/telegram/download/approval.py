@@ -39,7 +39,9 @@ async def save_to_library(self, pending_dl, chat_id: int) -> str | None:
     """
     track = pending_dl.track
     result = pending_dl.result
-    target_path = self.processor.process_file(pending_dl.source_path, track.artist, track.title)
+    target_path = self.processor.process_file(
+        pending_dl.source_path, track.artist, track.title, album=track.album, year=track.year
+    )
     if not target_path:
         return None
     await self._remove_download_file(pending_dl.source_path)

@@ -165,7 +165,7 @@ class TestHandleImportApprove:
         update = _make_update(chat_id=chat_id)
         context = _make_context()
         await bot._handle_import_approve(update, context, chat_id, 1, 5, dl_id)
-        bot.processor.process_file.assert_called_once_with(source.name, "Artist", "Title")
+        bot.processor.process_file.assert_called_once_with(source.name, "Artist", "Title", album="Album", year="2024")
         bot.import_repo.complete_track.assert_called_once_with(1, 5, TrackStatus.completed)
         os.unlink(source.name)
 

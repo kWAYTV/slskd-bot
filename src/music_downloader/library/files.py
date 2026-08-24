@@ -79,7 +79,25 @@ class FileProcessor:
         logger.warning(f"Downloaded file not found: {basename} (user={username})")
         return None
 
-    def process_file(self, source_path: str, artist: str, title: str) -> str | None:
+    def library_stats(self) -> tuple[int, int]:
+        """Return (file_count, total_bytes) for audio files in the library dir."""
+        if not os.path.isdir(self.output_dir):
+            return 0, 0
+        count = 0
+        total = 0
+        for filename in os.listdir(self.output_dir):
+            _, ext = os.path.splitext(filename)
+            if ext.lower() not in AUDIO_SUFFIXES:
+                continue
+            path = os.path.join(self.output_dir, filename)
+            if not os.path.isfile(path):
+                continue
+            count += 1
+            with contextlib.suppress(OSError):
+                total += os.path.getsize(path)
+        return count, total
+
+    def process_file(self, source_path: str, artist: str, title: str, album: str = "", year: str = "") -> str | None:
         """Rename and move a downloaded file to the library directory."""
         try:
             if not os.path.isfile(source_path):
@@ -103,6 +121,7 @@ class FileProcessor:
             tmp_path = target_path + ".importing"
             try:
                 shutil.copy2(source_path, tmp_path)
+                self._write_canonical_tags(tmp_path, artist, title, album, year)
                 self._dedup_flac_tags(tmp_path)
                 os.replace(tmp_path, target_path)
             except BaseException:
@@ -167,6 +186,52 @@ class FileProcessor:
         if rel.startswith(".."):
             return None
         return rel.replace(os.sep, "/")
+
+    @staticmethod
+    def _write_canonical_tags(filepath: str, artist: str, title: str, album: str, year: str) -> None:
+        """Overwrite identity tags with catalog metadata. Leaves other tags alone."""
+        # process_file writes to ``*.flac.importing`` first; ignore that suffix.
+        name = filepath.removesuffix(".importing")
+        ext = os.path.splitext(name)[1].lower()
+        try:
+            if ext == ".flac":
+                audio = mutagen.flac.FLAC(filepath)
+                audio["artist"] = [artist]
+                audio["title"] = [title]
+                if album:
+                    audio["album"] = [album]
+                if year:
+                    audio["date"] = [year]
+                audio.save()
+                return
+            if ext in {".m4a", ".mp4", ".alac", ".aac"}:
+                from mutagen.mp4 import MP4
+
+                audio = MP4(filepath)
+                audio["\xa9ART"] = [artist]
+                audio["\xa9nam"] = [title]
+                if album:
+                    audio["\xa9alb"] = [album]
+                if year:
+                    audio["\xa9day"] = [year]
+                audio.save()
+                return
+            if ext == ".mp3":
+                from mutagen.id3 import ID3, TALB, TDRC, TIT2, TPE1, ID3NoHeaderError
+
+                try:
+                    tags = ID3(filepath)
+                except ID3NoHeaderError:
+                    tags = ID3()
+                tags["TPE1"] = TPE1(encoding=3, text=[artist])
+                tags["TIT2"] = TIT2(encoding=3, text=[title])
+                if album:
+                    tags["TALB"] = TALB(encoding=3, text=[album])
+                if year:
+                    tags["TDRC"] = TDRC(encoding=3, text=[year])
+                tags.save(filepath)
+        except Exception:
+            logger.debug("Canonical tag write failed for %s", filepath, exc_info=True)
 
     @staticmethod
     def _dedup_flac_tags(filepath: str) -> None:
