@@ -51,9 +51,7 @@ class TestLinkQueries:
         update = _make_update(text=url)
         context = _make_context()
 
-        with patch(
-            "slskd_importer.telegram.search.links.start_import_from_url", new_callable=AsyncMock
-        ) as mock_start:
+        with patch("slskd_importer.telegram.search.links.start_import_from_url", new_callable=AsyncMock) as mock_start:
             handled = await search_links.handle_link_query(bot, update, context, 67890, url)
         assert handled is True
         mock_start.assert_awaited_once()
@@ -69,9 +67,7 @@ class TestLinkQueries:
         update = _make_update(text=url)
         context = _make_context()
 
-        with patch(
-            "slskd_importer.telegram.search.links.start_import_from_url", new_callable=AsyncMock
-        ) as mock_start:
+        with patch("slskd_importer.telegram.search.links.start_import_from_url", new_callable=AsyncMock) as mock_start:
             handled = await search_links.handle_link_query(bot, update, context, 67890, url)
         assert handled is True
         mock_start.assert_not_awaited()
