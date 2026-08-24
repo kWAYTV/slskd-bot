@@ -163,9 +163,13 @@ def create_bot(config: Config) -> Application:
         application.bot_data["music_bot"] = bot
         await basics.register_bot_commands(application)
         await bot.resume_stale_imports(application)
-        application.create_task(ttl.run_approval_ttl_loop(bot, application))
+        # Application.create_task() warns in post_init — the updater isn't running yet.
+        ttl.start_approval_ttl(bot, application)
 
-    builder = Application.builder().token(config.telegram_bot_token).post_init(_post_init)
+    async def _post_shutdown(application: Application) -> None:
+        await ttl.stop_approval_ttl(application)
+
+    builder = Application.builder().token(config.telegram_bot_token).post_init(_post_init).post_shutdown(_post_shutdown)
     if config.telegram_api_base_url:
         # Self-hosted Bot API server: 2000 MB uploads instead of the cloud 50 MB.
         builder = (

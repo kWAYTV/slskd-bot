@@ -16,6 +16,7 @@ class TestCreateBot:
             mock_app = MagicMock()
             mock_builder.token.return_value = mock_builder
             mock_builder.post_init.return_value = mock_builder
+            mock_builder.post_shutdown.return_value = mock_builder
             mock_builder.build.return_value = mock_app
             mock_app_cls.builder.return_value = mock_builder
 
@@ -25,6 +26,7 @@ class TestCreateBot:
             # 8 command handlers (/start+/help share one) + callback + text message
             assert mock_app.add_handler.call_count == 10
             mock_builder.base_url.assert_not_called()
+            mock_builder.post_shutdown.assert_called_once()
 
     def test_local_bot_api_server_wiring(self):
         config = _make_config()
@@ -34,6 +36,7 @@ class TestCreateBot:
             mock_app = MagicMock()
             mock_builder.token.return_value = mock_builder
             mock_builder.post_init.return_value = mock_builder
+            mock_builder.post_shutdown.return_value = mock_builder
             mock_builder.base_url.return_value = mock_builder
             mock_builder.base_file_url.return_value = mock_builder
             mock_builder.local_mode.return_value = mock_builder

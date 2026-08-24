@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class _ResumeContext:
-    """Minimal context so import resume can use Application.bot / create_task."""
+    """Minimal context so import resume can use Application.bot."""
 
     def __init__(self, application):
         self.application = application
@@ -74,8 +74,7 @@ async def resume_import_job(self, context, chat_id: int, notify: bool = False, j
         except Exception:
             logger.warning("Could not notify chat %s about import resume", chat_id)
 
-    app = getattr(context, "application", context)
-    task = app.create_task(
+    task = asyncio.create_task(
         self._process_next_import_track(context, chat_id, job.id, generation),
     )
     self._track_task(chat_id, task)

@@ -3,12 +3,31 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 
 logger = logging.getLogger(__name__)
 
 _SWEEP_INTERVAL_SECS = 900
+_TTL_TASK_KEY = "approval_ttl_task"
+
+
+def start_approval_ttl(self, application) -> None:
+    """Schedule the sweep on the running event loop. Safe from ``post_init``."""
+    application.bot_data[_TTL_TASK_KEY] = asyncio.create_task(
+        run_approval_ttl_loop(self, application),
+        name="approval-ttl",
+    )
+
+
+async def stop_approval_ttl(application) -> None:
+    task = application.bot_data.pop(_TTL_TASK_KEY, None)
+    if task is None:
+        return
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
 
 
 async def run_approval_ttl_loop(self, application) -> None:

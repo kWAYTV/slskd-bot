@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from music_downloader.telegram.core import ttl
 from music_downloader.telegram.core.app import MusicBot
 from music_downloader.telegram.core.session import PendingDownload
 from tests.telegram.helpers import _make_config, _make_search_result, _make_track
@@ -58,3 +59,16 @@ class TestExpireStaleApprovals:
         assert "fresh" in bot.downloads
         assert "inflight" in bot.downloads
         bot._cleanup_download_artifacts.assert_not_awaited()
+
+
+class TestApprovalTtlLifecycle:
+    @pytest.mark.asyncio
+    async def test_start_and_stop_cancels_task(self):
+        app = MagicMock()
+        app.bot_data = {}
+        ttl.start_approval_ttl(MagicMock(), app)
+        task = app.bot_data["approval_ttl_task"]
+        assert not task.done()
+        await ttl.stop_approval_ttl(app)
+        assert task.done()
+        assert "approval_ttl_task" not in app.bot_data

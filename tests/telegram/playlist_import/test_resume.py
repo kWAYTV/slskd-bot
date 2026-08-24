@@ -39,8 +39,11 @@ class TestResumeStaleImports:
                 coro.close()
             return MagicMock()
 
-        application.create_task = _create_task
-        await bot.resume_stale_imports(application)
+        with patch(
+            "music_downloader.telegram.playlist_import.resume.asyncio.create_task",
+            side_effect=_create_task,
+        ):
+            await bot.resume_stale_imports(application)
         assert bot._active_import[job.chat_id] == job.id
         application.bot.send_message.assert_awaited()
 
