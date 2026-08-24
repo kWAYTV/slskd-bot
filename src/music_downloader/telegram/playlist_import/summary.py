@@ -28,6 +28,7 @@ async def send_import_summary(self, context, chat_id: int, job_id: int):
     )
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.completed)
     self._active_import.pop(chat_id, None)
+    self._import_status_msg.pop(chat_id, None)
 
     lines = [
         ("🏁 *Import complete!*") + "\n",

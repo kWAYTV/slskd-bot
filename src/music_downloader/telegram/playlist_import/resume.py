@@ -63,13 +63,14 @@ async def resume_import_job(self, context, chat_id: int, notify: bool = False, j
     remaining = job.total_tracks - job.completed_tracks - job.skipped_tracks - job.failed_tracks
     if notify:
         try:
-            await context.bot.send_message(
+            progress_msg = await context.bot.send_message(
                 chat_id=chat_id,
                 text=(
                     f"Resuming import of *{escape_md(job.name)}* ({remaining} remaining, {job.completed_tracks} done)."
                 ),
                 parse_mode=ParseMode.MARKDOWN,
             )
+            self._import_status_msg[chat_id] = progress_msg
         except Exception:
             logger.warning("Could not notify chat %s about import resume", chat_id)
 

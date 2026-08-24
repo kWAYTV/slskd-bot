@@ -57,10 +57,12 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
 
 async def _start_job(self, update, context, chat_id: int, job_id: int):
     query = update.callback_query
-    await safe_query_edit(query, ("✅ Import started! Processing tracks one by one..."))
+    await safe_query_edit(query, ("✅ Import started! Progress updates in the next message."))
     logger.info("chat=%s started import job %s", chat_id, job_id)
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.active)
     self._active_import[chat_id] = job_id
+    progress_msg = await context.bot.send_message(chat_id=chat_id, text="📋 *Import starting…*", parse_mode="Markdown")
+    self._import_status_msg[chat_id] = progress_msg
     generation = self._chat_generation.get(chat_id, 0)
     task = context.application.create_task(
         self._process_next_import_track(context, chat_id, job_id, generation),

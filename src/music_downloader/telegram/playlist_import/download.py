@@ -39,14 +39,12 @@ async def do_import_download(
     pending_dl = self.downloads.get(dl_id) or PendingDownload(track=track, result=result, chat_id=chat_id)
 
     async def _render_progress(pct: float) -> None:
+        queued = pending_dl.transfer_state and "queued" in pending_dl.transfer_state.lower()
+        line = "⌛ queued at peer" if queued else f"⬇️ Downloading {pct:.0f}%\n{progress_bar(pct)}"
         await safe_edit(
             status_msg,
-            ("📋 *Import track:* {artist} - {title}\n⬇️ Downloading {pct}%\n{bar}\n`{file}`").format(
-                artist=escape_md(track.artist),
-                title=escape_md(track.title),
-                pct=f"{pct:.0f}",
-                bar=progress_bar(pct),
-                file=md_code_safe(result.basename),
+            (
+                f"📋 *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n{line}\n`{md_code_safe(result.basename)}`"
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
