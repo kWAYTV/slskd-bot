@@ -67,7 +67,7 @@ async def do_download(
         result.basename,
     )
 
-    render_progress = _progress_renderer(status_msg, label, track, result)
+    render_progress = _progress_renderer(status_msg, label, track, result, pending_dl)
 
     try:
         outcome = await fetch_from_peer(self, result, make_progress_callback(pending_dl, render_progress))
@@ -131,14 +131,18 @@ async def do_download(
         )
 
 
-def _progress_renderer(status_msg, label: str, track: TrackInfo, result: SearchResult):
+def _progress_renderer(status_msg, label: str, track: TrackInfo, result: SearchResult, pending_dl):
     async def _render(pct: float) -> None:
+        state = pending_dl.transfer_state or ""
+        queued = "queued" in state.lower()
+        headline = "⌛ *Queued {label}...*" if queued else "⬇️ *Downloading {label}...* {pct}%"
+        extra = "queued at peer" if queued else progress_bar(pct)
         await safe_edit(
             status_msg,
-            ("⬇️ *Downloading {label}...* {pct}%\n{bar}\n{artist} - {title}\nFile: `{file}`").format(
+            (headline + "\n{extra}\n{artist} - {title}\nFile: `{file}`").format(
                 label=label,
                 pct=f"{pct:.0f}",
-                bar=progress_bar(pct),
+                extra=extra,
                 artist=escape_md(track.artist),
                 title=escape_md(track.title),
                 file=md_code_safe(result.basename),

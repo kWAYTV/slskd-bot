@@ -21,8 +21,10 @@ def _make_config():
     config.slskd_host = "http://localhost:5030"
     config.slskd_api_key = "test-key"
     config.telegram_allowed_users = {12345}
-    config.auto_mode = False
     config.max_results = 5
+    config.max_concurrent_downloads = 3
+    config.approval_ttl_secs = 86400
+    config.quality_preference = "hires"
     config.duration_tolerance_secs = 5
     config.exclude_keywords = ["live", "remix"]
     config.download_dir = os.path.join(td, "downloads")

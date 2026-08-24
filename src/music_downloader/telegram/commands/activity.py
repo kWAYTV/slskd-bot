@@ -10,6 +10,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.playlist_import.job import JobStatus
+from music_downloader.telegram.ui.keyboards import build_history_keyboard
 from music_downloader.telegram.ui.markdown import code_span, escape_md
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ def _download_lines(self, chat_id: int) -> list[str]:
 def _download_state(dl) -> str:
     if dl.source_path:
         return "awaiting approval"
+    if dl.transfer_state and "queued" in dl.transfer_state.lower():
+        return "⌛ queued at peer"
     if dl.progress_percent is not None:
         return f"{dl.progress_percent:.0f}%"
     return "starting..."
@@ -93,7 +96,72 @@ async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = [("*Recent downloads:*") + "\n"]
     lines.extend(f"{_STATUS_ICONS.get(entry.status, '❌')} {code_span(entry.filename)}" for entry in records)
 
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=build_history_keyboard(records),
+    )
+
+
+async def cmd_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /stats — chat download totals and library size."""
+    if not await self._check_auth(update):
+        return
+
+    chat_id = update.effective_chat.id
+    stats = await asyncio.to_thread(self.history_repo.summarize, chat_id)
+    files, nbytes = await asyncio.to_thread(self.processor.library_stats)
+    rate = f"{(stats.success / stats.total * 100):.0f}%" if stats.total else "—"
+    lines = [
+        "*Download stats*\n",
+        f"Total: {stats.total} · saved {stats.success} · failed {stats.failed} · rejected {stats.rejected}",
+        f"Undone: {stats.undone} · delivered-only: {stats.delivered}",
+        f"Save rate: {rate}",
+        f"Library: {files} files ({nbytes / (1024 * 1024):.0f} MB)",
+    ]
+    if stats.top_sources:
+        lines.append("\n*Top sources*")
+        lines.extend(f"• {escape_md(user)} — {n}" for user, n in stats.top_sources)
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+
+
+async def handle_history_undo(self, update, context, chat_id: int, data: str):
+    """Inline ↩️ on /history — undo a specific successful save."""
+    query = update.callback_query
+    if not self._can_save_library(query.from_user.id):
+        await query.edit_message_text(
+            "You can search and download files, but only library users can remove library files."
+        )
+        return
+    try:
+        entry_id = int(data.split(":", 1)[1])
+    except (IndexError, ValueError):
+        return
+
+    entry = await asyncio.to_thread(self.history_repo.get_for_chat, entry_id, chat_id)
+    if not entry or entry.status != "success":
+        await query.edit_message_text("That save is already gone or isn't yours.")
+        return
+
+    deleted = await asyncio.to_thread(self.processor.delete_library_file, entry.filename)
+    if not deleted:
+        matches = await asyncio.to_thread(self.processor.find_exact, entry.artist, entry.title)
+        if matches:
+            deleted = await asyncio.to_thread(self.processor.delete_library_file, matches[0])
+
+    if deleted:
+        await asyncio.to_thread(self.history_repo.set_status, entry.id, "undone")
+        logger.info("chat=%s undid history id=%s %s", chat_id, entry.id, entry.filename)
+        await query.edit_message_text(
+            f"↩️ Removed from library: {code_span(entry.filename)}",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+
+    await query.edit_message_text(
+        f"Could not find {code_span(entry.filename)} in the library — maybe it was already removed.",
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
 
 async def cmd_undo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -58,7 +58,7 @@ Telegram is a delivery mechanism, not the domain. The `telegram/` package contai
 telegram/
   core/              # MusicBot composition root (app), callback routing, access, cleanup, session
   ui/                # markdown escaping, safe edits, text formatting, inline keyboards
-  commands/          # basics (/start /help), preferences (/auto /quality), activity (/status /history /undo /cancel)
+  commands/          # basics (/start /help), preferences (/quality), activity (/status /history /stats /undo /cancel)
   search/            # text entry, pasted links, Spotify pick, Soulseek search, direct search, results
   download/          # selection, run (orchestration), transfer (shared pipeline + history), delivery (send/preview/artwork), approval, retry
   playlist_import/   # /import command, callbacks, job queue, per-track search/download, summary, resume
@@ -100,9 +100,13 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Markdown escaping**: Dynamic text (filenames, paths from Soulseek) must be escaped with `escape_md()` or wrapped in backtick code spans via `code_span()` / `md_code_safe()` (plain backtick wrapping breaks when the value itself contains a backtick) to avoid `BadRequest` from Telegram's Markdown parser
 - **Safe edits**: Always use the `safe_edit()` / `safe_query_edit()` wrappers (catch `BadRequest`, `TimedOut`, `NetworkError`) instead of raw `msg.edit_text()`
 - **Result identification**: Download messages must include `#number` labels matching the result list so users can tell concurrent downloads apart
-- **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps) with a `progress_bar()` and update `PendingDownload.progress_percent` for `/status`
-- **Auto mode**: `/auto` toggles are per-chat (`MusicBot.is_auto(chat_id)`, overrides in `ChatSession._auto_overrides`); `AUTO_MODE` env is only the default
-- **Quality preference**: `/quality` toggles CD-vs-Hi-Res ranking per chat (`MusicBot.quality_pref(chat_id)`); `QUALITY_PREFERENCE` env is only the default. Scoring lives in `soulseek/scoring.py` (`_quality_points`)
+- **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps or on transfer-state change) with a `progress_bar()` and update `PendingDownload.progress_percent` / `transfer_state` for `/status`
+- **Quality preference**: `/quality` toggles CD-vs-Hi-Res ranking per chat (`MusicBot.quality_pref(chat_id)`); persisted in `chat_prefs`. `QUALITY_PREFERENCE` env is only the default. Scoring lives in `soulseek/scoring.py` (`_quality_points`)
+- **Canonical tags**: `FileProcessor.process_file` writes artist/title/album/year via mutagen at save time
+- **Import skip-owned**: `process_next_import_track` skips tracks already in the library (`find_exact`) or successful history (`find_success`)
+- **Import progress**: one in-place status message per job (`_import_status_msg`); extra messages only when the user must act
+- **Approval TTL**: `core/ttl.py` expires awaiting-approval downloads older than `APPROVAL_TTL_SECS` (default 24h)
+- **Download concurrency**: `fetch_from_peer` takes `MusicBot._download_sem` (`MAX_CONCURRENT_DOWNLOADS`, default 3)
 - **Pasted links**: `catalog/links.py` detects Spotify track links/URIs in free text; tracks resolve via `SpotifyResolver.get_track`. Playlist/album links start the import flow directly (library users only)
 - **Duplicates**: `notify_if_already_owned` (in `search/soulseek.py`) sends a non-blocking "already in the library" notice after Spotify resolve; the search always continues
 - **Direct search**: the "Search Soulseek directly" button searches immediately with artist/title parsed from the query (`parse_query_artist_title`) — no follow-up prompt

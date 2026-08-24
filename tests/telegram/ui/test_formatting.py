@@ -105,6 +105,14 @@ class TestFormatSearchResults:
         assert "No FLAC found" in text
         assert "FLAC match" not in text
 
+    def test_shows_remote_parent_folder(self):
+        from music_downloader.telegram.ui.formatting import format_search_results
+
+        result = _make_search_result()
+        result.filename = "\\Music\\2009 Remaster 24-96\\Track.flac"
+        text = format_search_results(_make_track(), [result])
+        assert "2009 Remaster 24-96" in text
+
 
 # ---------------------------------------------------------------------------
 # Pasted link handling

@@ -1,4 +1,4 @@
-"""Slash commands: /start /help /auto /quality /status /history /undo."""
+"""Slash commands: /start /help /quality /status /history /stats /undo."""
 
 from __future__ import annotations
 
@@ -33,6 +33,8 @@ class TestMusicBotCommands:
         call_args = update.message.reply_text.call_args
         assert "Send me a song name" in call_args[0][0]
         assert "/import" in call_args[0][0]
+        assert "/stats" in call_args[0][0]
+        assert "/auto" not in call_args[0][0]
         assert "/cancel" in call_args[0][0]
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
@@ -50,26 +52,14 @@ class TestMusicBotCommands:
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
-    async def test_cmd_auto(self, mock_slskd, mock_spotify):
+    async def test_cmd_stats_empty(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         update = _make_update()
         context = _make_context()
-        await bot.cmd_auto(update, context)
-        call_args = update.message.reply_text.call_args
-        assert "OFF" in call_args[0][0]
-
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cmd_auto_on(self, mock_slskd, mock_spotify):
-        config = _make_config()
-        config.auto_mode = True
-        bot = MusicBot(config)
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_auto(update, context)
-        call_args = update.message.reply_text.call_args
-        assert "ON" in call_args[0][0]
+        await bot.cmd_stats(update, context)
+        text = update.message.reply_text.call_args[0][0]
+        assert "Download stats" in text
+        assert "Total: 0" in text
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
@@ -178,6 +168,9 @@ class TestMusicBotCommands:
         call_args = update.message.reply_text.call_args
         text = call_args[0][0]
         assert "Recent downloads" in text
+        markup = call_args.kwargs["reply_markup"]
+        callbacks = [btn.callback_data for row in markup.inline_keyboard for btn in row]
+        assert any(cb.startswith("hu:") for cb in callbacks)
 
 
 class TestCmdStatusDetails:
@@ -197,6 +190,23 @@ class TestCmdStatusDetails:
         await bot.cmd_status(update, context)
         text = update.message.reply_text.call_args[0][0]
         assert "42%" in text
+
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_status_shows_queued_at_peer(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.downloads["1"] = PendingDownload(
+            track=_make_track(),
+            result=_make_search_result(),
+            chat_id=67890,
+            transfer_state="Queued, Remotely",
+        )
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_status(update, context)
+        text = update.message.reply_text.call_args[0][0]
+        assert "queued at peer" in text
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")

@@ -14,11 +14,10 @@
 
 - **Search by text or link** — free-text queries resolve via Spotify metadata; pasted Spotify track links resolve directly, and playlist/album links start an import
 - **Smart ranking** — results scored by duration match, audio quality, source reliability, and filename relevance; live/remix noise filtered out
-- **Quality preference** — `/quality` picks CD (16/44.1) or Hi-Res (24-bit) ranking per chat
-- **Auto mode** — `/auto` per chat downloads the best match without asking
-- **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, with progress, per-track retry/skip, and resume after restart
-- **Live progress** — download messages update with a progress bar; `/status` shows everything in flight for the chat
-- **Library hygiene** — duplicate detection before searching, `/undo` to remove the last save, `/history` per chat
+- **Quality preference** — `/quality` picks CD (16/44.1) or Hi-Res (24-bit) ranking per chat (persisted)
+- **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart
+- **Live progress** — download messages update with a progress bar and queue state; `/status` shows everything in flight for the chat
+- **Library hygiene** — canonical tags on save, duplicate detection, `/undo` / `/history` ↩️ to remove saves, `/stats` for totals
 - **Large files** — files over Telegram's 50 MB limit fall back to OGG Opus previews, or upload untouched (up to 2000 MB) via a self-hosted Bot API server
 - **Access control** — bot usage restricted to allowed user IDs; library writes optionally restricted further via `TELEGRAM_LIBRARY_USERS`
 - **Docker-ready** — image published to `ghcr.io/kwaytv/slskd-bot` on every push to `main`
@@ -62,13 +61,13 @@ uv run python -m music_downloader run
 | *(any text)* | Search for a song and show download options |
 | *(Spotify track link)* | Resolve the link and search for it |
 | *(Spotify playlist/album link)* | Start the import flow (library users only) |
-| `/auto` | Toggle auto-download of the best match (per chat) |
 | `/quality` | Prefer CD or Hi-Res when ranking results (per chat) |
 | `/import <url>` | Import a Spotify playlist or album (library users only) |
 | `/import resume` | Continue a paused import after a restart |
 | `/undo` | Remove the last track saved to the library |
 | `/status` | Active searches, downloads (with progress), and imports |
-| `/history` | Recent download history for this chat |
+| `/history` | Recent downloads — tap ↩️ to remove one |
+| `/stats` | Download totals and library size for this chat |
 | `/cancel` | Cancel the current search, download, or import |
 
 ## Configuration
@@ -85,8 +84,9 @@ uv run python -m music_downloader run
 | `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads |
 | `OUTPUT_DIR` | No | `/music` | Where renamed files are placed |
 | `DATA_DIR` | No | `/data` | SQLite directory (history, imports) |
-| `AUTO_MODE` | No | `false` | Default for the per-chat `/auto` toggle |
 | `QUALITY_PREFERENCE` | No | `hires` | Default for the per-chat `/quality` toggle (`hires` or `cd`) |
+| `MAX_CONCURRENT_DOWNLOADS` | No | `3` | Cap on simultaneous slskd transfers |
+| `APPROVAL_TTL_SECS` | No | `86400` | Discard unapproved downloads after this many seconds |
 | `MAX_RESULTS` | No | `5` | Search results shown per query |
 | `DURATION_TOLERANCE_SECS` | No | `5` | Duration match tolerance |
 | `SEARCH_TIMEOUT_SECS` | No | `30` | slskd search timeout |

@@ -1,4 +1,4 @@
-"""/auto and /quality — per-chat download preferences."""
+"""/quality — per-chat download ranking preference."""
 
 from __future__ import annotations
 
@@ -6,23 +6,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from music_downloader.telegram.ui.keyboards import build_auto_mode_keyboard, build_quality_keyboard
-
-
-async def cmd_auto(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /auto command — toggle auto-download mode."""
-    if not await self._check_auth(update):
-        return
-
-    is_auto = self.is_auto(update.effective_chat.id)
-    mode_str = "ON" if is_auto else "OFF"
-    await update.message.reply_text(
-        (
-            f"Auto-download mode is currently: *{mode_str}*\n\nWhen ON, the best FLAC match is downloaded automatically without asking you to pick."
-        ),
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=build_auto_mode_keyboard(is_auto),
-    )
+from music_downloader.telegram.ui.keyboards import build_quality_keyboard
 
 
 async def cmd_quality(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

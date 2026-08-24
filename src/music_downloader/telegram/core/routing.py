@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 
@@ -45,14 +46,11 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         "dl": self._handle_download_selection,
         "approve": self._handle_approval,
         "reject": self._handle_approval,
+        "hu": self._handle_history_undo,
     }.get(prefix)
 
     if handler:
         await handler(update, context, chat_id, data)
-        return
-
-    if data.startswith("auto:"):
-        await _toggle_auto_mode(self, query, chat_id, data)
         return
 
     if data.startswith("qp:"):
@@ -62,21 +60,11 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
     logger.warning("Unknown callback prefix %r from chat %s", prefix, chat_id)
 
 
-async def _toggle_auto_mode(self, query, chat_id: int, data: str) -> None:
-    self._auto_overrides[chat_id] = data == "auto:on"
-    mode_str = ("ON") if self.is_auto(chat_id) else ("OFF")
-    logger.info("chat=%s auto-mode=%s", chat_id, mode_str)
-    await safe_query_edit(
-        query,
-        (f"Auto-download mode: *{mode_str}*"),
-        parse_mode="Markdown",
-    )
-
-
 async def _switch_quality_preference(self, query, chat_id: int, data: str) -> None:
     pref = data.split(":", 1)[1]
     if pref in ("cd", "hires"):
         self._quality_overrides[chat_id] = pref
+        await asyncio.to_thread(self.prefs_repo.set_quality, chat_id, pref)
     logger.info("chat=%s quality=%s", chat_id, self.quality_pref(chat_id))
     label = ("CD quality (16/44.1)") if self.quality_pref(chat_id) == "cd" else ("Hi-Res (24-bit)")
     await safe_query_edit(

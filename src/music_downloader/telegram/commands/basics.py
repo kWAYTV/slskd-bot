@@ -11,10 +11,10 @@ from music_downloader.telegram.ui.formatting import welcome_text
 BOT_COMMANDS = [
     BotCommand("start", "How to search and download"),
     BotCommand("help", "Show help"),
-    BotCommand("auto", "Toggle auto-download"),
     BotCommand("quality", "Prefer CD or Hi-Res audio"),
     BotCommand("status", "Active searches and downloads"),
     BotCommand("history", "Recent downloads"),
+    BotCommand("stats", "Download and library stats"),
     BotCommand("undo", "Remove the last saved track"),
     BotCommand("import", "Import a Spotify playlist or album"),
     BotCommand("cancel", "Cancel the current operation"),

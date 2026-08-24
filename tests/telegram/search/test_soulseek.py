@@ -143,39 +143,6 @@ class TestDoSlskdSearch:
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
-    async def test_auto_mode_downloads_best_match(self, mock_slskd_cls, mock_spotify):
-        config = _make_config()
-        config.auto_mode = True
-        bot = MusicBot(config)
-        bot.auto_mode = True
-        bot.slskd = AsyncMock()
-        bot.slskd.search = AsyncMock(return_value=[{"responses": []}])
-        results = [_make_result(0), _make_result(1)]
-        bot.scorer = MagicMock()
-        bot.scorer.score_results = MagicMock(return_value=results)
-        bot._chat_generation[123] = 0
-        bot._do_download = AsyncMock()
-
-        msg = AsyncMock()
-        msg.edit_text = AsyncMock()
-        msg.message_id = 1
-
-        context = _make_context()
-
-        def _close_coro(coro, **kwargs):
-            coro.close()
-            return MagicMock()
-
-        context.application.create_task = MagicMock(side_effect=_close_coro)
-        await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
-        assert 123 in bot.pending
-        context.application.create_task.assert_called_once()
-        edited = " ".join(str(c) for c in msg.edit_text.call_args_list)
-        assert "Auto-download" in edited
-
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
     async def test_slskd_unavailable_message(self, mock_slskd_cls, mock_spotify):
         from music_downloader.soulseek.errors import SlskdUnavailableError
 

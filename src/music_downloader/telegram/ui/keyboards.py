@@ -83,13 +83,6 @@ def build_spotify_keyboard(
     return InlineKeyboardMarkup(buttons)
 
 
-def build_auto_mode_keyboard(current_mode: bool) -> InlineKeyboardMarkup:
-    """Build keyboard to toggle auto mode."""
-    if current_mode:
-        return InlineKeyboardMarkup([[InlineKeyboardButton("Disable auto-mode", callback_data="auto:off")]])
-    return InlineKeyboardMarkup([[InlineKeyboardButton("Enable auto-mode", callback_data="auto:on")]])
-
-
 def build_quality_keyboard(current: str) -> InlineKeyboardMarkup:
     """Build keyboard to switch the audio quality preference."""
     if current == "cd":
@@ -159,6 +152,19 @@ def build_import_failure_keyboard(job_id: int, track_id: int, dl_id: str) -> Inl
             ],
         ]
     )
+
+
+def build_history_keyboard(records) -> InlineKeyboardMarkup | None:
+    """Per-row undo buttons for successful history entries."""
+    buttons = []
+    for entry in records:
+        if entry.status != "success":
+            continue
+        label = f"↩️ {entry.filename}"
+        if len(label) > 64:
+            label = label[:61] + "..."
+        buttons.append([InlineKeyboardButton(label, callback_data=f"hu:{entry.id}")])
+    return InlineKeyboardMarkup(buttons) if buttons else None
 
 
 def build_retry_keyboard(dl_id: str) -> InlineKeyboardMarkup:

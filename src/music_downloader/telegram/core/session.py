@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass, field
 
 from music_downloader.catalog.track import TrackInfo
@@ -36,6 +37,8 @@ class PendingDownload:
     user_id: int | None = None
     transfer_id: str | None = None
     progress_percent: float | None = None
+    transfer_state: str | None = None
+    created_at: float = field(default_factory=time.time)
 
 
 class ChatSession:
@@ -51,7 +54,7 @@ class ChatSession:
         self._active_tasks: dict[int, set[asyncio.Task]] = {}
         self._active_import: dict[int, int] = {}
         self._import_pending: dict[int, PendingSearch] = {}
-        self._auto_overrides: dict[int, bool] = {}
+        self._import_status_msg: dict[int, object] = {}
         self._quality_overrides: dict[int, str] = {}
 
     def next_dl_id(self) -> str:
@@ -75,6 +78,7 @@ class ChatSession:
 
         self.pending.pop(chat_id, None)
         self._import_pending.pop(chat_id, None)
+        self._import_status_msg.pop(chat_id, None)
         self._spotify_candidates.pop(chat_id, None)
         self._spotify_page.pop(chat_id, None)
 

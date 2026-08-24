@@ -37,13 +37,17 @@ def make_progress_callback(
     /cancel, and re-renders the status message only every ``min_step`` percent.
     """
     last_edited_pct = -100.0
+    last_state = ""
 
     async def _on_progress(progress) -> None:
-        nonlocal last_edited_pct
+        nonlocal last_edited_pct, last_state
         pct = progress.percent_complete
         pending_dl.progress_percent = pct
         pending_dl.transfer_id = progress.transfer_id or pending_dl.transfer_id
-        if pct - last_edited_pct < min_step:
+        pending_dl.transfer_state = progress.state
+        state_changed = progress.state != last_state
+        last_state = progress.state
+        if not state_changed and pct - last_edited_pct < min_step:
             return
         last_edited_pct = pct
         await render(pct)
@@ -69,21 +73,22 @@ async def abort_transfer(self, dl_id: str, result: SearchResult, transfer_id: st
 
 async def fetch_from_peer(self, result: SearchResult, progress_callback) -> TransferOutcome:
     """Enqueue on slskd, wait for completion, and locate the file on disk."""
-    success = await asyncio.to_thread(self.slskd.enqueue_download, result)
-    if not success:
-        return TransferOutcome(enqueued=False)
+    async with self._download_sem:
+        success = await asyncio.to_thread(self.slskd.enqueue_download, result)
+        if not success:
+            return TransferOutcome(enqueued=False)
 
-    status = await self.slskd.wait_for_download(
-        username=result.username,
-        filename=result.filename,
-        timeout_secs=self.config.download_timeout_secs,
-        progress_callback=progress_callback,
-    )
-    if status is None or status.is_failed:
-        return TransferOutcome(enqueued=True, status=status)
+        status = await self.slskd.wait_for_download(
+            username=result.username,
+            filename=result.filename,
+            timeout_secs=self.config.download_timeout_secs,
+            progress_callback=progress_callback,
+        )
+        if status is None or status.is_failed:
+            return TransferOutcome(enqueued=True, status=status)
 
-    source_path = self.processor.find_downloaded_file(result.username, result.filename)
-    return TransferOutcome(enqueued=True, status=status, source_path=source_path)
+        source_path = self.processor.find_downloaded_file(result.username, result.filename)
+        return TransferOutcome(enqueued=True, status=status, source_path=source_path)
 
 
 async def add_history(self, track: TrackInfo, result: SearchResult, status: str, chat_id: int | None = None):

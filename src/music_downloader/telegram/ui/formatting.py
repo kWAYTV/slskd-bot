@@ -23,12 +23,12 @@ def welcome_text() -> str:
         "Send me a song name (e.g., `Nancy Sinatra Bang Bang`) or a Spotify track link "
         "and I'll find and download it in FLAC.\n\n"
         "Commands:\n"
-        "/auto — Toggle auto-download mode\n"
         "/quality — Prefer CD or Hi-Res audio\n"
         "/import <url> — Import a Spotify playlist or album\n"
         "/import resume — Continue a paused import after restart\n"
         "/status — Show active searches, downloads, and imports\n"
-        "/history — Recent downloads\n"
+        "/history — Recent downloads (tap ↩️ to remove one)\n"
+        "/stats — Library and download stats\n"
         "/undo — Remove the last track saved to the library\n"
         "/cancel — Cancel the current search, download, or import\n"
         "/help — Show this message"
@@ -131,10 +131,12 @@ def format_search_results(
         slot_icon = "🟢" if r.has_free_slot else "🔴"
         fmt = r.extension.upper()
         format_tag = f" [{fmt}]" if is_fallback else ""
+        folder = r.parent_dir
+        folder_line = f"\n    _{escape_md(folder)}_" if folder else ""
         lines.append(
             f"*#{i + 1}* {slot_icon} `{r.duration_display}` | "
             f"{r.quality_display}{format_tag} | {r.size_mb:.0f}MB\n"
-            f"    {code_span(r.basename)}"
+            f"    {code_span(r.basename)}{folder_line}"
         )
 
     return "\n".join(lines)

@@ -7,13 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Auto mode (`/auto`, `AUTO_MODE`). Results always show a pick keyboard; "Auto-pick best" remains a one-click `#1`
+
 ### Changed
 
 - Operational logging: millisecond timestamps, silenced noisy HTTP/Telegram clients, and lifecycle logs for search, download, approval, import, auth, and cancel
 - Dependencies and CI pins refreshed (PTB 22.8, slskd-api 0.2.4, ruff 0.16.4, CodeQL Action 4.37.8, pre-commit-hooks v6)
+- Schema v4 adds `chat_prefs` for persisted per-chat quality preference
+- Playlist import uses a single in-place progress message instead of one message per track
+- Search results show the remote parent folder so identical filenames are distinguishable
+- Download progress and `/status` surface queued-at-peer state
 
 ### Added
 
+- Canonical artist/title/album/year tags written on library save
+- Playlist import skips tracks already in the library or successful history
+- `/stats` — chat download totals, save rate, top sources, library size
+- `/history` inline ↩️ buttons to undo a specific save
+- Approval TTL (`APPROVAL_TTL_SECS`, default 24h) discards stale pending files
+- Download concurrency cap (`MAX_CONCURRENT_DOWNLOADS`, default 3)
 - Live download progress: the "Downloading" status message now updates with a percentage and progress bar (manual search and playlist import flows)
 - `/status` shows per-download progress ("42%" / "awaiting approval") and the active playlist import with saved/failed/skipped counters
 - `/auto` is now a per-chat toggle; the `AUTO_MODE` env var is only the default

@@ -12,10 +12,8 @@ from music_downloader.telegram.core.app import MusicBot
 from music_downloader.telegram.ui.formatting import format_search_results, format_spotify_results
 from tests.telegram.helpers import (
     _make_config,
-    _make_context,
     _make_search_result,
     _make_track,
-    _make_update,
 )
 
 
@@ -25,7 +23,6 @@ class TestMusicBotInit:
     def test_init(self, mock_slskd, mock_spotify):
         config = _make_config()
         bot = MusicBot(config)
-        assert bot.auto_mode is False
         assert bot.pending == {}
         assert bot.downloads == {}
         assert bot.history_repo is not None
@@ -161,31 +158,41 @@ class TestRankResponses:
 # ---------------------------------------------------------------------------
 
 
-class TestPerChatAutoMode:
+class TestPerChatQualityPref:
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
-    def test_is_auto_defaults_to_config(self, mock_slskd, mock_spotify):
+    def test_quality_defaults_to_config(self, mock_slskd, mock_spotify):
         config = _make_config()
-        config.auto_mode = True
+        config.quality_preference = "cd"
         bot = MusicBot(config)
-        assert bot.is_auto(67890) is True
-        assert bot.is_auto(11111) is True
+        assert bot.quality_pref(67890) == "cd"
+        assert bot.quality_pref(11111) == "cd"
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
     def test_override_beats_default(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot._auto_overrides[67890] = True
-        assert bot.is_auto(67890) is True
-        assert bot.is_auto(11111) is False
+        bot._quality_overrides[67890] = "cd"
+        assert bot.quality_pref(67890) == "cd"
+        assert bot.quality_pref(11111) == "hires"
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cmd_auto_reflects_chat_override(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot._auto_overrides[67890] = True
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_auto(update, context)
-        assert "ON" in update.message.reply_text.call_args[0][0]
+    def test_quality_reloaded_from_db(self, mock_slskd, mock_spotify):
+        config = _make_config()
+        bot = MusicBot(config)
+        bot.prefs_repo.set_quality(67890, "cd")
+        restarted = MusicBot(config)
+        assert restarted.quality_pref(67890) == "cd"
+        assert restarted.quality_pref(11111) == "hires"
+
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
+    def test_download_semaphore(self, mock_slskd, mock_spotify):
+        import asyncio
+
+        config = _make_config()
+        config.max_concurrent_downloads = 2
+        bot = MusicBot(config)
+        assert isinstance(bot._download_sem, asyncio.Semaphore)
+        assert bot._download_sem._value == 2

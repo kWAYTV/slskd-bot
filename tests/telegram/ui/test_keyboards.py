@@ -4,7 +4,7 @@ from music_downloader.catalog.track import TrackInfo
 from music_downloader.soulseek.result import SearchResult
 from music_downloader.telegram.ui.keyboards import (
     build_approve_keyboard,
-    build_auto_mode_keyboard,
+    build_history_keyboard,
     build_import_failure_keyboard,
     build_results_keyboard,
     build_spotify_keyboard,
@@ -159,15 +159,41 @@ class TestBuildImportFailureKeyboard:
         assert "ir:7:3" in callbacks
 
 
-class TestBuildAutoModeKeyboard:
-    def test_currently_on(self):
-        kb = build_auto_mode_keyboard(True)
-        btn = kb.inline_keyboard[0][0]
-        assert "Disable" in btn.text
-        assert btn.callback_data == "auto:off"
+class TestBuildHistoryKeyboard:
+    def test_only_success_rows(self):
+        from music_downloader.history.record import HistoryRecord
 
-    def test_currently_off(self):
-        kb = build_auto_mode_keyboard(False)
-        btn = kb.inline_keyboard[0][0]
-        assert "Enable" in btn.text
-        assert btn.callback_data == "auto:on"
+        records = [
+            HistoryRecord(
+                id=1,
+                artist="A",
+                title="T",
+                album="",
+                filename="A - T.flac",
+                source_user="u",
+                remote_path="",
+                status="success",
+                duration_secs=1,
+                file_size=1,
+                created_at="x",
+                chat_id=1,
+            ),
+            HistoryRecord(
+                id=2,
+                artist="B",
+                title="U",
+                album="",
+                filename="B - U.flac",
+                source_user="u",
+                remote_path="",
+                status="failed",
+                duration_secs=1,
+                file_size=1,
+                created_at="x",
+                chat_id=1,
+            ),
+        ]
+        kb = build_history_keyboard(records)
+        assert kb is not None
+        assert kb.inline_keyboard[0][0].callback_data == "hu:1"
+        assert len(kb.inline_keyboard) == 1

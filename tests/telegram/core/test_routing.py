@@ -21,29 +21,14 @@ class TestMusicBotCallbackHandler:
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
-    async def test_auto_toggle_on(self, mock_slskd, mock_spotify):
+    async def test_quality_toggle_persists(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        update = _make_callback_update(data="auto:on")
+        update = _make_callback_update(data="qp:cd")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert bot.is_auto(update.effective_chat.id) is True
-        # Per-chat toggle: config default and other chats are untouched.
-        assert bot.auto_mode is False
-        assert bot.is_auto(99999) is False
-
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_auto_toggle_off(self, mock_slskd, mock_spotify):
-        config = _make_config()
-        config.auto_mode = True
-        bot = MusicBot(config)
-        update = _make_callback_update(data="auto:off")
-        context = _make_context()
-        await bot.handle_callback(update, context)
-        assert bot.is_auto(update.effective_chat.id) is False
-        # Other chats still follow the config default.
-        assert bot.is_auto(99999) is True
+        assert bot.quality_pref(update.effective_chat.id) == "cd"
+        assert bot.prefs_repo.get_quality(update.effective_chat.id) == "cd"
+        assert bot.quality_pref(99999) == "hires"
 
     @patch("music_downloader.telegram.core.app.SpotifyResolver")
     @patch("music_downloader.telegram.core.app.SlskdClient")
@@ -292,11 +277,10 @@ class TestMusicBotCallbackHandler:
         config = _make_config()
         config.telegram_allowed_users = {11111}
         bot = MusicBot(config)
-        update = _make_callback_update(user_id=99999, data="auto:on")
+        update = _make_callback_update(user_id=99999, data="qp:cd")
         context = _make_context()
         await bot.handle_callback(update, context)
-        # Should not change auto mode for the chat
-        assert bot.is_auto(update.effective_chat.id) is False
+        assert bot.quality_pref(update.effective_chat.id) == "hires"
 
 
 class TestImportCallbackRouting:
@@ -360,3 +344,46 @@ class TestImportCallbackRouting:
 
         progress = bot.import_repo.get_job_progress(job_id)
         assert progress[2] == 1  # skipped_tracks == 1
+
+
+class TestHistoryUndoCallback:
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_history_undo_wrong_chat(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        row_id = bot.history_repo.add(
+            artist="A",
+            title="T",
+            filename="A - T.flac",
+            source_user="u",
+            status="success",
+            chat_id=11111,
+        )
+        update = _make_callback_update(chat_id=67890, data=f"hu:{row_id}")
+        await bot.handle_callback(update, _make_context())
+        text = update.callback_query.edit_message_text.call_args[0][0]
+        assert "isn't yours" in text
+        assert bot.history_repo.get_recent(1, 11111)[0].status == "success"
+
+    @patch("music_downloader.telegram.core.app.SpotifyResolver")
+    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_history_undo_deletes_file(self, mock_slskd, mock_spotify, tmp_path):
+        bot = MusicBot(_make_config())
+        target = tmp_path / "music" / "A - T.flac"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("data")
+        bot.processor.output_dir = str(target.parent)
+        row_id = bot.history_repo.add(
+            artist="A",
+            title="T",
+            filename="A - T.flac",
+            source_user="u",
+            status="success",
+            chat_id=67890,
+        )
+        update = _make_callback_update(chat_id=67890, data=f"hu:{row_id}")
+        await bot.handle_callback(update, _make_context())
+        assert not target.exists()
+        assert bot.history_repo.get_recent(1, 67890)[0].status == "undone"
