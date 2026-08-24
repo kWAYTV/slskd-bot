@@ -54,7 +54,7 @@ Issues = "https://github.com/GeiserX/telegram-slskd-local-bot/issues"
 Changelog = "https://github.com/GeiserX/telegram-slskd-local-bot/blob/main/docs/CHANGELOG.md"
 
 [project.scripts]
-slskd-importer = "music_downloader.__main__:main"
+slskd-importer = "slskd_importer.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -83,7 +83,7 @@ ignore = [
 "tests/*" = ["F841"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["music_downloader"]
+known-first-party = ["slskd_importer"]
 
 [tool.ruff.format]
 quote-style = "double"

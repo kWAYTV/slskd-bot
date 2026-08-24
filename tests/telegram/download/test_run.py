@@ -8,15 +8,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_downloader.library.flac import FlacVerdict
-from music_downloader.soulseek.result import DownloadStatus
-from music_downloader.telegram.core.app import MusicBot
+from slskd_importer.library.flac import FlacVerdict
+from slskd_importer.soulseek.result import DownloadStatus
+from slskd_importer.telegram.core.app import MusicBot
 from tests.telegram.download.helpers import _make_config, _make_context, _make_result, _make_track
 
 
 class TestDoDownload:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_enqueue_fails(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -30,8 +30,8 @@ class TestDoDownload:
         context = _make_context()
         await bot._do_download(context, 123, _make_track(), _make_result(), status_msg)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_download_failed_status(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -49,8 +49,8 @@ class TestDoDownload:
         records = bot.history_repo.get_recent(1)
         assert any(r.status == "failed" for r in records)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_download_timeout(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -65,8 +65,8 @@ class TestDoDownload:
         context = _make_context()
         await bot._do_download(context, 123, _make_track(), _make_result(), status_msg)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_file_not_found_on_disk(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -86,8 +86,8 @@ class TestDoDownload:
         records = bot.history_repo.get_recent(1)
         assert any(r.status == "file_not_found" for r in records)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_successful_download_small_file(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -131,8 +131,8 @@ class TestDoDownload:
         finally:
             os.unlink(source_path)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_send_audio_bad_request_falls_back_to_document(self, mock_slskd_cls, mock_spotify):
         from telegram.error import BadRequest
@@ -169,8 +169,8 @@ class TestDoDownload:
         finally:
             os.unlink(source_path)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_download_exception(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -184,8 +184,8 @@ class TestDoDownload:
         context = _make_context()
         await bot._do_download(context, 123, _make_track(), _make_result(), status_msg)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_non_flac_skips_analysis(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from music_downloader.telegram.core.session import PendingSearch
+from slskd_importer.telegram.core.session import PendingSearch
 from tests.telegram.playlist_import.helpers import (
     _make_context,
     _make_result,
@@ -49,8 +49,8 @@ class TestHandleDirectSearch:
 
 
 class TestDoDirectSlskdSearch:
-    @patch("music_downloader.telegram.search.direct.rank_responses", return_value=([], False))
-    @patch("music_downloader.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.search.direct.rank_responses", return_value=([], False))
+    @patch("slskd_importer.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_direct_search_no_results(self, mock_edit, mock_rank):
         bot = _setup_bot()
         chat_id = 67890
@@ -60,8 +60,8 @@ class TestDoDirectSlskdSearch:
         mock_edit.assert_awaited()
         assert "No results" in mock_edit.call_args[0][1]
 
-    @patch("music_downloader.telegram.search.direct.rank_responses")
-    @patch("music_downloader.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.search.direct.rank_responses")
+    @patch("slskd_importer.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_direct_search_finds_results(self, mock_edit, mock_rank):
         bot = _setup_bot()
         chat_id = 67890

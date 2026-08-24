@@ -3,7 +3,7 @@
 import os
 import tempfile
 
-from music_downloader.records.database import Database
+from slskd_importer.records.database import Database
 
 
 class TestDatabaseNormalCreation:

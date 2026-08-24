@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
-from music_downloader.telegram.core.session import PendingDownload, PendingSearch
+from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.session import PendingDownload, PendingSearch
 from tests.telegram.helpers import (
     _make_callback_update,
     _make_config,
@@ -18,8 +18,8 @@ from tests.telegram.helpers import (
 
 
 class TestRetryResultIndex:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_retry_preserves_result_index(self, mock_slskd, mock_spotify):
         """Retry should pass the stored result_index, not hardcoded 0."""
@@ -36,8 +36,8 @@ class TestRetryResultIndex:
             # result_index is the last positional arg
             assert mock_dl.call_args[0][-1] == 3
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_retry_pops_old_entry(self, mock_slskd, mock_spotify):
         """Retry should remove the old download entry to prevent leaks."""
@@ -52,8 +52,8 @@ class TestRetryResultIndex:
             await bot.handle_callback(update, context)
             assert "1" not in bot.downloads
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_next_result_uses_stored_index(self, mock_slskd, mock_spotify):
         """Next-result should use stored result_index + 1."""
@@ -73,8 +73,8 @@ class TestRetryResultIndex:
             assert call_args[3] == results[3]  # next_result
             assert call_args[-1] == 3  # next_idx
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_next_result_exhausted(self, mock_slskd, mock_spotify):
         """Next-result on last result should show 'no more results'."""

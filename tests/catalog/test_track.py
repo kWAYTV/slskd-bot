@@ -2,7 +2,7 @@
 
 import pytest
 
-from music_downloader.catalog.track import TrackInfo
+from slskd_importer.catalog.track import TrackInfo
 
 
 class TestTrackInfo:

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from telegram.error import BadRequest, NetworkError, TimedOut
 
-from music_downloader.telegram.ui.editing import safe_query_edit as _safe_query_edit
+from slskd_importer.telegram.ui.editing import safe_query_edit as _safe_query_edit
 
 
 class TestSafeQueryEdit:

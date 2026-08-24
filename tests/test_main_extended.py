@@ -3,14 +3,14 @@
 import os
 from unittest.mock import MagicMock, patch
 
-from music_downloader.__main__ import _start_health_server, cmd_run
+from slskd_importer.__main__ import _start_health_server, cmd_run
 
 
 class TestStartHealthServer:
     def test_creates_and_starts_server(self):
         with (
-            patch("music_downloader.health.server.HTTPServer") as mock_server_cls,
-            patch("music_downloader.health.server.threading.Thread") as mock_thread,
+            patch("slskd_importer.health.server.HTTPServer") as mock_server_cls,
+            patch("slskd_importer.health.server.threading.Thread") as mock_thread,
         ):
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance
@@ -31,8 +31,8 @@ class TestCmdRun:
         }
         with (
             patch.dict(os.environ, env, clear=False),
-            patch("music_downloader.__main__.create_bot") as mock_create,
-            patch("music_downloader.__main__.start_health_server") as mock_health,
+            patch("slskd_importer.__main__.create_bot") as mock_create,
+            patch("slskd_importer.__main__.start_health_server") as mock_health,
         ):
             mock_app = MagicMock()
             mock_bot = MagicMock()

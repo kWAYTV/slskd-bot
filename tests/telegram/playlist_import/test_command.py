@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from music_downloader.catalog.playlist import PlaylistInfo
+from slskd_importer.catalog.playlist import PlaylistInfo
 from tests.telegram.playlist_import.helpers import (
     _fake_to_thread,
     _make_context,
@@ -17,7 +17,7 @@ from tests.telegram.playlist_import.helpers import (
 
 class TestCmdImport:
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_cmd_import_no_args(self, mock_edit, mock_thread):
         bot = _setup_bot()
         update = _make_update(text="/import")
@@ -27,7 +27,7 @@ class TestCmdImport:
         assert "Usage" in update.message.reply_text.call_args[0][0]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_cmd_import_invalid_url(self, mock_edit, mock_thread):
         bot = _setup_bot()
         update = _make_update(text="/import https://example.com/not-spotify")
@@ -37,8 +37,8 @@ class TestCmdImport:
         assert "valid Spotify" in update.message.reply_text.call_args[0][0]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
-    @patch("music_downloader.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
     async def test_cmd_import_active_job_exists(self, mock_is_url, mock_edit, mock_thread):
         bot = _setup_bot()
         bot.import_repo.get_active_job = MagicMock(return_value=_make_import_job())
@@ -49,8 +49,8 @@ class TestCmdImport:
         assert "already have an active import" in update.message.reply_text.call_args[0][0]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
-    @patch("music_downloader.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
     async def test_cmd_import_resolve_fails(self, mock_is_url, mock_edit, mock_thread):
         bot = _setup_bot()
         bot.import_repo.get_active_job = MagicMock(return_value=None)
@@ -62,9 +62,9 @@ class TestCmdImport:
         assert "Failed to resolve" in mock_edit.call_args[0][1]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
-    @patch("music_downloader.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
-    @patch("music_downloader.telegram.playlist_import.command.build_import_confirm_keyboard", return_value=None)
+    @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.command.PlaylistResolver.is_spotify_url", return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.command.build_import_confirm_keyboard", return_value=None)
     async def test_cmd_import_success(self, mock_kb, mock_is_url, mock_edit, mock_thread):
         bot = _setup_bot()
         bot.import_repo.get_active_job = MagicMock(return_value=None)

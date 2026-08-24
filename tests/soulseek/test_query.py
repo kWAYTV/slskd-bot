@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from music_downloader.soulseek.query import build_reduced_queries as _build_reduced_queries
-from music_downloader.soulseek.query import clean_search_title as _clean_search_title
+from slskd_importer.soulseek.query import build_reduced_queries as _build_reduced_queries
+from slskd_importer.soulseek.query import clean_search_title as _clean_search_title
 
 
 class TestBuildReducedQueries:

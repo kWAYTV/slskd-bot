@@ -49,4 +49,4 @@ EXPOSE 8080
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 
 # Default: run the bot
-CMD ["python", "-m", "music_downloader", "run"]
+CMD ["python", "-m", "slskd_importer", "run"]

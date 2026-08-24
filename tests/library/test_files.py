@@ -6,7 +6,7 @@ import unittest.mock
 import mutagen.flac
 import pytest
 
-from music_downloader.library.files import FileProcessor
+from slskd_importer.library.files import FileProcessor
 
 
 class TestFileProcessor:
@@ -163,7 +163,7 @@ class TestFileProcessor:
         source.write_text("data")
 
         with unittest.mock.patch(
-            "music_downloader.library.files.os.remove",
+            "slskd_importer.library.files.os.remove",
             side_effect=OSError(30, "Read-only file system"),
         ):
             assert processor.cleanup_download(str(source)) is False

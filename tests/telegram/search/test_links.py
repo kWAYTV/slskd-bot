@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.app import MusicBot
 from tests.telegram.helpers import (
     _make_config,
     _make_context,
@@ -18,14 +18,14 @@ from tests.telegram.helpers import (
 class TestLinkQueries:
     def _make_bot(self):
         with (
-            patch("music_downloader.telegram.core.app.SpotifyResolver"),
-            patch("music_downloader.telegram.core.app.SlskdClient"),
+            patch("slskd_importer.telegram.core.app.SpotifyResolver"),
+            patch("slskd_importer.telegram.core.app.SlskdClient"),
         ):
             return MusicBot(_make_config())
 
     @pytest.mark.asyncio
     async def test_spotify_track_link_resolves_directly(self):
-        from music_downloader.telegram.search import links as search_links
+        from slskd_importer.telegram.search import links as search_links
 
         bot = self._make_bot()
         bot.spotify.get_track = MagicMock(return_value=_make_track())
@@ -43,7 +43,7 @@ class TestLinkQueries:
 
     @pytest.mark.asyncio
     async def test_playlist_link_starts_import(self):
-        from music_downloader.telegram.search import links as search_links
+        from slskd_importer.telegram.search import links as search_links
 
         bot = self._make_bot()
         bot._check_library_auth = AsyncMock(return_value=True)
@@ -52,7 +52,7 @@ class TestLinkQueries:
         context = _make_context()
 
         with patch(
-            "music_downloader.telegram.search.links.start_import_from_url", new_callable=AsyncMock
+            "slskd_importer.telegram.search.links.start_import_from_url", new_callable=AsyncMock
         ) as mock_start:
             handled = await search_links.handle_link_query(bot, update, context, 67890, url)
         assert handled is True
@@ -61,7 +61,7 @@ class TestLinkQueries:
 
     @pytest.mark.asyncio
     async def test_playlist_link_requires_library_access(self):
-        from music_downloader.telegram.search import links as search_links
+        from slskd_importer.telegram.search import links as search_links
 
         bot = self._make_bot()
         bot._check_library_auth = AsyncMock(return_value=False)
@@ -70,7 +70,7 @@ class TestLinkQueries:
         context = _make_context()
 
         with patch(
-            "music_downloader.telegram.search.links.start_import_from_url", new_callable=AsyncMock
+            "slskd_importer.telegram.search.links.start_import_from_url", new_callable=AsyncMock
         ) as mock_start:
             handled = await search_links.handle_link_query(bot, update, context, 67890, url)
         assert handled is True
@@ -78,7 +78,7 @@ class TestLinkQueries:
 
     @pytest.mark.asyncio
     async def test_plain_text_is_not_handled(self):
-        from music_downloader.telegram.search import links as search_links
+        from slskd_importer.telegram.search import links as search_links
 
         bot = self._make_bot()
         update = _make_update(text="nancy sinatra bang bang")

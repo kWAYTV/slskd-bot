@@ -25,7 +25,7 @@ class TestConfig:
     def test_loads_required_vars(self, env_vars):
         """Config loads all required environment variables."""
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.telegram_bot_token == "test-token-123"
@@ -37,7 +37,7 @@ class TestConfig:
     def test_default_values(self, env_vars):
         """Config uses sensible defaults for optional vars."""
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.max_results == 5
@@ -53,7 +53,7 @@ class TestConfig:
         env_vars["MAX_CONCURRENT_DOWNLOADS"] = "5"
         env_vars["APPROVAL_TTL_SECS"] = "120"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.max_concurrent_downloads == 5
@@ -63,7 +63,7 @@ class TestConfig:
         """Config parses comma-separated user IDs."""
         env_vars["TELEGRAM_ALLOWED_USERS"] = "123,456,789"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.telegram_allowed_users == {123, 456, 789}
@@ -71,7 +71,7 @@ class TestConfig:
     def test_allowed_users_empty(self, env_vars):
         """Config treats empty allowed users as deny-all."""
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.telegram_allowed_users == set()
@@ -79,14 +79,14 @@ class TestConfig:
     def test_library_users_parsing(self, env_vars):
         env_vars["TELEGRAM_LIBRARY_USERS"] = "123,456"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.telegram_library_users == {123, 456}
 
     def test_library_users_empty(self, env_vars):
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.telegram_library_users == set()
@@ -94,7 +94,7 @@ class TestConfig:
     def test_missing_required_var_raises(self):
         """Config raises ValueError for missing required variables."""
         with patch.dict(os.environ, {}, clear=True):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             with pytest.raises(ValueError, match="TELEGRAM_BOT_TOKEN"):
                 Config()
@@ -103,7 +103,7 @@ class TestConfig:
         """Config parses exclude keywords correctly."""
         env_vars["EXCLUDE_KEYWORDS"] = "live,remix,demo"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.exclude_keywords == ["live", "remix", "demo"]
@@ -111,7 +111,7 @@ class TestConfig:
     def test_file_limit_default_cloud(self, env_vars):
         """Without a local Bot API server, the upload limit is the cloud 50 MB."""
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.telegram_api_base_url == ""
@@ -121,7 +121,7 @@ class TestConfig:
         """A local Bot API server raises the upload limit to 2000 MB."""
         env_vars["TELEGRAM_API_BASE_URL"] = "http://telegram-bot-api:8081/"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.telegram_api_base_url == "http://telegram-bot-api:8081"
@@ -131,7 +131,7 @@ class TestConfig:
         """Config accepts custom filename template."""
         env_vars["FILENAME_TEMPLATE"] = "{title} by {artist}"
         with patch.dict(os.environ, env_vars, clear=False):
-            from music_downloader.settings import Config
+            from slskd_importer.settings import Config
 
             config = Config()
             assert config.filename_template == "{title} by {artist}"

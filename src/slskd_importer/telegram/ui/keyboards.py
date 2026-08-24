@@ -1,0 +1,184 @@
+"""Inline keyboard builders for Telegram conversations."""
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.soulseek.result import SearchResult
+
+
+def build_results_keyboard(
+    results: list[SearchResult],
+    page: int = 0,
+    page_size: int = 10,
+) -> InlineKeyboardMarkup:
+    """Build an inline keyboard with search results for the user to pick from."""
+    start = page * page_size
+    end = min(start + page_size, len(results))
+    page_results = results[start:end]
+
+    buttons = []
+    for i, result in enumerate(page_results):
+        absolute_idx = start + i
+        label = f"#{absolute_idx + 1} {result.duration_display} | {result.quality_display} | {result.size_mb:.0f}MB"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"dl:{absolute_idx}")])
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("◀️ Prev", callback_data=f"dl_page:{page - 1}"))
+    if end < len(results):
+        nav_row.append(InlineKeyboardButton("Next ▶️", callback_data=f"dl_page:{page + 1}"))
+    if nav_row:
+        buttons.append(nav_row)
+
+    action_row = []
+    if results:
+        action_row.append(InlineKeyboardButton("Auto-pick best", callback_data="dl:auto"))
+    action_row.append(InlineKeyboardButton("Cancel", callback_data="dl:cancel"))
+    buttons.append(action_row)
+
+    return InlineKeyboardMarkup(buttons)
+
+
+def build_approve_keyboard(download_id: str, has_next: bool = False) -> InlineKeyboardMarkup:
+    """Build approve/reject keyboard for a downloaded file."""
+    rows = [
+        [
+            InlineKeyboardButton("💾 Save to library", callback_data=f"approve:{download_id}"),
+            InlineKeyboardButton("🗑 Discard", callback_data=f"reject:{download_id}"),
+        ]
+    ]
+    if has_next:
+        rows.append([InlineKeyboardButton("⏭ Try next result", callback_data=f"next:{download_id}")])
+    return InlineKeyboardMarkup(rows)
+
+
+def build_spotify_keyboard(
+    tracks: list[TrackInfo],
+    page: int = 0,
+    page_size: int = 5,
+) -> InlineKeyboardMarkup:
+    """Build inline keyboard for selecting from multiple Spotify results."""
+    start = page * page_size
+    end = min(start + page_size, len(tracks))
+    page_tracks = tracks[start:end]
+
+    buttons = []
+    for i, t in enumerate(page_tracks):
+        absolute_idx = start + i
+        label = f"#{absolute_idx + 1} {t.artist} - {t.title} ({t.duration_display})"
+        if len(label) > 64:
+            label = label[:61] + "..."
+        buttons.append([InlineKeyboardButton(label, callback_data=f"sp:{absolute_idx}")])
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("◀️ Prev", callback_data=f"sp_page:{page - 1}"))
+    if end < len(tracks):
+        nav_row.append(InlineKeyboardButton("Next ▶️", callback_data=f"sp_page:{page + 1}"))
+    if nav_row:
+        buttons.append(nav_row)
+
+    buttons.append([InlineKeyboardButton("🔍 Search Soulseek directly", callback_data="direct:search")])
+    buttons.append([InlineKeyboardButton("Cancel", callback_data="sp:cancel")])
+    return InlineKeyboardMarkup(buttons)
+
+
+def build_quality_keyboard(current: str) -> InlineKeyboardMarkup:
+    """Build keyboard to switch the audio quality preference."""
+    if current == "cd":
+        return InlineKeyboardMarkup([[InlineKeyboardButton("Prefer Hi-Res (24-bit)", callback_data="qp:hires")]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton("Prefer CD quality (16/44.1)", callback_data="qp:cd")]])
+
+
+def build_import_summary_keyboard(job_id: int, failed_count: int) -> InlineKeyboardMarkup:
+    """Retry-failed button on the end-of-import summary."""
+    noun = "track" if failed_count == 1 else "tracks"
+    label = f"🔄 Retry {failed_count} failed {noun}"
+    return InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data=f"if:{job_id}")]])
+
+
+def build_direct_search_keyboard() -> InlineKeyboardMarkup:
+    """Button to search Soulseek directly without Spotify resolution."""
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔍 Search Soulseek directly", callback_data="direct:search")]])
+
+
+def build_import_confirm_keyboard(job_id: int) -> InlineKeyboardMarkup:
+    """Confirm/cancel keyboard for playlist import."""
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Start import", callback_data=f"ic:{job_id}"),
+                InlineKeyboardButton("❌ Cancel", callback_data=f"ix:{job_id}"),
+            ]
+        ]
+    )
+
+
+def build_import_track_keyboard(job_id: int, track_id: int, dl_id: str) -> InlineKeyboardMarkup:
+    """Approve/reject/skip keyboard for individual import track downloads."""
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("💾 Save to library", callback_data=f"ia:{job_id}:{track_id}:{dl_id}"),
+                InlineKeyboardButton("🗑 Discard", callback_data=f"ir:{job_id}:{track_id}"),
+            ],
+            [
+                InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),
+            ],
+        ]
+    )
+
+
+def build_import_skip_keyboard(job_id: int, track_id: int) -> InlineKeyboardMarkup:
+    """Reject/skip keyboard for import tracks with no download available."""
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("🚫 Mark failed", callback_data=f"ir:{job_id}:{track_id}"),
+                InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),
+            ],
+        ]
+    )
+
+
+def build_import_failure_keyboard(job_id: int, track_id: int, dl_id: str) -> InlineKeyboardMarkup:
+    """Retry / skip / fail keyboard when an import download fails."""
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🔄 Retry", callback_data=f"iy:{job_id}:{track_id}:{dl_id}")],
+            [
+                InlineKeyboardButton("🚫 Mark failed", callback_data=f"ir:{job_id}:{track_id}"),
+                InlineKeyboardButton("⏭ Skip track", callback_data=f"is:{job_id}:{track_id}"),
+            ],
+        ]
+    )
+
+
+def build_history_keyboard(records) -> InlineKeyboardMarkup | None:
+    """Per-row undo buttons for successful history entries."""
+    buttons = []
+    for entry in records:
+        if entry.status != "success":
+            continue
+        label = f"↩️ {entry.filename}"
+        if len(label) > 64:
+            label = label[:61] + "..."
+        buttons.append([InlineKeyboardButton(label, callback_data=f"hu:{entry.id}")])
+    return InlineKeyboardMarkup(buttons) if buttons else None
+
+
+def build_retry_keyboard(dl_id: str) -> InlineKeyboardMarkup:
+    """Retry button shown on download failure."""
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔄 Retry", callback_data=f"retry:{dl_id}")]])
+
+
+def build_retry_next_keyboard(dl_id: str) -> InlineKeyboardMarkup:
+    """Retry + next result buttons shown after repeated failure."""
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("🔄 Retry", callback_data=f"retry:{dl_id}"),
+                InlineKeyboardButton("⏭ Try next result", callback_data=f"next:{dl_id}"),
+            ]
+        ]
+    )

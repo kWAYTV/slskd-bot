@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
-from music_downloader.telegram.core.session import PendingDownload, PendingSearch
+from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.session import PendingDownload, PendingSearch
 from tests.telegram.helpers import (
     _make_config,
     _make_search_result,
@@ -18,16 +18,16 @@ from tests.telegram.helpers import (
 
 
 class TestMusicBotCancellation:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cancel_chat_operations_empty(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         had_work = await bot._cancel_chat_operations(12345)
         assert had_work is False
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cancel_chat_operations_with_pending(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -36,8 +36,8 @@ class TestMusicBotCancellation:
         assert had_work is True
         assert 12345 not in bot.pending
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cancel_removes_downloads_for_chat(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -55,8 +55,8 @@ class TestMusicBotCancellation:
         assert "1" not in bot.downloads
         assert "2" in bot.downloads
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_is_stale(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot._chat_generation[123] = 5
@@ -64,8 +64,8 @@ class TestMusicBotCancellation:
         assert bot._is_stale(123, 4) is True
         assert bot._is_stale(123, 6) is True
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_track_task(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         loop = asyncio.new_event_loop()
@@ -80,8 +80,8 @@ class TestRemoveDownloadFile:
     def _make_bot_with_download(self):
         config = _make_config()
         with (
-            patch("music_downloader.telegram.core.app.SpotifyResolver"),
-            patch("music_downloader.telegram.core.app.SlskdClient"),
+            patch("slskd_importer.telegram.core.app.SpotifyResolver"),
+            patch("slskd_importer.telegram.core.app.SlskdClient"),
         ):
             bot = MusicBot(config)
         source = os.path.join(config.download_dir, "someuser", "song.flac")

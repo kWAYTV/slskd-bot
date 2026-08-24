@@ -1,8 +1,8 @@
 """Tests for inline keyboard builders."""
 
-from music_downloader.catalog.track import TrackInfo
-from music_downloader.soulseek.result import SearchResult
-from music_downloader.telegram.ui.keyboards import (
+from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.soulseek.result import SearchResult
+from slskd_importer.telegram.ui.keyboards import (
     build_approve_keyboard,
     build_history_keyboard,
     build_import_failure_keyboard,
@@ -161,7 +161,7 @@ class TestBuildImportFailureKeyboard:
 
 class TestBuildHistoryKeyboard:
     def test_only_success_rows(self):
-        from music_downloader.history.record import HistoryRecord
+        from slskd_importer.history.record import HistoryRecord
 
         records = [
             HistoryRecord(

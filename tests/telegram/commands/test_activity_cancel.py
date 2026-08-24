@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from music_downloader.playlist_import import JobStatus
+from slskd_importer.playlist_import import JobStatus
 from tests.telegram.playlist_import.helpers import (
     _fake_to_thread,
     _make_context,

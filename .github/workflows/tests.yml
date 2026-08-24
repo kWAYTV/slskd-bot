@@ -32,4 +32,4 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          python -m pytest tests/ -v --tb=short --cov=src/music_downloader --cov-report=term-missing
+          python -m pytest tests/ -v --tb=short --cov=src/slskd_importer --cov-report=term-missing

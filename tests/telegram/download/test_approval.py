@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
-from music_downloader.telegram.core.session import PendingDownload, PendingSearch
+from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.session import PendingDownload, PendingSearch
 from tests.telegram.helpers import (
     _make_callback_update,
     _make_config,
@@ -18,8 +18,8 @@ from tests.telegram.helpers import (
 
 
 class TestMusicBotDismissOtherDownloads:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_dismiss(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -59,8 +59,8 @@ class TestMusicBotEditApprovalMessage:
 
 
 class TestIDORProtection:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_approval_idor_blocked(self, mock_slskd, mock_spotify):
         """Approval from a different chat_id should be silently rejected."""
@@ -74,8 +74,8 @@ class TestIDORProtection:
         # Download should still be in the dict (not popped by wrong chat)
         assert "1" in bot.downloads
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_retry_idor_blocked(self, mock_slskd, mock_spotify):
         """Retry from a different chat_id should be silently rejected."""
@@ -88,8 +88,8 @@ class TestIDORProtection:
         await bot.handle_callback(update, context)
         assert "1" in bot.downloads
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_next_result_idor_blocked(self, mock_slskd, mock_spotify):
         """Next-result from a different chat should be silently rejected."""

@@ -2,9 +2,9 @@
 
 import pytest
 
-from music_downloader.catalog.track import TrackInfo
-from music_downloader.soulseek.result import SearchResult
-from music_downloader.soulseek.scoring import ResultScorer
+from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.soulseek.result import SearchResult
+from slskd_importer.soulseek.scoring import ResultScorer
 
 
 @pytest.fixture

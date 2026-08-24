@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.app import MusicBot
 from tests.telegram.download.helpers import _make_config, _make_context, _make_result, _make_track
 
 
 class TestSendLargeFile:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_ogg_conversion_success_small_enough(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -49,8 +49,8 @@ class TestSendLargeFile:
             if os.path.exists(ogg_path):
                 os.unlink(ogg_path)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_ogg_too_large_falls_back_to_preview(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -83,7 +83,7 @@ class TestSendLargeFile:
                     return 60_000_000  # > 50MB limit
                 return orig_getsize(path)
 
-            with patch("music_downloader.telegram.download.delivery.os.path.getsize", side_effect=mock_getsize):
+            with patch("slskd_importer.telegram.download.delivery.os.path.getsize", side_effect=mock_getsize):
                 await bot._send_large_file(
                     context,
                     123,
@@ -100,8 +100,8 @@ class TestSendLargeFile:
                 if os.path.exists(p):
                     os.unlink(p)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_ogg_conversion_fails_uses_preview(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -136,8 +136,8 @@ class TestSendLargeFile:
             if os.path.exists(preview_path):
                 os.unlink(preview_path)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_both_conversions_fail(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())

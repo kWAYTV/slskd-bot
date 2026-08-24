@@ -5,15 +5,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_downloader.telegram.core import ttl
-from music_downloader.telegram.core.app import MusicBot
-from music_downloader.telegram.core.session import PendingDownload
+from slskd_importer.telegram.core import ttl
+from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.session import PendingDownload
 from tests.telegram.helpers import _make_config, _make_search_result, _make_track
 
 
 class TestExpireStaleApprovals:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_expires_old_awaiting_approval(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -34,8 +34,8 @@ class TestExpireStaleApprovals:
         bot._cleanup_download_artifacts.assert_awaited_once()
         app.bot.edit_message_caption.assert_awaited_once()
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_keeps_fresh_and_in_flight(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())

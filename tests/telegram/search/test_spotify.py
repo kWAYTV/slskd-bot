@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_downloader.catalog.track import TrackInfo
-from music_downloader.telegram.core.app import MusicBot
+from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.telegram.core.app import MusicBot
 from tests.telegram.helpers import (
     _make_config,
     _make_context,
@@ -17,8 +17,8 @@ from tests.telegram.helpers import (
 
 
 class TestMusicBotDoSearch:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_no_spotify_results(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -32,8 +32,8 @@ class TestMusicBotDoSearch:
         bot._chat_generation[67890] = 0
         await bot._do_search(update, context, "nonexistent song", 0)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_single_spotify_result(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -49,8 +49,8 @@ class TestMusicBotDoSearch:
         await bot._do_search(update, context, "Nancy Sinatra Bang Bang", 0)
         bot._do_slskd_search.assert_called_once()
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_multiple_spotify_results(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -67,8 +67,8 @@ class TestMusicBotDoSearch:
         await bot._do_search(update, context, "Nancy Sinatra Bang Bang", 0)
         assert 67890 in bot._spotify_candidates
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_stale_search_aborted(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -84,8 +84,8 @@ class TestMusicBotDoSearch:
         await bot._do_search(update, context, "test", 0)  # generation 0 is stale
         bot._do_slskd_search.assert_not_called()
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_exception_handled(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -100,8 +100,8 @@ class TestMusicBotDoSearch:
         await bot._do_search(update, context, "test", 0)
         # Should not raise
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_artist_filter(self, mock_slskd, mock_spotify):
         """When query has 'Artist - Title', filter by artist."""

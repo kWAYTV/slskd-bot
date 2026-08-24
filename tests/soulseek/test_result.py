@@ -1,6 +1,6 @@
 """Tests for Soulseek search and download value objects."""
 
-from music_downloader.soulseek.result import DownloadStatus, SearchResult
+from slskd_importer.soulseek.result import DownloadStatus, SearchResult
 
 
 class TestSearchResult:

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from music_downloader.telegram.ui.markdown import code_span, md_code_safe
-from music_downloader.telegram.ui.markdown import escape_md as _escape_md
+from slskd_importer.telegram.ui.markdown import code_span, md_code_safe
+from slskd_importer.telegram.ui.markdown import escape_md as _escape_md
 
 
 class TestEscapeMd:

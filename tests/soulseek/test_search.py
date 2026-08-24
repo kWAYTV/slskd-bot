@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from music_downloader.soulseek.client import SlskdClient
+from slskd_importer.soulseek.client import SlskdClient
 
 
 class TestSearchInner:

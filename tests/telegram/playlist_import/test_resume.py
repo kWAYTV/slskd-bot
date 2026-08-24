@@ -40,7 +40,7 @@ class TestResumeStaleImports:
             return MagicMock()
 
         with patch(
-            "music_downloader.telegram.playlist_import.resume.asyncio.create_task",
+            "slskd_importer.telegram.playlist_import.resume.asyncio.create_task",
             side_effect=_create_task,
         ):
             await bot.resume_stale_imports(application)

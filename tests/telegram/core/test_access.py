@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.app import MusicBot
 from tests.telegram.helpers import (
     _make_config,
     _make_update,
@@ -14,16 +14,16 @@ from tests.telegram.helpers import (
 
 
 class TestMusicBotAuthorization:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_is_authorized_empty_denies_all(self, mock_slskd, mock_spotify):
         config = _make_config()
         config.telegram_allowed_users = set()
         bot = MusicBot(config)
         assert bot._is_authorized(99999) is False
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_is_authorized_allowed(self, mock_slskd, mock_spotify):
         config = _make_config()
         config.telegram_allowed_users = {12345, 67890}
@@ -31,8 +31,8 @@ class TestMusicBotAuthorization:
         assert bot._is_authorized(12345) is True
         assert bot._is_authorized(99999) is False
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_check_auth_denied(self, mock_slskd, mock_spotify):
         config = _make_config()
@@ -43,8 +43,8 @@ class TestMusicBotAuthorization:
         assert result is False
         update.message.reply_text.assert_called_once_with("You are not authorized to use this bot.")
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_check_auth_allowed(self, mock_slskd, mock_spotify):
         config = _make_config()

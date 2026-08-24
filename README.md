@@ -51,7 +51,7 @@ services:
 git clone https://github.com/kWAYTV/slskd-bot.git && cd slskd-bot
 uv sync
 cp .env.example .env  # fill in credentials
-uv run python -m music_downloader run
+uv run python -m slskd_importer run
 ```
 
 ## Commands

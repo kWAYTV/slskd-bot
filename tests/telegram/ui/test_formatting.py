@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from music_downloader.telegram.ui.formatting import progress_bar
+from slskd_importer.telegram.ui.formatting import progress_bar
 from tests.telegram.helpers import (
     _make_search_result,
     _make_track,
@@ -29,7 +29,7 @@ class TestProgressBar:
 
 class TestFormatResultReasons:
     def test_full_reasons_line(self):
-        from music_downloader.telegram.ui.formatting import format_result_reasons
+        from slskd_importer.telegram.ui.formatting import format_result_reasons
 
         track = _make_track()  # 162s reference
         result = _make_search_result()
@@ -42,7 +42,7 @@ class TestFormatResultReasons:
         assert "87/100" in line
 
     def test_duration_diff_and_queue(self):
-        from music_downloader.telegram.ui.formatting import format_result_reasons
+        from slskd_importer.telegram.ui.formatting import format_result_reasons
 
         track = _make_track()
         result = _make_search_result()
@@ -55,7 +55,7 @@ class TestFormatResultReasons:
         assert "queue of 3" in line
 
     def test_no_reference_duration(self):
-        from music_downloader.telegram.ui.formatting import format_result_reasons
+        from slskd_importer.telegram.ui.formatting import format_result_reasons
 
         track = _make_track()
         track.duration_ms = 0
@@ -75,7 +75,7 @@ class TestFormatSearchResults:
     def test_direct_search_fallback_does_not_claim_flac(self):
         """Direct search (no reference duration) must honor is_fallback: an MP3
         fallback list used to be headlined 'Found N FLAC matches'."""
-        from music_downloader.telegram.ui.formatting import format_search_results
+        from slskd_importer.telegram.ui.formatting import format_search_results
 
         track = _make_track()
         track.duration_ms = 0  # direct search marker
@@ -88,7 +88,7 @@ class TestFormatSearchResults:
         assert "[MP3]" in text
 
     def test_direct_search_flac_header(self):
-        from music_downloader.telegram.ui.formatting import format_search_results
+        from slskd_importer.telegram.ui.formatting import format_search_results
 
         track = _make_track()
         track.duration_ms = 0
@@ -96,7 +96,7 @@ class TestFormatSearchResults:
         assert "Found 1 FLAC match" in text
 
     def test_spotify_search_fallback_header_unchanged(self):
-        from music_downloader.telegram.ui.formatting import format_search_results
+        from slskd_importer.telegram.ui.formatting import format_search_results
 
         track = _make_track()
         result = _make_search_result()
@@ -106,7 +106,7 @@ class TestFormatSearchResults:
         assert "FLAC match" not in text
 
     def test_shows_remote_parent_folder(self):
-        from music_downloader.telegram.ui.formatting import format_search_results
+        from slskd_importer.telegram.ui.formatting import format_search_results
 
         result = _make_search_result()
         result.filename = "\\Music\\2009 Remaster 24-96\\Track.flac"

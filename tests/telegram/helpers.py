@@ -7,8 +7,8 @@ import os
 import tempfile
 from unittest.mock import AsyncMock, MagicMock
 
-from music_downloader.catalog.track import TrackInfo
-from music_downloader.soulseek.result import SearchResult
+from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.soulseek.result import SearchResult
 
 
 def _make_config():

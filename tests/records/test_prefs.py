@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from music_downloader.records.database import Database
-from music_downloader.records.prefs import ChatPrefsRepository
+from slskd_importer.records.database import Database
+from slskd_importer.records.prefs import ChatPrefsRepository
 
 
 @pytest.fixture()

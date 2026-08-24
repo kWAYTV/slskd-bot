@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from music_downloader.__main__ import HealthHandler, main
+from slskd_importer.__main__ import HealthHandler, main
 
 
 class TestHealthHandler:
@@ -24,7 +24,7 @@ class TestHealthHandler:
 
     def test_health_endpoint(self):
         """HealthHandler responds 200 on /health."""
-        from music_downloader.health.server import set_health_checker
+        from slskd_importer.health.server import set_health_checker
 
         set_health_checker(None)
         handler = self._handler("/health")
@@ -37,7 +37,7 @@ class TestHealthHandler:
         assert b'"slskd": "ok"' in body
 
     def test_ready_endpoint(self):
-        from music_downloader.health.server import set_health_checker
+        from slskd_importer.health.server import set_health_checker
 
         set_health_checker(None)
         handler = self._handler("/ready")
@@ -47,7 +47,7 @@ class TestHealthHandler:
         assert b'"status": "ready"' in handler.wfile.read()
 
     def test_health_degraded(self):
-        from music_downloader.health.server import set_health_checker
+        from slskd_importer.health.server import set_health_checker
 
         set_health_checker(lambda: False)
         handler = self._handler("/health")
@@ -59,7 +59,7 @@ class TestHealthHandler:
         set_health_checker(None)
 
     def test_ready_unavailable(self):
-        from music_downloader.health.server import set_health_checker
+        from slskd_importer.health.server import set_health_checker
 
         set_health_checker(lambda: False)
         handler = self._handler("/ready")
@@ -82,14 +82,14 @@ class TestMain:
 
     def test_default_command_is_run(self):
         """Without a subcommand, main defaults to 'run'."""
-        with patch.object(sys, "argv", ["slskd-importer"]), patch("music_downloader.__main__.cmd_run") as mock_run:
+        with patch.object(sys, "argv", ["slskd-importer"]), patch("slskd_importer.__main__.cmd_run") as mock_run:
             main()
             mock_run.assert_called_once()
 
     def test_run_subcommand(self):
         with (
             patch.object(sys, "argv", ["slskd-importer", "run"]),
-            patch("music_downloader.__main__.cmd_run") as mock_run,
+            patch("slskd_importer.__main__.cmd_run") as mock_run,
         ):
             main()
             mock_run.assert_called_once()

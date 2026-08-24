@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from music_downloader.playlist_import import TrackStatus
+from slskd_importer.playlist_import import TrackStatus
 from tests.telegram.playlist_import.helpers import (
     _fake_to_thread,
     _make_context,
@@ -15,7 +15,7 @@ from tests.telegram.playlist_import.helpers import (
 
 class TestDoImportSlskdSearch:
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_search_no_results(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -32,7 +32,7 @@ class TestDoImportSlskdSearch:
         assert bot.slskd.search.await_count >= 1
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_search_success(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -53,7 +53,7 @@ class TestDoImportSlskdSearch:
         context.application.create_task.assert_called_once()
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_search_exception(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890

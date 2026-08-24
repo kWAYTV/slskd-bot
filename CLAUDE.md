@@ -40,7 +40,7 @@ Configuration via `.env` (see `.env.example`).
 The package is organized by **what the app does** (Screaming Architecture), not by technical layers.
 
 ```
-src/music_downloader/
+src/slskd_importer/
   catalog/           # Track identity — Spotify lookup, playlists, TrackInfo
   soulseek/          # Find and fetch files — search lifecycle, transfers, ranking, fallbacks
   library/           # Organize the collection — rename, formats, artwork, FLAC, previews

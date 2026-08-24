@@ -1,6 +1,6 @@
 """Extended tests for file_handler edge cases."""
 
-from music_downloader.library.files import FileProcessor
+from slskd_importer.library.files import FileProcessor
 
 
 class TestFindDownloadedFileFallback:

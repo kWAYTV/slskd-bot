@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from music_downloader.playlist_import import JobStatus, TrackStatus
+from slskd_importer.playlist_import import JobStatus, TrackStatus
 from tests.telegram.playlist_import.helpers import (
     _fake_to_thread,
     _make_context,
@@ -33,7 +33,7 @@ class TestProcessNextImportTrack:
         assert "2" in msg_text  # failed
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.search.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_process_next_has_track(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890
@@ -48,7 +48,7 @@ class TestProcessNextImportTrack:
         context.bot.send_message.assert_awaited()
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
-    @patch("music_downloader.telegram.playlist_import.queue.safe_edit", new_callable=AsyncMock, return_value=True)
+    @patch("slskd_importer.telegram.playlist_import.queue.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_process_next_skips_already_owned(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890

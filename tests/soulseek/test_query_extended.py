@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from music_downloader.soulseek.query import clean_search_title as _clean_search_title
-from music_downloader.soulseek.query import extract_latin_keywords as _extract_latin_keywords
-from music_downloader.soulseek.query import has_non_latin_script as _has_non_latin_script
+from slskd_importer.soulseek.query import clean_search_title as _clean_search_title
+from slskd_importer.soulseek.query import extract_latin_keywords as _extract_latin_keywords
+from slskd_importer.soulseek.query import has_non_latin_script as _has_non_latin_script
 
 
 class TestHasNonLatinScript:

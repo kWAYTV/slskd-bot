@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from music_downloader.soulseek.client import SlskdClient
-from music_downloader.soulseek.parsing import parse_search_responses
-from music_downloader.soulseek.result import DownloadStatus, SearchResult
+from slskd_importer.soulseek.client import SlskdClient
+from slskd_importer.soulseek.parsing import parse_search_responses
+from slskd_importer.soulseek.result import DownloadStatus, SearchResult
 
 
 class TestParseSearchResponses:

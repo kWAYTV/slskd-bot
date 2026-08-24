@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from music_downloader.catalog.track import TrackInfo
-from music_downloader.soulseek.scoring import rank_responses
-from music_downloader.telegram.core.app import MusicBot
-from music_downloader.telegram.ui.formatting import format_search_results, format_spotify_results
+from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.soulseek.scoring import rank_responses
+from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.ui.formatting import format_search_results, format_spotify_results
 from tests.telegram.helpers import (
     _make_config,
     _make_search_result,
@@ -18,8 +18,8 @@ from tests.telegram.helpers import (
 
 
 class TestMusicBotInit:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_init(self, mock_slskd, mock_spotify):
         config = _make_config()
         bot = MusicBot(config)
@@ -78,8 +78,8 @@ class TestMusicBotHelpers:
         text = format_spotify_results(tracks, page=0, page_size=5)
         assert "page 1/" in text
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_add_history(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -90,8 +90,8 @@ class TestMusicBotHelpers:
         records = bot.history_repo.get_recent(1)
         assert records[0].status == "success"
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_add_history_persists_multiple(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -101,8 +101,8 @@ class TestMusicBotHelpers:
             await bot._add_history(track, result, "success")
         assert bot.history_repo.count() == 55
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_next_dl_id(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         id1 = bot._next_dl_id()
@@ -159,8 +159,8 @@ class TestRankResponses:
 
 
 class TestPerChatQualityPref:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_quality_defaults_to_config(self, mock_slskd, mock_spotify):
         config = _make_config()
         config.quality_preference = "cd"
@@ -168,16 +168,16 @@ class TestPerChatQualityPref:
         assert bot.quality_pref(67890) == "cd"
         assert bot.quality_pref(11111) == "cd"
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_override_beats_default(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot._quality_overrides[67890] = "cd"
         assert bot.quality_pref(67890) == "cd"
         assert bot.quality_pref(11111) == "hires"
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_quality_reloaded_from_db(self, mock_slskd, mock_spotify):
         config = _make_config()
         bot = MusicBot(config)
@@ -186,8 +186,8 @@ class TestPerChatQualityPref:
         assert restarted.quality_pref(67890) == "cd"
         assert restarted.quality_pref(11111) == "hires"
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_download_semaphore(self, mock_slskd, mock_spotify):
         import asyncio
 

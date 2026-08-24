@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_downloader.catalog.track import TrackInfo
-from music_downloader.soulseek.result import DownloadStatus, SearchResult
-from music_downloader.telegram.core.app import MusicBot
-from music_downloader.telegram.core.session import PendingDownload, PendingSearch
+from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.soulseek.result import DownloadStatus, SearchResult
+from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.session import PendingDownload, PendingSearch
 
 
 def _make_config(*, library_users=None):
@@ -74,8 +74,8 @@ def _make_update(user_id=12345, chat_id=67890, text="/import"):
     return update
 
 
-@patch("music_downloader.telegram.core.app.SpotifyResolver")
-@patch("music_downloader.telegram.core.app.SlskdClient")
+@patch("slskd_importer.telegram.core.app.SpotifyResolver")
+@patch("slskd_importer.telegram.core.app.SlskdClient")
 class TestCanSaveLibrary:
     def test_empty_list_allows_all(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config(library_users=set()))
@@ -98,8 +98,8 @@ class TestCanSaveLibrary:
         assert "library users" in update.message.reply_text.call_args[0][0]
 
 
-@patch("music_downloader.telegram.core.app.SpotifyResolver")
-@patch("music_downloader.telegram.core.app.SlskdClient")
+@patch("slskd_importer.telegram.core.app.SpotifyResolver")
+@patch("slskd_importer.telegram.core.app.SlskdClient")
 class TestSendThenDelete:
     @pytest.mark.asyncio
     async def test_non_library_user_file_is_deleted(self, mock_slskd, mock_spotify, tmp_path):
@@ -176,7 +176,7 @@ class TestSendThenDelete:
         status_msg = MagicMock()
         status_msg.edit_text = AsyncMock()
         with patch(
-            "music_downloader.telegram.download.run.os.path.getsize",
+            "slskd_importer.telegram.download.run.os.path.getsize",
             return_value=100 * 1024 * 1024,
         ):
             await bot._do_download(context, 1, _make_track(), _make_result(), status_msg, 0, user_id=99999)
@@ -185,8 +185,8 @@ class TestSendThenDelete:
         assert not source.exists()
 
 
-@patch("music_downloader.telegram.core.app.SpotifyResolver")
-@patch("music_downloader.telegram.core.app.SlskdClient")
+@patch("slskd_importer.telegram.core.app.SpotifyResolver")
+@patch("slskd_importer.telegram.core.app.SlskdClient")
 class TestUserIdThreading:
     @pytest.mark.asyncio
     async def test_single_spotify_match_keeps_user_id(self, mock_slskd, mock_spotify):

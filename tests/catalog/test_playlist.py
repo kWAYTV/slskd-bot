@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 import spotipy
 
-from music_downloader.catalog.playlist import MAX_IMPORT_TRACKS, PlaylistInfo, PlaylistResolver
+from slskd_importer.catalog.playlist import MAX_IMPORT_TRACKS, PlaylistInfo, PlaylistResolver
 
 
 @pytest.fixture
@@ -368,7 +368,7 @@ class TestResolveAlbum:
 
 class TestPlaylistInfo:
     def test_dataclass_fields(self):
-        from music_downloader.catalog.track import TrackInfo
+        from slskd_importer.catalog.track import TrackInfo
 
         track = TrackInfo("A", "B", "C", 180000, "", "2023")
         info = PlaylistInfo(

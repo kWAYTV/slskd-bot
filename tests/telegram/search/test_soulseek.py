@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
-from music_downloader.telegram.search.soulseek import notify_if_already_owned
+from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.search.soulseek import notify_if_already_owned
 from tests.telegram.download.helpers import _make_config, _make_context, _make_result, _make_track
 
 
 class TestNotifyIfAlreadyOwned:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_not_owned_sends_nothing(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -23,8 +23,8 @@ class TestNotifyIfAlreadyOwned:
         await notify_if_already_owned(bot, context, 123, _make_track())
         context.bot.send_message.assert_not_called()
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_owned_sends_notice_without_blocking(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -40,8 +40,8 @@ class TestNotifyIfAlreadyOwned:
 
 
 class TestDoSlskdSearch:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_no_results_all_fallbacks(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -59,8 +59,8 @@ class TestDoSlskdSearch:
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
         # Should have tried multiple fallback searches
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_finds_flac_results(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -79,8 +79,8 @@ class TestDoSlskdSearch:
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
         assert 123 in bot.pending
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_non_flac_fallback(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -104,8 +104,8 @@ class TestDoSlskdSearch:
         context = _make_context()
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_stale_aborts_early(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -123,8 +123,8 @@ class TestDoSlskdSearch:
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
         assert 123 not in bot.pending
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_exception_handled(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
@@ -140,11 +140,11 @@ class TestDoSlskdSearch:
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
         # Should not raise
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_slskd_unavailable_message(self, mock_slskd_cls, mock_spotify):
-        from music_downloader.soulseek.errors import SlskdUnavailableError
+        from slskd_importer.soulseek.errors import SlskdUnavailableError
 
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()

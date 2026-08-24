@@ -1,6 +1,6 @@
 """Tests for pasted-link detection (Spotify track links)."""
 
-from music_downloader.catalog.links import extract_spotify_track_id
+from slskd_importer.catalog.links import extract_spotify_track_id
 
 
 class TestSpotifyTrackLinks:

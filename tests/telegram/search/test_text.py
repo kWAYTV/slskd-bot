@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.app import MusicBot
 from tests.telegram.helpers import (
     _make_config,
     _make_context,
@@ -15,8 +15,8 @@ from tests.telegram.helpers import (
 
 
 class TestMusicBotHandleText:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_empty_text_ignored(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -25,8 +25,8 @@ class TestMusicBotHandleText:
         await bot.handle_text(update, context)
         # Should not proceed to search
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_text_query_starts_search(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
@@ -37,8 +37,8 @@ class TestMusicBotHandleText:
         bot._do_search.assert_awaited_once()
         assert bot._do_search.await_args.args[2] == "Artist Song"
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_unauthorized_text(self, mock_slskd, mock_spotify):
         config = _make_config()

@@ -6,10 +6,10 @@ import os
 import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from music_downloader.catalog.track import TrackInfo
-from music_downloader.playlist_import import ImportJob, ImportTrack
-from music_downloader.soulseek.result import SearchResult
-from music_downloader.telegram.core.app import MusicBot
+from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.playlist_import import ImportJob, ImportTrack
+from slskd_importer.soulseek.result import SearchResult
+from slskd_importer.telegram.core.app import MusicBot
 
 
 async def _fake_to_thread(fn, *args, **kwargs):
@@ -94,8 +94,8 @@ def _make_update(chat_id=67890, user_id=12345, text="/import https://open.spotif
     return update
 
 
-@patch("music_downloader.telegram.core.app.SpotifyResolver")
-@patch("music_downloader.telegram.core.app.SlskdClient")
+@patch("slskd_importer.telegram.core.app.SpotifyResolver")
+@patch("slskd_importer.telegram.core.app.SlskdClient")
 def _setup_bot(mock_slskd_cls, mock_spotify_cls):
     config = _make_config()
     mock_slskd_cls.return_value = MagicMock()

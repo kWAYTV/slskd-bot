@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from music_downloader.telegram.core.app import MusicBot
-from music_downloader.telegram.core.session import PendingSearch
+from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.session import PendingSearch
 from tests.telegram.helpers import (
     _make_config,
     _make_search_result,
@@ -16,8 +16,8 @@ from tests.telegram.helpers import (
 
 
 class TestImportPendingSeparation:
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_import_pending_does_not_clobber_regular(self, mock_slskd, mock_spotify):
         """Import flow should use _import_pending, not overwrite self.pending."""
         bot = MusicBot(_make_config())
@@ -31,8 +31,8 @@ class TestImportPendingSeparation:
         assert bot.pending[67890].query == "regular"
         assert bot._import_pending[67890].query == "import"
 
-    @patch("music_downloader.telegram.core.app.SpotifyResolver")
-    @patch("music_downloader.telegram.core.app.SlskdClient")
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_cancel_clears_import_pending(self, mock_slskd, mock_spotify):
         """Cancellation should clear both pending dicts."""

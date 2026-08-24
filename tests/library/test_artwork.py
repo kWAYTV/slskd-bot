@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import mutagen.flac
 import mutagen.mp4
 
-from music_downloader.library.artwork import embed_artwork_into_file, fetch_spotify_artwork
+from slskd_importer.library.artwork import embed_artwork_into_file, fetch_spotify_artwork
 
 
 def _create_test_flac(path: str, with_art: bool = False) -> None:
@@ -59,7 +59,7 @@ class TestFetchSpotifyArtwork:
         mock_sp.search.return_value = {
             "tracks": {"items": [{"album": {"images": [{"url": "https://example.com/art.jpg"}]}}]}
         }
-        with patch("music_downloader.library.artwork.httpx") as mock_httpx:
+        with patch("slskd_importer.library.artwork.httpx") as mock_httpx:
             mock_resp = MagicMock()
             mock_resp.content = b"\xff\xd8\xff\xe0JFIF"
             mock_resp.raise_for_status = MagicMock()
@@ -116,7 +116,7 @@ class TestEmbedArtworkIntoFile:
         with open(m4a_path, "wb") as f:
             f.write(b"\x00" * 100)
 
-        with patch("music_downloader.library.artwork.mutagen.mp4.MP4") as mock_mp4:
+        with patch("slskd_importer.library.artwork.mutagen.mp4.MP4") as mock_mp4:
             mock_file = MagicMock()
             mock_file.tags = {}
             mock_mp4.return_value = mock_file
@@ -128,7 +128,7 @@ class TestEmbedArtworkIntoFile:
         with open(m4a_path, "wb") as f:
             f.write(b"\x00" * 100)
 
-        with patch("music_downloader.library.artwork.mutagen.mp4.MP4") as mock_mp4:
+        with patch("slskd_importer.library.artwork.mutagen.mp4.MP4") as mock_mp4:
             mock_file = MagicMock()
             tags_mock = MagicMock()
             tags_mock.get.return_value = [b"existing"]
