@@ -159,3 +159,29 @@ class TestUndoSupport:
         repo.set_status(row_id, "undone")
         assert repo.get_last_saved(5) is None
         assert repo.get_recent(1, 5)[0].status == "undone"
+
+    def test_get_for_chat_scopes_to_owner(self, repo):
+        row_id = repo.add(
+            artist="A", title="One", filename="A - One.flac", source_user="u", status="success", chat_id=5
+        )
+        assert repo.get_for_chat(row_id, 5) is not None
+        assert repo.get_for_chat(row_id, 99) is None
+
+
+class TestSummarize:
+    def test_empty_chat(self, repo):
+        stats = repo.summarize(5)
+        assert stats.total == 0
+        assert stats.success == 0
+        assert stats.top_sources == []
+
+    def test_counts_and_top_sources(self, repo):
+        repo.add(artist="A", title="1", filename="a.flac", source_user="alice", status="success", chat_id=5)
+        repo.add(artist="B", title="2", filename="b.flac", source_user="alice", status="success", chat_id=5)
+        repo.add(artist="C", title="3", filename="c.flac", source_user="bob", status="failed", chat_id=5)
+        repo.add(artist="D", title="4", filename="d.flac", source_user="carol", status="success", chat_id=99)
+        stats = repo.summarize(5)
+        assert stats.total == 3
+        assert stats.success == 2
+        assert stats.failed == 1
+        assert stats.top_sources == [("alice", 2)]

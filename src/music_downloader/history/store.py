@@ -1,7 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from music_downloader.history.record import HistoryRecord
 from music_downloader.records.database import Database
+
+
+@dataclass
+class HistoryStats:
+    total: int
+    success: int
+    rejected: int
+    failed: int
+    undone: int
+    delivered: int
+    top_sources: list[tuple[str, int]]
 
 
 class HistoryRepository:
@@ -93,9 +106,45 @@ class HistoryRepository:
         row = cursor.fetchone()
         return HistoryRecord(**dict(row)) if row else None
 
+    def get_for_chat(self, entry_id: int, chat_id: int) -> HistoryRecord | None:
+        cursor = self._conn.execute(
+            "SELECT * FROM download_history WHERE id = ? AND chat_id = ?",
+            (entry_id, chat_id),
+        )
+        row = cursor.fetchone()
+        return HistoryRecord(**dict(row)) if row else None
+
     def set_status(self, entry_id: int, status: str) -> None:
         self._conn.execute("UPDATE download_history SET status = ? WHERE id = ?", (status, entry_id))
         self._conn.commit()
+
+    def summarize(self, chat_id: int) -> HistoryStats:
+        def _count(status: str | None = None) -> int:
+            if status is None:
+                return self._conn.execute(
+                    "SELECT COUNT(*) FROM download_history WHERE chat_id = ?",
+                    (chat_id,),
+                ).fetchone()[0]
+            return self._conn.execute(
+                "SELECT COUNT(*) FROM download_history WHERE chat_id = ? AND status = ?",
+                (chat_id, status),
+            ).fetchone()[0]
+
+        sources = self._conn.execute(
+            """SELECT source_user, COUNT(*) AS n FROM download_history
+               WHERE chat_id = ? AND status = 'success'
+               GROUP BY source_user ORDER BY n DESC LIMIT 5""",
+            (chat_id,),
+        ).fetchall()
+        return HistoryStats(
+            total=_count(),
+            success=_count("success"),
+            rejected=_count("rejected"),
+            failed=_count("failed"),
+            undone=_count("undone"),
+            delivered=_count("delivered"),
+            top_sources=[(row[0], row[1]) for row in sources],
+        )
 
     def count(self, chat_id: int | None = None) -> int:
         if chat_id is None:
