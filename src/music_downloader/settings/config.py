@@ -40,11 +40,12 @@ class Config:
         self.output_dir = os.getenv("OUTPUT_DIR", "/music")
         self.data_dir = os.getenv("DATA_DIR", "/data")
 
-        self.auto_mode = os.getenv("AUTO_MODE", "false").lower() == "true"
         self.max_results = int(os.getenv("MAX_RESULTS", "5"))
         self.duration_tolerance_secs = int(os.getenv("DURATION_TOLERANCE_SECS", "5"))
         self.search_timeout_secs = int(os.getenv("SEARCH_TIMEOUT_SECS", "30"))
         self.download_timeout_secs = int(os.getenv("DOWNLOAD_TIMEOUT_SECS", "600"))
+        self.max_concurrent_downloads = max(1, int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3")))
+        self.approval_ttl_secs = max(60, int(os.getenv("APPROVAL_TTL_SECS", "86400")))
 
         exclude_kw = os.getenv(
             "EXCLUDE_KEYWORDS",
@@ -68,23 +69,23 @@ class Config:
 
     def _log_summary(self, limit_mb: int) -> None:
         logger.info(
-            "Config: download_dir=%s output_dir=%s data_dir=%s auto=%s quality=%s "
-            "max_results=%s search_timeout=%ss download_timeout=%ss duration_tol=%ss file_limit=%sMB",
+            "Config: download_dir=%s output_dir=%s data_dir=%s quality=%s "
+            "max_results=%s search_timeout=%ss download_timeout=%ss duration_tol=%ss "
+            "file_limit=%sMB concurrent=%s approval_ttl=%ss",
             self.download_dir,
             self.output_dir,
             self.data_dir,
-            self.auto_mode,
             self.quality_preference,
             self.max_results,
             self.search_timeout_secs,
             self.download_timeout_secs,
             self.duration_tolerance_secs,
             limit_mb,
+            self.max_concurrent_downloads,
+            self.approval_ttl_secs,
         )
         if self.telegram_api_base_url:
             logger.info("Local Bot API server at %s (file limit %sMB)", self.telegram_api_base_url, limit_mb)
-        if self.auto_mode:
-            logger.info("AUTO_MODE enabled — best match will be downloaded automatically")
 
         if self.telegram_allowed_users:
             logger.info("Bot restricted to %d allowed user(s)", len(self.telegram_allowed_users))

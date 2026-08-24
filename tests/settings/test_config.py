@@ -40,22 +40,24 @@ class TestConfig:
             from music_downloader.settings import Config
 
             config = Config()
-            assert config.auto_mode is False
             assert config.max_results == 5
+            assert config.max_concurrent_downloads == 3
+            assert config.approval_ttl_secs == 86400
             assert config.duration_tolerance_secs == 5
             assert config.search_timeout_secs == 30
             assert config.download_timeout_secs == 600
             assert config.log_level == 20  # logging.INFO
             assert config.health_port == 8080
 
-    def test_auto_mode_enabled(self, env_vars):
-        """Config parses AUTO_MODE=true correctly."""
-        env_vars["AUTO_MODE"] = "true"
+    def test_concurrent_and_ttl_override(self, env_vars):
+        env_vars["MAX_CONCURRENT_DOWNLOADS"] = "5"
+        env_vars["APPROVAL_TTL_SECS"] = "120"
         with patch.dict(os.environ, env_vars, clear=False):
             from music_downloader.settings import Config
 
             config = Config()
-            assert config.auto_mode is True
+            assert config.max_concurrent_downloads == 5
+            assert config.approval_ttl_secs == 120
 
     def test_allowed_users_parsing(self, env_vars):
         """Config parses comma-separated user IDs."""
