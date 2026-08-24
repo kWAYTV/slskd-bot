@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from telegram.constants import ParseMode
 
 from music_downloader.catalog.track import TrackInfo
@@ -11,6 +13,8 @@ from music_downloader.telegram.ui.editing import safe_edit
 from music_downloader.telegram.ui.formatting import format_result_reasons, format_search_results, track_md
 from music_downloader.telegram.ui.keyboards import build_results_keyboard
 from music_downloader.telegram.ui.markdown import md_code_safe
+
+logger = logging.getLogger(__name__)
 
 
 async def present_search_results(
@@ -35,6 +39,7 @@ async def present_search_results(
     )
 
     if self.is_auto(chat_id):
+        logger.info("chat=%s auto-downloading top result for %s - %s", chat_id, track.artist, track.title)
         header = track_md(track)
         await safe_edit(
             searching_msg,

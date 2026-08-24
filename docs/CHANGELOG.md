@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Operational logging: millisecond timestamps, silenced noisy HTTP/Telegram clients, and lifecycle logs for search, download, approval, import, auth, and cancel
+- Dependencies and CI pins refreshed (PTB 22.8, slskd-api 0.2.4, ruff 0.16.4, CodeQL Action 4.37.8, pre-commit-hooks v6)
+
 ### Added
 
 - Live download progress: the "Downloading" status message now updates with a percentage and progress bar (manual search and playlist import flows)

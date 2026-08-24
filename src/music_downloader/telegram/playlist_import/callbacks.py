@@ -58,6 +58,7 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
 async def _start_job(self, update, context, chat_id: int, job_id: int):
     query = update.callback_query
     await safe_query_edit(query, ("✅ Import started! Processing tracks one by one..."))
+    logger.info("chat=%s started import job %s", chat_id, job_id)
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.active)
     self._active_import[chat_id] = job_id
     generation = self._chat_generation.get(chat_id, 0)
@@ -71,6 +72,7 @@ async def _start_job(self, update, context, chat_id: int, job_id: int):
 async def _cancel_job(self, query, chat_id: int, job_id: int):
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
     self._active_import.pop(chat_id, None)
+    logger.info("chat=%s cancelled import job %s via keyboard", chat_id, job_id)
     await safe_query_edit(query, ("❌ Import cancelled."))
 
 
@@ -79,6 +81,7 @@ async def _discard_track(self, query, context, chat_id: int, job_id: int, track_
     for stale_id in stale:
         await self._cleanup_download_artifacts(self.downloads.pop(stale_id))
     await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Rejected by user")
+    logger.info("chat=%s import job %s discarded track %s", chat_id, job_id, track_id)
     await safe_query_edit(query, ("🗑 Track discarded."))
     generation = self._chat_generation.get(chat_id, 0)
     await self._process_next_import_track(context, chat_id, job_id, generation)
@@ -86,6 +89,7 @@ async def _discard_track(self, query, context, chat_id: int, job_id: int, track_
 
 async def _skip_track(self, query, context, chat_id: int, job_id: int, track_id: int):
     await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.skipped)
+    logger.info("chat=%s import job %s skipped track %s", chat_id, job_id, track_id)
     await safe_query_edit(query, ("⏭ Track skipped."))
     generation = self._chat_generation.get(chat_id, 0)
     await self._process_next_import_track(context, chat_id, job_id, generation)
@@ -153,6 +157,7 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
         return
 
     await self._edit_approval_message(query, (f"✅ Saved: `{target_name}`"))
+    logger.info("chat=%s import job %s saved track %s as %s", chat_id, job_id, track_id, target_name)
     await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.completed)
     await self._process_next_import_track(context, chat_id, job_id, self._chat_generation.get(chat_id, 0))
 

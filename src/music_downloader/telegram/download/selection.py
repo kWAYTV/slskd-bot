@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 
 from music_downloader.telegram.ui.markdown import escape_md, md_code_safe
+
+logger = logging.getLogger(__name__)
 
 
 async def handle_download_selection(self, update, context, chat_id: int, data: str):
@@ -32,6 +35,13 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     result = pending.results[index]
     track = pending.track
     user_id = pending.user_id or query.from_user.id
+    logger.info(
+        "chat=%s selected #%d %s from %s",
+        chat_id,
+        index + 1,
+        result.basename,
+        result.username,
+    )
 
     with contextlib.suppress(BadRequest):
         await query.edit_message_reply_markup(reply_markup=None)

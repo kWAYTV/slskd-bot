@@ -185,6 +185,12 @@ def create_bot(config: Config) -> Application:
     app.add_handler(CommandHandler("cancel", bot.cmd_cancel))
     app.add_handler(CallbackQueryHandler(bot.handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_text))
+    app.add_error_handler(_on_error)
 
-    logger.info("Telegram bot configured")
+    logger.info("Telegram bot configured (local_api=%s)", bool(config.telegram_api_base_url))
     return app
+
+
+async def _on_error(update: object, context) -> None:
+    """Log unhandled exceptions from conversation handlers."""
+    logger.error("Unhandled Telegram error: %s", context.error, exc_info=context.error)

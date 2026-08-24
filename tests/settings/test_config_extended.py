@@ -25,8 +25,13 @@ class TestSetupLogging:
             setup_logging(config)
             assert logging.getLogger("httpx").level == logging.WARNING
             assert logging.getLogger("httpcore").level == logging.WARNING
+            assert logging.getLogger("urllib3").level == logging.WARNING
             assert logging.getLogger("telegram").level == logging.WARNING
+            assert logging.getLogger("telegram.ext").level == logging.WARNING
             assert logging.getLogger("spotipy").level == logging.WARNING
+            assert logging.getLogger("music_downloader").level == logging.DEBUG
+            root = logging.getLogger()
+            assert "%(name)s" in root.handlers[0].formatter._fmt
 
 
 class TestConfigWarnLevel:

@@ -6,7 +6,11 @@ attributes in ``core.app``.
 
 from __future__ import annotations
 
+import logging
+
 from telegram import Update
+
+logger = logging.getLogger(__name__)
 
 
 def is_authorized(self, user_id: int) -> bool:
@@ -28,7 +32,9 @@ def can_save_library(self, user_id: int | None) -> bool:
 
 
 async def check_auth(self, update: Update) -> bool:
-    if not self._is_authorized(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not self._is_authorized(user_id):
+        logger.warning("Denied unauthorized user %s", user_id)
         await update.message.reply_text("You are not authorized to use this bot.")
         return False
     return True
@@ -37,7 +43,9 @@ async def check_auth(self, update: Update) -> bool:
 async def check_library_auth(self, update: Update) -> bool:
     if not await self._check_auth(update):
         return False
-    if not self._can_save_library(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not self._can_save_library(user_id):
+        logger.info("Denied library access for user %s", user_id)
         await update.message.reply_text(
             "You can search and download files, but only library users can save to the music library or import playlists."
         )

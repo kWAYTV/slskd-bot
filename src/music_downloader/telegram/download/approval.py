@@ -70,7 +70,7 @@ async def _approve_download(self, query, context, chat_id: int, dl_id: str, pend
         return
 
     await self._edit_approval_message(query, (f"✅ Saved: `{target_name}`"))
-    logger.info(f"Approved and saved: {target_name}")
+    logger.info("chat=%s approved and saved: %s", chat_id, target_name)
     await self._dismiss_other_downloads(context, chat_id)
 
 
@@ -85,7 +85,7 @@ async def _reject_download(self, query, chat_id: int, pending_dl):
         (f"🗑 Discarded: {escape_md(track.artist)} - {escape_md(track.title)}"),
     )
     await self._add_history(track, result, "rejected", chat_id=chat_id)
-    logger.info(f"Rejected: {track.artist} - {track.title} ({result.basename})")
+    logger.info("chat=%s rejected: %s - %s (%s)", chat_id, track.artist, track.title, result.basename)
 
 
 async def dismiss_other_downloads(self, context, chat_id: int):

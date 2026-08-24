@@ -67,19 +67,32 @@ class Config:
         self._log_summary(limit_mb)
 
     def _log_summary(self, limit_mb: int) -> None:
-        logger.info("Configuration loaded successfully")
+        logger.info(
+            "Config: download_dir=%s output_dir=%s data_dir=%s auto=%s quality=%s "
+            "max_results=%s search_timeout=%ss download_timeout=%ss duration_tol=%ss file_limit=%sMB",
+            self.download_dir,
+            self.output_dir,
+            self.data_dir,
+            self.auto_mode,
+            self.quality_preference,
+            self.max_results,
+            self.search_timeout_secs,
+            self.download_timeout_secs,
+            self.duration_tolerance_secs,
+            limit_mb,
+        )
         if self.telegram_api_base_url:
-            logger.info(f"Using local Bot API server at {self.telegram_api_base_url} (file limit {limit_mb}MB)")
+            logger.info("Local Bot API server at %s (file limit %sMB)", self.telegram_api_base_url, limit_mb)
         if self.auto_mode:
             logger.info("AUTO_MODE enabled — best match will be downloaded automatically")
 
         if self.telegram_allowed_users:
-            logger.info(f"Bot restricted to {len(self.telegram_allowed_users)} allowed user(s)")
+            logger.info("Bot restricted to %d allowed user(s)", len(self.telegram_allowed_users))
         else:
             logger.warning("TELEGRAM_ALLOWED_USERS is empty — bot will deny all commands until configured")
 
         if self.telegram_library_users:
-            logger.info(f"Library save restricted to {len(self.telegram_library_users)} user(s)")
+            logger.info("Library save restricted to %d user(s)", len(self.telegram_library_users))
         else:
             logger.info("TELEGRAM_LIBRARY_USERS is empty — all allowed users can save to the library")
 

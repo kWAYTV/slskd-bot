@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from music_downloader.telegram.search.links import handle_link_query
+
+logger = logging.getLogger(__name__)
 
 
 async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -24,4 +28,5 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await self._cancel_chat_operations(chat_id)
     generation = self._chat_generation[chat_id]
+    logger.info("chat=%s user=%s search query=%r", chat_id, update.effective_user.id, query)
     await self._do_search(update, context, query, generation)

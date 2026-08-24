@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from telegram.constants import ParseMode
 
@@ -10,6 +11,8 @@ from music_downloader.catalog.track import TrackInfo
 from music_downloader.playlist_import.job import TrackStatus
 from music_downloader.telegram.playlist_import.summary import send_import_summary
 from music_downloader.telegram.ui.markdown import escape_md
+
+logger = logging.getLogger(__name__)
 
 
 async def process_next_import_track(self, context, chat_id: int, job_id: int, generation: int):
@@ -36,6 +39,15 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
     completed, failed, skipped, total = progress
     position = completed + failed + skipped + 1
 
+    logger.info(
+        "chat=%s import job %s track %d/%d: %s - %s",
+        chat_id,
+        job_id,
+        position,
+        total,
+        track_info.artist,
+        track_info.title,
+    )
     await asyncio.to_thread(self.import_repo.update_track_status, next_track.id, TrackStatus.searching)
 
     searching_msg = await context.bot.send_message(

@@ -29,6 +29,7 @@ async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAU
         return
 
     search_query = pending.query
+    logger.info("chat=%s direct Soulseek search %r", chat_id, search_query)
     generation = self._chat_generation.get(chat_id, 0)
     display_track = _synthetic_track(search_query, None)
 

@@ -80,8 +80,17 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
 
         ranked, is_fallback, stale = await search_with_fallbacks(self, track, chat_id, generation, on_tier=on_tier)
         if stale:
+            logger.info("chat=%s search cancelled (stale) for %s - %s", chat_id, track.artist, track.title)
             return
 
+        logger.info(
+            "chat=%s slskd ranked %d result(s) fallback=%s for %s - %s",
+            chat_id,
+            len(ranked),
+            is_fallback,
+            track.artist,
+            track.title,
+        )
         if not ranked:
             await safe_edit(
                 searching_msg,

@@ -32,6 +32,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         if self._is_stale(chat_id, generation):
             return
 
+        logger.info("chat=%s Spotify returned %d track(s) for %r", chat_id, len(tracks), query)
         if not tracks:
             await safe_edit(
                 searching_msg,
@@ -44,6 +45,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
 
         unique_tracks = _filter_candidates(query, tracks)
 
+        logger.debug("chat=%s Spotify candidates after filter: %d", chat_id, len(unique_tracks))
         if len(unique_tracks) == 1:
             self.pending[chat_id] = PendingSearch(
                 query=query,

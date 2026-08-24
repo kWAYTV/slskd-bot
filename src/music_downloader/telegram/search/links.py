@@ -24,11 +24,13 @@ async def handle_link_query(self, update: Update, context: ContextTypes.DEFAULT_
         # bouncing the user to /import.
         if not await self._check_library_auth(update):
             return True
+        logger.info("chat=%s pasted playlist/album link", chat_id)
         await start_import_from_url(self, update, context, chat_id, query.split()[0])
         return True
 
     spotify_track_id = extract_spotify_track_id(query)
     if spotify_track_id:
+        logger.info("chat=%s pasted Spotify track %s", chat_id, spotify_track_id)
         await _search_from_spotify_link(self, update, context, chat_id, spotify_track_id)
         return True
 

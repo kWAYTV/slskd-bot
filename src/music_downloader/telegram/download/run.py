@@ -56,12 +56,23 @@ async def do_download(
         user_id=user_id,
     )
     self.downloads[dl_id] = pending_dl
+    logger.info(
+        "chat=%s download %s %s: %s - %s from %s (%s)",
+        chat_id,
+        dl_id,
+        label,
+        track.artist,
+        track.title,
+        result.username,
+        result.basename,
+    )
 
     render_progress = _progress_renderer(status_msg, label, track, result)
 
     try:
         outcome = await fetch_from_peer(self, result, make_progress_callback(pending_dl, render_progress))
         if not outcome.enqueued:
+            logger.warning("chat=%s enqueue failed for %s from %s", chat_id, result.basename, result.username)
             await _report_enqueue_failure(self, status_msg, chat_id, result, result_index, dl_id)
             return
 
@@ -71,12 +82,14 @@ async def do_download(
 
         if outcome.failed:
             state = status.state if status else ("Timeout")
+            logger.warning("chat=%s transfer failed (%s): %s", chat_id, state, result.basename)
             await _report_download_failure(self, status_msg, chat_id, result, result_index, dl_id, state)
             await self._add_history(track, result, "failed", chat_id=chat_id)
             return
 
         source_path = outcome.source_path
         if not source_path:
+            logger.error("chat=%s downloaded file missing on disk: %s", chat_id, result.basename)
             self.downloads.pop(dl_id, None)
             await safe_edit(
                 status_msg,

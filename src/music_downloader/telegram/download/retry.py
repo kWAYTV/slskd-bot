@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from music_downloader.telegram.ui.editing import safe_query_edit
 from music_downloader.telegram.ui.markdown import md_code_safe
+
+logger = logging.getLogger(__name__)
 
 
 async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
@@ -27,6 +31,7 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
     track = pending_dl.track
     result_index = pending_dl.result_index
     label = f"#{result_index + 1}"
+    logger.info("chat=%s retrying %s %s", chat_id, label, result.basename)
 
     await safe_query_edit(
         query,
@@ -74,6 +79,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
     next_result = pending.results[next_idx]
     track = pending_dl.track
     label = f"#{next_idx + 1}"
+    logger.info("chat=%s trying next result %s %s", chat_id, label, next_result.basename)
 
     await safe_query_edit(
         query,

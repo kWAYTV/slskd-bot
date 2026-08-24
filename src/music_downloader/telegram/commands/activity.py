@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -10,6 +11,8 @@ from telegram.ext import ContextTypes
 
 from music_downloader.playlist_import.job import JobStatus
 from music_downloader.telegram.ui.markdown import code_span, escape_md
+
+logger = logging.getLogger(__name__)
 
 _STATUS_ICONS = {
     "success": "✅",
@@ -112,6 +115,7 @@ async def cmd_undo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if deleted:
         await asyncio.to_thread(self.history_repo.set_status, entry.id, "undone")
+        logger.info("chat=%s undid library save %s", chat_id, entry.filename)
         await update.message.reply_text(
             (f"↩️ Removed from library: {code_span(entry.filename)}"),
             parse_mode=ParseMode.MARKDOWN,
@@ -135,6 +139,7 @@ async def cmd_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if job_id:
         await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
         await self._cancel_chat_operations(chat_id)
+        logger.info("chat=%s cancelled import job %s", chat_id, job_id)
         await update.message.reply_text("❌ Import cancelled.")
         return
 
@@ -142,6 +147,7 @@ async def cmd_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if active:
         await asyncio.to_thread(self.import_repo.update_job_status, active.id, JobStatus.cancelled)
         await self._cancel_chat_operations(chat_id)
+        logger.info("chat=%s cancelled import job %s", chat_id, active.id)
         await update.message.reply_text("❌ Import cancelled.")
         return
 

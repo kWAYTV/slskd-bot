@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -13,6 +14,8 @@ from music_downloader.telegram.playlist_import.resume import resume_import_job
 from music_downloader.telegram.ui.editing import safe_edit
 from music_downloader.telegram.ui.keyboards import build_import_confirm_keyboard
 from music_downloader.telegram.ui.markdown import escape_md
+
+logger = logging.getLogger(__name__)
 
 
 async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -97,6 +100,14 @@ async def start_import_from_url(self, update: Update, context: ContextTypes.DEFA
         for i, t in enumerate(playlist_info.tracks)
     ]
     await asyncio.to_thread(self.import_repo.add_tracks, job_id, track_dicts)
+    logger.info(
+        "chat=%s created import job %s (%s, %d tracks): %s",
+        chat_id,
+        job_id,
+        "album" if playlist_info.is_album else "playlist",
+        playlist_info.total_tracks,
+        playlist_info.name,
+    )
 
     type_label = ("album") if playlist_info.is_album else ("playlist")
     await safe_edit(

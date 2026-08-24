@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 
 from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from music_downloader.telegram.ui.editing import safe_query_edit
+
+logger = logging.getLogger(__name__)
 
 
 async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -22,6 +25,7 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
 
     chat_id = update.effective_chat.id
     data = query.data
+    logger.debug("Callback chat=%s user=%s data=%s", chat_id, query.from_user.id, data)
 
     prefix = data.split(":", 1)[0]
     handler = {
@@ -55,10 +59,13 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         await _switch_quality_preference(self, query, chat_id, data)
         return
 
+    logger.warning("Unknown callback prefix %r from chat %s", prefix, chat_id)
+
 
 async def _toggle_auto_mode(self, query, chat_id: int, data: str) -> None:
     self._auto_overrides[chat_id] = data == "auto:on"
     mode_str = ("ON") if self.is_auto(chat_id) else ("OFF")
+    logger.info("chat=%s auto-mode=%s", chat_id, mode_str)
     await safe_query_edit(
         query,
         (f"Auto-download mode: *{mode_str}*"),
@@ -70,6 +77,7 @@ async def _switch_quality_preference(self, query, chat_id: int, data: str) -> No
     pref = data.split(":", 1)[1]
     if pref in ("cd", "hires"):
         self._quality_overrides[chat_id] = pref
+    logger.info("chat=%s quality=%s", chat_id, self.quality_pref(chat_id))
     label = ("CD quality (16/44.1)") if self.quality_pref(chat_id) == "cd" else ("Hi-Res (24-bit)")
     await safe_query_edit(
         query,

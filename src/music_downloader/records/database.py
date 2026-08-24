@@ -4,6 +4,7 @@ import atexit
 import contextlib
 import logging
 import os
+import shutil
 import sqlite3
 import time
 from pathlib import Path
@@ -70,9 +71,14 @@ CREATE INDEX IF NOT EXISTS idx_download_history_chat ON download_history(chat_id
 def _open_connection(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
-    conn.execute("PRAGMA foreign_keys=ON")
+    try:
+        conn.execute("SELECT count(*) FROM sqlite_master")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA foreign_keys=ON")
+    except Exception:
+        conn.close()
+        raise
     return conn
 
 
@@ -88,12 +94,20 @@ class Database:
             if failed_conn is not None:
                 with contextlib.suppress(Exception):
                     failed_conn.close()
+                self._conn = None
             backup = f"{db_path}.bak.{int(time.time())}"
             logger.warning("Database corrupt or unreadable at %s — backing up to %s and recreating", db_path, backup)
             for suffix in ("", "-wal", "-shm"):
                 src = f"{db_path}{suffix}"
                 if os.path.exists(src):
-                    os.rename(src, f"{backup}{suffix}")
+                    dest = f"{backup}{suffix}"
+                    try:
+                        os.replace(src, dest)
+                    except OSError:
+                        # Windows can hold a brief lock after close; copy then unlink.
+                        shutil.copy2(src, dest)
+                        with contextlib.suppress(OSError):
+                            os.remove(src)
             self._conn = _open_connection(db_path)
             self._init_schema()
         atexit.register(self.close)

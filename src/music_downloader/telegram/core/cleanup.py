@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 async def cancel_chat_operations(self, chat_id: int) -> bool:
     had_work, stale = self._session.cancel_chat_operations(chat_id)
+    if had_work:
+        logger.info("Cancelled in-flight work for chat %s (%d download(s))", chat_id, len(stale))
     for dl in stale:
         await self._cleanup_download_artifacts(dl)
     return had_work

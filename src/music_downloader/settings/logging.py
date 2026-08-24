@@ -4,16 +4,38 @@ import logging
 
 from music_downloader.settings.config import Config
 
+LOG_FORMAT = "%(asctime)s.%(msecs)03d %(levelname)-8s [%(name)s] %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-def setup_logging(config: Config):
-    """Configure logging for the application."""
+# Third-party loggers that drown operational output at INFO/DEBUG.
+_NOISY_LOGGERS = (
+    "httpx",
+    "httpcore",
+    "urllib3",
+    "telegram",
+    "telegram.ext",
+    "spotipy",
+    "asyncio",
+    "h11",
+    "hpack",
+)
+
+
+def setup_logging(config: Config) -> None:
+    """Configure logging for the application.
+
+    ``force=True`` replaces any earlier basicConfig (e.g. from a library)
+    so LOG_LEVEL actually applies. Noisy HTTP/Telegram clients stay at
+    WARNING so DEBUG of ``music_downloader.*`` stays readable.
+    """
     logging.basicConfig(
         level=config.log_level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+        format=LOG_FORMAT,
+        datefmt=DATE_FORMAT,
+        force=True,
     )
 
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("telegram").setLevel(logging.WARNING)
-    logging.getLogger("spotipy").setLevel(logging.WARNING)
+    for name in _NOISY_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+    logging.getLogger("music_downloader").setLevel(config.log_level)

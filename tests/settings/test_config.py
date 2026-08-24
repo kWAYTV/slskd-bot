@@ -18,6 +18,8 @@ class TestConfig:
             "SPOTIFY_CLIENT_SECRET": "test-client-secret",
             "SLSKD_HOST": "http://localhost:5030",
             "SLSKD_API_KEY": "test-api-key",
+            "TELEGRAM_ALLOWED_USERS": "",
+            "TELEGRAM_LIBRARY_USERS": "",
         }
 
     def test_loads_required_vars(self, env_vars):
