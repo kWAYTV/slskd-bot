@@ -97,21 +97,3 @@ class TestMain:
     def test_unknown_command(self):
         with patch.object(sys, "argv", ["slskd-importer", "unknown"]), pytest.raises(SystemExit):
             main()
-
-
-class TestLegacyModuleAlias:
-    def test_import_alias(self):
-        import music_downloader
-        import slskd_importer
-
-        assert music_downloader.__version__ == slskd_importer.__version__
-
-    def test_python_m_music_downloader(self):
-        with (
-            patch.object(sys, "argv", ["music_downloader", "run"]),
-            patch("slskd_importer.__main__.cmd_run") as mock_run,
-        ):
-            from music_downloader.__main__ import main as legacy_main
-
-            legacy_main()
-            mock_run.assert_called_once()

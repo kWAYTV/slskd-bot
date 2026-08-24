@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Python package renamed `music_downloader` → `slskd_importer` (`python -m slskd_importer`). `python -m music_downloader` remains a compatibility alias.
+- Python package renamed `music_downloader` → `slskd_importer` (`python -m slskd_importer`)
 - Operational logging: millisecond timestamps, silenced noisy HTTP/Telegram clients, and lifecycle logs for search, download, approval, import, auth, and cancel
 - Dependencies and CI pins refreshed (PTB 22.8, slskd-api 0.2.4, ruff 0.16.4, CodeQL Action 4.37.8, pre-commit-hooks v6)
 - Schema v4 adds `chat_prefs` for persisted per-chat quality preference
