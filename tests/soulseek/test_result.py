@@ -22,6 +22,14 @@ class TestSearchResult:
         r = SearchResult(username="u", filename="\\Music/Artist\\Song.flac", size=100)
         assert r.basename == "Song.flac"
 
+    def test_parent_dir_windows_path(self):
+        r = SearchResult(username="u", filename="\\Music\\2009 Remaster\\Song.flac", size=100)
+        assert r.parent_dir == "2009 Remaster"
+
+    def test_parent_dir_bare_filename(self):
+        r = SearchResult(username="u", filename="Song.flac", size=100)
+        assert r.parent_dir == ""
+
     def test_extension(self):
         r = SearchResult(username="u", filename="\\Music\\Song.flac", size=100)
         assert r.extension == "flac"
@@ -147,3 +155,11 @@ class TestDownloadStatus:
     def test_is_active_failed(self):
         s = DownloadStatus(username="u", filename="f", state="Errored")
         assert s.is_active is False
+
+    def test_is_queued_and_state_display(self):
+        queued = DownloadStatus(username="u", filename="f", state="Queued, Remotely")
+        assert queued.is_queued is True
+        assert queued.state_display == "⌛ queued at peer"
+        xfer = DownloadStatus(username="u", filename="f", state="InProgress")
+        assert xfer.is_queued is False
+        assert xfer.state_display == "⬇️ transferring"

@@ -25,6 +25,14 @@ class SearchResult:
         return self.filename.replace("\\", "/").rsplit("/", 1)[-1]
 
     @property
+    def parent_dir(self) -> str:
+        """Immediate parent folder of the remote file, or empty if none."""
+        parts = [p for p in self.filename.replace("\\", "/").split("/") if p]
+        if len(parts) < 2:
+            return ""
+        return parts[-2]
+
+    @property
     def extension(self) -> str:
         """File extension in lowercase."""
         return self.basename.rsplit(".", 1)[-1].lower() if "." in self.basename else ""
@@ -83,3 +91,16 @@ class DownloadStatus:
     @property
     def is_active(self) -> bool:
         return not self.is_complete and not self.is_failed
+
+    @property
+    def is_queued(self) -> bool:
+        return "queued" in self.state.lower()
+
+    @property
+    def state_display(self) -> str:
+        """Short human label for in-flight transfer state."""
+        if self.is_queued:
+            return "⌛ queued at peer"
+        if "inprogress" in self.state.lower() or "transferring" in self.state.lower():
+            return "⬇️ transferring"
+        return self.state or "starting..."
