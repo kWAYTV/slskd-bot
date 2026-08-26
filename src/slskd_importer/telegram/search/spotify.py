@@ -23,7 +23,7 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=(f"🔍 Looking up: `{query}`"),
+        text=self.t(chat_id, "looking_up", query=query),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -36,9 +36,9 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         if not tracks:
             await safe_edit(
                 searching_msg,
-                (f"Could not find `{query}` on Spotify.\nYou can search Soulseek directly instead."),
+                self.t(chat_id, "spotify_not_found", query=query),
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_direct_search_keyboard(),
+                reply_markup=build_direct_search_keyboard(locale=self.locale(chat_id)),
             )
             self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
             return
@@ -60,17 +60,17 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
         await safe_edit(
             searching_msg,
-            format_spotify_results(unique_tracks, page=0),
+            format_spotify_results(unique_tracks, page=0, locale=self.locale(chat_id)),
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=True,
-            reply_markup=build_spotify_keyboard(unique_tracks, page=0),
+            reply_markup=build_spotify_keyboard(unique_tracks, page=0, locale=self.locale(chat_id)),
         )
 
     except Exception:
         logger.exception(f"Unexpected error in _do_search for: {query}")
         self._spotify_candidates.pop(chat_id, None)
         self._spotify_page.pop(chat_id, None)
-        await safe_edit(searching_msg, ("Something went wrong. Please try again."))
+        await safe_edit(searching_msg, self.t(chat_id, "something_wrong"))
 
 
 def _filter_candidates(query: str, tracks: list[TrackInfo]) -> list[TrackInfo]:
@@ -118,7 +118,7 @@ async def handle_spotify_page(self, update, context, chat_id: int, data: str):
     query = update.callback_query
     candidates = self._spotify_candidates.get(chat_id)
     if not candidates:
-        await query.edit_message_text("Search expired. Send a new query.")
+        await query.edit_message_text(self.t(chat_id, "search_expired"))
         return
 
     try:
@@ -128,10 +128,10 @@ async def handle_spotify_page(self, update, context, chat_id: int, data: str):
 
     self._spotify_page[chat_id] = page
     await query.edit_message_text(
-        format_spotify_results(candidates, page=page),
+        format_spotify_results(candidates, page=page, locale=self.locale(chat_id)),
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
-        reply_markup=build_spotify_keyboard(candidates, page=page),
+        reply_markup=build_spotify_keyboard(candidates, page=page, locale=self.locale(chat_id)),
     )
 
 
@@ -144,7 +144,7 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
     self._spotify_page.pop(chat_id, None)
 
     if action == "cancel" or not candidates:
-        await query.edit_message_text("Cancelled.")
+        await query.edit_message_text(self.t(chat_id, "cancelled"))
         return
 
     try:
@@ -157,13 +157,13 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
 
     track = candidates[index]
     await query.edit_message_text(
-        (f"Selected: {track_md(track)} ({track.duration_display})"),
+        self.t(chat_id, "spotify_selected", track=track_md(track), duration=track.duration_display),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=("🔍 Searching slskd for FLAC..."),
+        text=self.t(chat_id, "searching_slskd"),
         parse_mode=ParseMode.MARKDOWN,
     )
     generation = self._chat_generation.get(chat_id, 0)

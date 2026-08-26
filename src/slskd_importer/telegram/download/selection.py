@@ -18,14 +18,14 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     query = update.callback_query
     pending = self.pending.get(chat_id)
     if not pending:
-        await query.edit_message_text("Search expired. Send a new query.")
+        await query.edit_message_text(self.t(chat_id, "search_expired"))
         return
 
     action = data.split(":", 1)[1]
 
     if action == "cancel":
         del self.pending[chat_id]
-        await query.edit_message_text("Cancelled.")
+        await query.edit_message_text(self.t(chat_id, "cancelled"))
         return
 
     index = _parse_result_index(action)
@@ -48,8 +48,14 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=(
-            f"⬇️ *Downloading #{index + 1}...*\n{escape_md(track.artist)} - {escape_md(track.title)}\nFrom: `{md_code_safe(result.username)}`\nFile: `{md_code_safe(result.basename)}`"
+        text=self.t(
+            chat_id,
+            "downloading",
+            label=f"#{index + 1}",
+            artist=escape_md(track.artist),
+            title=escape_md(track.title),
+            user=md_code_safe(result.username),
+            file=md_code_safe(result.basename),
         ),
         parse_mode=ParseMode.MARKDOWN,
     )

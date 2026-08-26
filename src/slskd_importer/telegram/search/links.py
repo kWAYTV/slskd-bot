@@ -44,14 +44,14 @@ async def _search_from_spotify_link(self, update, context, chat_id: int, track_i
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text="🔗 Resolving Spotify track link...",
+        text=self.t(chat_id, "resolving_link"),
     )
 
     track = await asyncio.to_thread(self.spotify.get_track, track_id)
     if self._is_stale(chat_id, generation):
         return
     if not track:
-        await safe_edit(searching_msg, "Could not resolve that Spotify track link. Try the song name instead.")
+        await safe_edit(searching_msg, self.t(chat_id, "link_failed"))
         return
 
     self.pending[chat_id] = PendingSearch(

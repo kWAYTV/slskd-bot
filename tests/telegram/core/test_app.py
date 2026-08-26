@@ -188,6 +188,18 @@ class TestPerChatQualityPref:
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
+    def test_locale_reloaded_from_db(self, mock_slskd, mock_spotify):
+        config = _make_config()
+        bot = MusicBot(config)
+        bot.prefs_repo.set_locale(67890, "es")
+        restarted = MusicBot(config)
+        assert restarted.locale(67890) == "es"
+        assert restarted.locale(11111) == "en"
+        assert restarted.has_locale(67890)
+        assert not restarted.has_locale(11111)
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_download_semaphore(self, mock_slskd, mock_spotify):
         import asyncio
 

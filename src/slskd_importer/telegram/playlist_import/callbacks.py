@@ -30,7 +30,7 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
 
     job = await asyncio.to_thread(self.import_repo.get_job_for_chat, job_id, chat_id)
     if not job:
-        await safe_query_edit(query, ("⏹ Import not found."))
+        await safe_query_edit(query, self.t(chat_id, "import_not_found"))
         return
 
     if prefix == "ic":
@@ -57,11 +57,13 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
 
 async def _start_job(self, update, context, chat_id: int, job_id: int):
     query = update.callback_query
-    await safe_query_edit(query, ("✅ Import started! Progress updates in the next message."))
+    await safe_query_edit(query, self.t(chat_id, "import_started"))
     logger.info("chat=%s started import job %s", chat_id, job_id)
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.active)
     self._active_import[chat_id] = job_id
-    progress_msg = await context.bot.send_message(chat_id=chat_id, text="📋 *Import starting…*", parse_mode="Markdown")
+    progress_msg = await context.bot.send_message(
+        chat_id=chat_id, text=self.t(chat_id, "import_starting"), parse_mode="Markdown"
+    )
     self._import_status_msg[chat_id] = progress_msg
     generation = self._chat_generation.get(chat_id, 0)
     task = context.application.create_task(
@@ -75,7 +77,7 @@ async def _cancel_job(self, query, chat_id: int, job_id: int):
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
     self._active_import.pop(chat_id, None)
     logger.info("chat=%s cancelled import job %s via keyboard", chat_id, job_id)
-    await safe_query_edit(query, ("❌ Import cancelled."))
+    await safe_query_edit(query, self.t(chat_id, "import_cancelled"))
 
 
 async def _discard_track(self, query, context, chat_id: int, job_id: int, track_id: int):
@@ -84,7 +86,7 @@ async def _discard_track(self, query, context, chat_id: int, job_id: int, track_
         await self._cleanup_download_artifacts(self.downloads.pop(stale_id))
     await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Rejected by user")
     logger.info("chat=%s import job %s discarded track %s", chat_id, job_id, track_id)
-    await safe_query_edit(query, ("🗑 Track discarded."))
+    await safe_query_edit(query, self.t(chat_id, "import_discarded"))
     generation = self._chat_generation.get(chat_id, 0)
     await self._process_next_import_track(context, chat_id, job_id, generation)
 
@@ -92,7 +94,7 @@ async def _discard_track(self, query, context, chat_id: int, job_id: int, track_
 async def _skip_track(self, query, context, chat_id: int, job_id: int, track_id: int):
     await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.skipped)
     logger.info("chat=%s import job %s skipped track %s", chat_id, job_id, track_id)
-    await safe_query_edit(query, ("⏭ Track skipped."))
+    await safe_query_edit(query, self.t(chat_id, "import_skipped"))
     generation = self._chat_generation.get(chat_id, 0)
     await self._process_next_import_track(context, chat_id, job_id, generation)
 
@@ -103,7 +105,7 @@ async def handle_import_retry(self, update, context, chat_id: int, job_id: int, 
     pending_dl = self.downloads.get(dl_id)
 
     if not pending_dl:
-        await safe_query_edit(query, ("⏹ Download expired. Use Skip or Mark failed to continue the import."))
+        await safe_query_edit(query, self.t(chat_id, "import_expired"))
         return
 
     result = pending_dl.result
@@ -111,13 +113,13 @@ async def handle_import_retry(self, update, context, chat_id: int, job_id: int, 
 
     await safe_query_edit(
         query,
-        (f"🔄 Retrying: `{md_code_safe(result.basename)}`..."),
+        self.t(chat_id, "import_retrying", file=md_code_safe(result.basename)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=(f"⬇️ Re-downloading from `{md_code_safe(result.username)}`..."),
+        text=self.t(chat_id, "import_redownloading", user=md_code_safe(result.username)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -135,30 +137,30 @@ async def handle_import_approve(self, update, context, chat_id: int, job_id: int
     query = update.callback_query
 
     if not self._can_save_library(query.from_user.id):
-        await self._edit_approval_message(query, ("🚫 You are not allowed to save to the library."))
+        await self._edit_approval_message(query, self.t(chat_id, "approval_denied"))
         return
 
     pending_dl = self.downloads.pop(dl_id, None)
 
     if not pending_dl:
-        await self._edit_approval_message(query, ("⏹ Download expired"))
+        await self._edit_approval_message(query, self.t(chat_id, "download_expired_short"))
         return
 
     if not pending_dl.source_path:
-        await self._edit_approval_message(query, ("❌ Source file not ready. Download may still be in progress."))
+        await self._edit_approval_message(query, self.t(chat_id, "approval_not_ready"))
         self.downloads[dl_id] = pending_dl
         return
 
     target_name = await save_to_library(self, pending_dl, chat_id)
     if not target_name:
-        await self._edit_approval_message(query, ("❌ Failed to save file."))
+        await self._edit_approval_message(query, self.t(chat_id, "approval_save_failed_short"))
         await asyncio.to_thread(
             self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "File processing failed"
         )
         await self._process_next_import_track(context, chat_id, job_id, self._chat_generation.get(chat_id, 0))
         return
 
-    await self._edit_approval_message(query, (f"✅ Saved: `{target_name}`"))
+    await self._edit_approval_message(query, self.t(chat_id, "saved", name=target_name))
     logger.info("chat=%s import job %s saved track %s as %s", chat_id, job_id, track_id, target_name)
     await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.completed)
     await self._process_next_import_track(context, chat_id, job_id, self._chat_generation.get(chat_id, 0))
@@ -170,12 +172,12 @@ async def handle_import_retry_failed(self, update, context, chat_id: int, job_id
 
     reset = await asyncio.to_thread(self.import_repo.reset_failed_tracks, job_id)
     if not reset:
-        await safe_query_edit(query, ("Nothing to retry — no failed tracks left."))
+        await safe_query_edit(query, self.t(chat_id, "import_nothing_retry"))
         return
 
     await safe_query_edit(
         query,
-        (f"🔄 Retrying {reset} failed track(s)..."),
+        self.t(chat_id, "import_retry_n", n=reset),
     )
     self._active_import[chat_id] = job_id
     generation = self._chat_generation.get(chat_id, 0)

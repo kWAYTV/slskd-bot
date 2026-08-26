@@ -67,7 +67,7 @@ async def do_download(
         result.basename,
     )
 
-    render_progress = _progress_renderer(status_msg, label, track, result, pending_dl)
+    render_progress = _progress_renderer(self, status_msg, label, track, result, pending_dl)
 
     try:
         outcome = await fetch_from_peer(self, result, make_progress_callback(pending_dl, render_progress))
@@ -93,7 +93,7 @@ async def do_download(
             self.downloads.pop(dl_id, None)
             await safe_edit(
                 status_msg,
-                ("❌ Downloaded file not found on disk.\nCheck DOWNLOAD_DIR configuration."),
+                self.t(chat_id, "file_missing"),
             )
             await self._add_history(track, result, "file_not_found", chat_id=chat_id)
             return
@@ -101,10 +101,12 @@ async def do_download(
         pending_dl.source_path = source_path
         pending_dl.progress_percent = 100.0
 
-        quality_line = await _build_quality_line(self, track, result, source_path)
+        quality_line = await _build_quality_line(self, chat_id, track, result, source_path)
         await safe_edit(
             status_msg,
-            (f"✅ *{label} Downloaded!* Sending preview...\n`{md_code_safe(result.basename)}`\n{quality_line}"),
+            self.t(
+                chat_id, "downloaded_sending", label=label, file=md_code_safe(result.basename), quality=quality_line
+            ),
             parse_mode=ParseMode.MARKDOWN,
         )
 
@@ -125,23 +127,28 @@ async def do_download(
         logger.exception(f"Download failed for {result.basename}")
         await safe_edit(
             status_msg,
-            (f"❌ Error downloading `{md_code_safe(result.basename)}`. Check logs."),
+            self.t(chat_id, "download_error", file=md_code_safe(result.basename)),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
         )
 
 
-def _progress_renderer(status_msg, label: str, track: TrackInfo, result: SearchResult, pending_dl):
+def _progress_renderer(self, status_msg, label: str, track: TrackInfo, result: SearchResult, pending_dl):
     async def _render(pct: float) -> None:
         state = pending_dl.transfer_state or ""
         queued = "queued" in state.lower()
-        headline = "⌛ *Queued {label}...*" if queued else "⬇️ *Downloading {label}...* {pct}%"
-        extra = "queued at peer" if queued else progress_bar(pct)
+        headline = (
+            self.t(pending_dl.chat_id, "download_queued_headline", label=label)
+            if queued
+            else self.t(pending_dl.chat_id, "download_headline", label=label, pct=f"{pct:.0f}")
+        )
+        extra = self.t(pending_dl.chat_id, "download_queued_extra") if queued else progress_bar(pct)
         await safe_edit(
             status_msg,
-            (headline + "\n{extra}\n{artist} - {title}\nFile: `{file}`").format(
-                label=label,
-                pct=f"{pct:.0f}",
+            self.t(
+                pending_dl.chat_id,
+                "download_progress",
+                headline=headline,
                 extra=extra,
                 artist=escape_md(track.artist),
                 title=escape_md(track.title),
@@ -154,15 +161,16 @@ def _progress_renderer(status_msg, label: str, track: TrackInfo, result: SearchR
 
 
 def _retry_keyboard(self, chat_id: int, result_index: int, dl_id: str):
+    locale = self.locale(chat_id)
     if self._has_next_result(chat_id, result_index):
-        return build_retry_next_keyboard(dl_id)
-    return build_retry_keyboard(dl_id)
+        return build_retry_next_keyboard(dl_id, locale=locale)
+    return build_retry_keyboard(dl_id, locale=locale)
 
 
 async def _report_enqueue_failure(self, status_msg, chat_id: int, result: SearchResult, result_index: int, dl_id: str):
     await safe_edit(
         status_msg,
-        (f"❌ Failed to enqueue download from `{md_code_safe(result.username)}`.\nThe user might be offline."),
+        self.t(chat_id, "enqueue_failed", user=md_code_safe(result.username)),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
     )
@@ -173,15 +181,16 @@ async def _report_download_failure(
 ):
     await safe_edit(
         status_msg,
-        (f"❌ Download failed: {state}\nFile: `{md_code_safe(result.basename)}`"),
+        self.t(chat_id, "download_failed", state=state, file=md_code_safe(result.basename)),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
     )
 
 
-async def _build_quality_line(self, track: TrackInfo, result: SearchResult, source_path: str) -> str:
+async def _build_quality_line(self, chat_id: int, track: TrackInfo, result: SearchResult, source_path: str) -> str:
     quality_line = f"Quality: {result.quality_display} | {result.duration_display}"
-    reasons = format_result_reasons(track, result)
+    locale = self.locale(chat_id)
+    reasons = format_result_reasons(track, result, locale=locale)
     if reasons:
         quality_line += f"\n{reasons}"
 
@@ -189,7 +198,7 @@ async def _build_quality_line(self, track: TrackInfo, result: SearchResult, sour
         return quality_line
     verdict = await self._analyze_flac(source_path)
     if verdict:
-        quality_line += f"\n{format_flac_verdict(verdict)}"
+        quality_line += f"\n{format_flac_verdict(verdict, locale=locale)}"
     return quality_line
 
 
@@ -208,7 +217,13 @@ async def _deliver_preview(
 ) -> bool:
     """Send the downloaded audio (or a preview for over-limit files). Returns delivery success."""
     file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
-    markup = build_approve_keyboard(dl_id, has_next=self._has_next_result(chat_id, result_index)) if can_save else None
+    markup = (
+        build_approve_keyboard(
+            dl_id, has_next=self._has_next_result(chat_id, result_index), locale=self.locale(chat_id)
+        )
+        if can_save
+        else None
+    )
 
     if file_size > self.config.telegram_file_limit:
         return await self._send_large_file(
@@ -225,10 +240,11 @@ async def _deliver_preview(
             can_save=can_save,
         )
 
-    caption = (
-        (f"{label} {quality_line}\nSave to library?")
-        if can_save
-        else (f"{label} {quality_line}\nSent to you — not saved to the library.")
+    caption = self.t(
+        chat_id,
+        "caption_save" if can_save else "caption_sent",
+        label=label,
+        quality=quality_line,
     )
     sent = await send_audio_or_document(
         context,

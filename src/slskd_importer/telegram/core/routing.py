@@ -10,7 +10,10 @@ from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
+from slskd_importer.telegram.i18n import LABELS, LOCALES
 from slskd_importer.telegram.ui.editing import safe_query_edit
+from slskd_importer.telegram.ui.formatting import welcome_text
+from slskd_importer.telegram.ui.keyboards import build_quality_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +56,32 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         await handler(update, context, chat_id, data)
         return
 
+    if data.startswith("lang:"):
+        await _switch_locale(self, query, chat_id, data)
+        return
+
     if data.startswith("qp:"):
         await _switch_quality_preference(self, query, chat_id, data)
         return
 
     logger.warning("Unknown callback prefix %r from chat %s", prefix, chat_id)
+
+
+async def _switch_locale(self, query, chat_id: int, data: str) -> None:
+    code = data.split(":", 1)[1]
+    if code not in LOCALES:
+        return
+    first = self.set_locale(chat_id, code)
+    await asyncio.to_thread(self.prefs_repo.set_locale, chat_id, self.locale(chat_id))
+    logger.info("chat=%s locale=%s first=%s", chat_id, self.locale(chat_id), first)
+    if first:
+        await safe_query_edit(query, welcome_text(self.locale(chat_id)), parse_mode="Markdown")
+        return
+    await safe_query_edit(
+        query,
+        self.t(chat_id, "lang_set", language=LABELS[self.locale(chat_id)]),
+        parse_mode="Markdown",
+    )
 
 
 async def _switch_quality_preference(self, query, chat_id: int, data: str) -> None:
@@ -66,9 +90,10 @@ async def _switch_quality_preference(self, query, chat_id: int, data: str) -> No
         self._quality_overrides[chat_id] = pref
         await asyncio.to_thread(self.prefs_repo.set_quality, chat_id, pref)
     logger.info("chat=%s quality=%s", chat_id, self.quality_pref(chat_id))
-    label = ("CD quality (16/44.1)") if self.quality_pref(chat_id) == "cd" else ("Hi-Res (24-bit)")
+    label_key = "quality_cd" if self.quality_pref(chat_id) == "cd" else "quality_hires"
     await safe_query_edit(
         query,
-        (f"Audio quality preference: *{label}*"),
+        self.t(chat_id, "quality_short", label=self.t(chat_id, label_key)),
         parse_mode="Markdown",
+        reply_markup=build_quality_keyboard(self.quality_pref(chat_id), locale=self.locale(chat_id)),
     )

@@ -58,14 +58,14 @@ async def expire_stale_approvals(self, application) -> None:
                 await application.bot.edit_message_caption(
                     chat_id=dl.chat_id,
                     message_id=dl.approval_message_id,
-                    caption="⏹ Approval expired — file discarded.",
+                    caption=self.t(dl.chat_id, "approval_expired"),
                 )
             except Exception:
                 try:
                     await application.bot.edit_message_text(
                         chat_id=dl.chat_id,
                         message_id=dl.approval_message_id,
-                        text="⏹ Approval expired — file discarded.",
+                        text=self.t(dl.chat_id, "approval_expired"),
                     )
                 except Exception:
                     logger.debug("Could not edit expired approval message %s", dl.approval_message_id)

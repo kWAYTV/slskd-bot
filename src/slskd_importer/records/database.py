@@ -11,7 +11,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_VERSION = 4
+_SCHEMA_VERSION = 5
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS download_history (
@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS import_tracks (
 
 CREATE TABLE IF NOT EXISTS chat_prefs (
     chat_id INTEGER PRIMARY KEY,
-    quality_preference TEXT NOT NULL,
+    quality_preference TEXT NOT NULL DEFAULT '',
+    locale TEXT,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -138,6 +139,13 @@ class Database:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_download_history_chat ON download_history(chat_id, created_at)"
         )
+        prefs_exists = self._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='chat_prefs'"
+        ).fetchone()
+        if prefs_exists:
+            prefs_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(chat_prefs)")}
+            if "locale" not in prefs_cols:
+                self._conn.execute("ALTER TABLE chat_prefs ADD COLUMN locale TEXT")
 
     def close(self) -> None:
         with contextlib.suppress(Exception):

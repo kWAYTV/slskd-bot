@@ -25,7 +25,7 @@ async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAU
 
     pending = self.pending.get(chat_id)
     if not pending:
-        await query.edit_message_text("Search expired. Send a new query.")
+        await query.edit_message_text(self.t(chat_id, "search_expired"))
         return
 
     search_query = pending.query
@@ -34,8 +34,13 @@ async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAU
     display_track = _synthetic_track(search_query, None)
 
     await query.edit_message_text(
-        f"🔍 Searching slskd for: `{escape_md(search_query)}`\n"
-        f"Saving as: *{escape_md(display_track.artist)} - {escape_md(display_track.title)}*",
+        self.t(
+            chat_id,
+            "direct_searching",
+            query=escape_md(search_query),
+            artist=escape_md(display_track.artist),
+            title=escape_md(display_track.title),
+        ),
         parse_mode=ParseMode.MARKDOWN,
     )
     searching_msg = query.message
@@ -88,7 +93,7 @@ async def do_direct_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                (f"🔍 Direct search: `{query}`\n\nNo results found on Soulseek."),
+                self.t(chat_id, "direct_no_results", query=query),
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
@@ -101,9 +106,9 @@ async def do_direct_slskd_search(
         logger.exception("slskd unreachable during direct search for: %s", query)
         await safe_edit(
             searching_msg,
-            ("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
+            self.t(chat_id, "slskd_unreachable"),
             parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
         logger.exception(f"Direct search failed for: {query}")
-        await safe_edit(searching_msg, ("Something went wrong. Please try again."))
+        await safe_edit(searching_msg, self.t(chat_id, "something_wrong"))

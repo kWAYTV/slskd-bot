@@ -20,7 +20,7 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
 
     pending_dl = self.downloads.pop(dl_id, None)
     if not pending_dl:
-        await safe_query_edit(query, "⏹ Download expired. Send a new search.")
+        await safe_query_edit(query, self.t(chat_id, "download_expired"))
         return
 
     if pending_dl.chat_id != chat_id:
@@ -35,13 +35,13 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
 
     await safe_query_edit(
         query,
-        f"🔄 Retrying {label}: `{md_code_safe(result.basename)}`...",
+        self.t(chat_id, "retrying", label=label, file=md_code_safe(result.basename)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"⬇️ Re-downloading {label} from `{md_code_safe(result.username)}`...",
+        text=self.t(chat_id, "redownloading", label=label, user=md_code_safe(result.username)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -61,7 +61,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
     pending_dl = self.downloads.pop(dl_id, None)
 
     if not pending or not pending.results or not pending_dl:
-        await safe_query_edit(query, "⏹ No more results available. Try a new search.")
+        await safe_query_edit(query, self.t(chat_id, "no_more_available"))
         return
 
     if pending_dl.chat_id != chat_id:
@@ -70,7 +70,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
 
     next_idx = pending_dl.result_index + 1
     if next_idx >= len(pending.results):
-        await safe_query_edit(query, "⏹ No more results to try.")
+        await safe_query_edit(query, self.t(chat_id, "no_more_results"))
         return
 
     if pending_dl.source_path:
@@ -83,13 +83,13 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
 
     await safe_query_edit(
         query,
-        f"⏭ Trying next result {label}: `{md_code_safe(next_result.basename)}`",
+        self.t(chat_id, "trying_next", label=label, file=md_code_safe(next_result.basename)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"⬇️ Downloading {label} from `{md_code_safe(next_result.username)}`...",
+        text=self.t(chat_id, "downloading_next", label=label, user=md_code_safe(next_result.username)),
         parse_mode=ParseMode.MARKDOWN,
     )
 

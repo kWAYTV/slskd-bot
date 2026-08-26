@@ -23,13 +23,15 @@ class TestDatabaseNormalCreation:
         db.close()
 
     def test_database_schema_version(self, tmp_path):
-        """Verify user_version is set to 4."""
+        """Verify user_version is set to 5."""
         db_path = str(tmp_path / "version.db")
         db = Database(db_path)
 
         cursor = db.connection.execute("PRAGMA user_version")
         version = cursor.fetchone()[0]
-        assert version == 4
+        assert version == 5
+        cols = {row[1] for row in db.connection.execute("PRAGMA table_info(chat_prefs)")}
+        assert "locale" in cols
         db.close()
 
 
@@ -68,7 +70,7 @@ class TestDatabaseCorruptRecovery:
 
             db = Database(db_path)
             cursor = db.connection.execute("PRAGMA user_version")
-            assert cursor.fetchone()[0] == 4
+            assert cursor.fetchone()[0] == 5
             db.close()
 
 
@@ -131,9 +133,37 @@ class TestDatabaseMigration:
         assert "chat_id" in cols
         assert "spotify_url" in cols
         version = db.connection.execute("PRAGMA user_version").fetchone()[0]
-        assert version == 4
+        assert version == 5
         tables = {row[0] for row in db.connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "chat_prefs" in tables
+        prefs_cols = {row[1] for row in db.connection.execute("PRAGMA table_info(chat_prefs)")}
+        assert "locale" in prefs_cols
+        db.close()
+
+    def test_adds_locale_to_legacy_chat_prefs(self, tmp_path):
+        import sqlite3
+
+        db_path = str(tmp_path / "prefs_v4.db")
+        conn = sqlite3.connect(db_path)
+        conn.executescript(
+            """
+            CREATE TABLE chat_prefs (
+                chat_id INTEGER PRIMARY KEY,
+                quality_preference TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO chat_prefs (chat_id, quality_preference) VALUES (1, 'cd');
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        db = Database(db_path)
+        cols = {row[1] for row in db.connection.execute("PRAGMA table_info(chat_prefs)")}
+        assert "locale" in cols
+        row = db.connection.execute("SELECT quality_preference, locale FROM chat_prefs WHERE chat_id = 1").fetchone()
+        assert row[0] == "cd"
+        assert row[1] is None
         db.close()
 
 

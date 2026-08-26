@@ -27,6 +27,8 @@ from slskd_importer.telegram.commands import activity, basics, preferences
 from slskd_importer.telegram.core import access, cleanup, routing, ttl
 from slskd_importer.telegram.core.session import ChatSession
 from slskd_importer.telegram.download import approval, delivery, retry, run, selection, transfer
+from slskd_importer.telegram.i18n import DEFAULT_LOCALE, normalize_locale
+from slskd_importer.telegram.i18n import t as translate
 from slskd_importer.telegram.playlist_import import callbacks as import_callbacks
 from slskd_importer.telegram.playlist_import import command as import_command
 from slskd_importer.telegram.playlist_import import download as import_download
@@ -69,6 +71,7 @@ class MusicBot:
         self._import_pending = session._import_pending
         self._import_status_msg = session._import_status_msg
         self._quality_overrides = session._quality_overrides
+        self._locales = session._locales
         self._download_sem = asyncio.Semaphore(config.max_concurrent_downloads)
 
         self.db = Database(f"{config.data_dir}/importer.db")
@@ -76,6 +79,7 @@ class MusicBot:
         self.import_repo = ImportRepository(self.db)
         self.prefs_repo = ChatPrefsRepository(self.db)
         self._quality_overrides.update(self.prefs_repo.load_all_quality())
+        self._locales.update(self.prefs_repo.load_all_locales())
         self.playlist_resolver = PlaylistResolver(self.spotify)
 
     # --- per-chat preferences -------------------------------------------------
@@ -83,6 +87,22 @@ class MusicBot:
     def quality_pref(self, chat_id: int) -> str:
         """Effective audio quality preference for a chat: per-chat toggle, else config default."""
         return self._quality_overrides.get(chat_id, self.config.quality_preference)
+
+    def locale(self, chat_id: int) -> str:
+        """Persisted locale for a chat, or English if the user has not chosen one."""
+        return self._locales.get(chat_id, DEFAULT_LOCALE)
+
+    def has_locale(self, chat_id: int) -> bool:
+        return chat_id in self._locales
+
+    def t(self, chat_id: int, key: str, **kwargs: object) -> str:
+        return translate(self.locale(chat_id), key, **kwargs)
+
+    def set_locale(self, chat_id: int, locale: str) -> bool:
+        """Remember a chat locale. Returns True when this is the first saved locale."""
+        first = chat_id not in self._locales
+        self._locales[chat_id] = normalize_locale(locale)
+        return first
 
     # --- session delegation ----------------------------------------------------
 
@@ -111,6 +131,7 @@ class MusicBot:
 
     cmd_start = basics.cmd_start
     cmd_quality = preferences.cmd_quality
+    cmd_lang = preferences.cmd_lang
     cmd_undo = activity.cmd_undo
     cmd_status = activity.cmd_status
     cmd_history = activity.cmd_history
@@ -182,6 +203,7 @@ def create_bot(config: Config) -> Application:
 
     app.add_handler(CommandHandler(["start", "help"], bot.cmd_start))
     app.add_handler(CommandHandler("quality", bot.cmd_quality))
+    app.add_handler(CommandHandler(["lang", "language"], bot.cmd_lang))
     app.add_handler(CommandHandler("undo", bot.cmd_undo))
     app.add_handler(CommandHandler("status", bot.cmd_status))
     app.add_handler(CommandHandler("history", bot.cmd_history))

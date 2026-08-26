@@ -39,14 +39,14 @@ async def resume_import_job(self, context, chat_id: int, notify: bool = False, j
         job = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
     if not job:
         if notify:
-            await context.bot.send_message(chat_id=chat_id, text="Nothing to resume.")
+            await context.bot.send_message(chat_id=chat_id, text=self.t(chat_id, "import_resume_nothing"))
         return
 
     if self._active_import.get(chat_id) == job.id:
         if notify:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"Import of *{escape_md(job.name)}* is already running.",
+                text=self.t(chat_id, "import_already_running", name=escape_md(job.name)),
                 parse_mode=ParseMode.MARKDOWN,
             )
         return
@@ -66,7 +66,13 @@ async def resume_import_job(self, context, chat_id: int, notify: bool = False, j
             progress_msg = await context.bot.send_message(
                 chat_id=chat_id,
                 text=(
-                    f"Resuming import of *{escape_md(job.name)}* ({remaining} remaining, {job.completed_tracks} done)."
+                    self.t(
+                        chat_id,
+                        "import_resuming",
+                        name=escape_md(job.name),
+                        remaining=remaining,
+                        done=job.completed_tracks,
+                    )
                 ),
                 parse_mode=ParseMode.MARKDOWN,
             )

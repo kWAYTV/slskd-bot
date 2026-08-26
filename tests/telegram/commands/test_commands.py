@@ -31,11 +31,10 @@ class TestMusicBotCommands:
         await bot.cmd_start(update, context)
         update.message.reply_text.assert_called_once()
         call_args = update.message.reply_text.call_args
-        assert "Send me a song name" in call_args[0][0]
-        assert "/import" in call_args[0][0]
-        assert "/stats" in call_args[0][0]
-        assert "/auto" not in call_args[0][0]
-        assert "/cancel" in call_args[0][0]
+        assert "Choose your language" in call_args[0][0]
+        markup = call_args.kwargs["reply_markup"]
+        labels = [btn.text for row in markup.inline_keyboard for btn in row]
+        assert labels == ["English", "Español", "Galego", "Deutsch"]
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -48,6 +47,62 @@ class TestMusicBotCommands:
         context = _make_context()
         await bot.cmd_start(update, context)
         update.message.reply_text.assert_called_once_with("You are not authorized to use this bot.")
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_cmd_start_welcome_after_locale(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot._locales[67890] = "en"
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_start(update, context)
+        text = update.message.reply_text.call_args[0][0]
+        assert "Send me a song name" in text
+        assert "/lang" in text
+        assert "/import" in text
+        assert "/auto" not in text
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_cmd_lang_shows_picker(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot._locales[67890] = "en"
+        update = _make_update()
+        context = _make_context()
+        await bot.cmd_lang(update, context)
+        text = update.message.reply_text.call_args[0][0]
+        assert "Choose your language" in text
+        markup = update.message.reply_text.call_args.kwargs["reply_markup"]
+        callbacks = [btn.callback_data for row in markup.inline_keyboard for btn in row]
+        assert callbacks == ["lang:en", "lang:es", "lang:gl", "lang:de"]
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_lang_callback_first_pick_shows_welcome(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        update = _make_callback_update(data="lang:es")
+        context = _make_context()
+        await bot.handle_callback(update, context)
+        assert bot.locale(67890) == "es"
+        text = update.callback_query.edit_message_text.call_args[0][0]
+        assert "Envíame el nombre de una canción" in text
+        assert bot.prefs_repo.get_locale(67890) == "es"
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_lang_callback_later_confirms(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot._locales[67890] = "en"
+        update = _make_callback_update(data="lang:de")
+        context = _make_context()
+        await bot.handle_callback(update, context)
+        assert bot.locale(67890) == "de"
+        text = update.callback_query.edit_message_text.call_args[0][0]
+        assert "Deutsch" in text
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")

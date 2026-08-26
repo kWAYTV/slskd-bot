@@ -35,7 +35,8 @@ async def check_auth(self, update: Update) -> bool:
     user_id = update.effective_user.id
     if not self._is_authorized(user_id):
         logger.warning("Denied unauthorized user %s", user_id)
-        await update.message.reply_text("You are not authorized to use this bot.")
+        chat_id = update.effective_chat.id if update.effective_chat else 0
+        await update.message.reply_text(self.t(chat_id, "auth_denied"))
         return False
     return True
 
@@ -46,8 +47,7 @@ async def check_library_auth(self, update: Update) -> bool:
     user_id = update.effective_user.id
     if not self._can_save_library(user_id):
         logger.info("Denied library access for user %s", user_id)
-        await update.message.reply_text(
-            "You can search and download files, but only library users can save to the music library or import playlists."
-        )
+        chat_id = update.effective_chat.id if update.effective_chat else 0
+        await update.message.reply_text(self.t(chat_id, "auth_library"))
         return False
     return True

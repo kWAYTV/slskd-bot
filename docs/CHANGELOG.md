@@ -34,8 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/auto` is now a per-chat toggle; the `AUTO_MODE` env var is only the default
 - Retry and "try next result" messages carry the `#n` result label so concurrent downloads stay distinguishable
 - Unexpected download errors now offer Retry / Try next result instead of a dead end
-- i18n via GNU gettext + Babel: English, Spanish, German, and Galician. First-time users pick a language; `/lang` (or `/language`) changes it later
-- Schema v3 adds `user_locales` for persisted language preference
+- i18n via in-code catalogs (no gettext/Babel): English (default), Spanish, Galician, and German. First `/start` shows a language picker; `/lang` (or `/language`) changes it later. Command menu descriptions are set per Telegram `language_code`
 - Auto-mode actually downloads the best match after a successful search
 - Import download failures now offer Retry, Skip, and Mark failed (no longer stall)
 - `/import` and `/cancel` documented in `/help` and README

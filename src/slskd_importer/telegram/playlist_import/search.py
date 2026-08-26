@@ -32,11 +32,9 @@ async def do_import_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                (
-                    f"📋 *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n\nNo results found on Soulseek."
-                ),
+                self.t(chat_id, "import_no_results", artist=escape_md(track.artist), title=escape_md(track.title)),
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_import_skip_keyboard(job_id, track_id),
+                reply_markup=build_import_skip_keyboard(job_id, track_id, locale=self.locale(chat_id)),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
             return
@@ -64,7 +62,15 @@ async def do_import_slskd_search(
         await safe_edit(
             searching_msg,
             (
-                f"📋 *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n⬇️ Downloading: `{md_code_safe(best.basename)}`\nFrom: `{md_code_safe(best.username)}` | {best.quality_display}"
+                self.t(
+                    chat_id,
+                    "import_downloading",
+                    artist=escape_md(track.artist),
+                    title=escape_md(track.title),
+                    file=md_code_safe(best.basename),
+                    user=md_code_safe(best.username),
+                    quality=best.quality_display,
+                )
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
@@ -79,16 +85,16 @@ async def do_import_slskd_search(
         logger.exception("slskd unreachable during import search for: %s - %s", track.artist, track.title)
         await safe_edit(
             searching_msg,
-            ("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
+            self.t(chat_id, "slskd_unreachable"),
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=build_import_skip_keyboard(job_id, track_id),
+            reply_markup=build_import_skip_keyboard(job_id, track_id, locale=self.locale(chat_id)),
         )
         await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
     except Exception:
         logger.exception(f"Import search failed for: {track.artist} - {track.title}")
         await safe_edit(
             searching_msg,
-            (f"❌ Search failed for {track.artist} - {track.title}"),
+            self.t(chat_id, "import_search_failed", artist=track.artist, title=track.title),
         )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Search error")
         await self._process_next_import_track(context, chat_id, job_id, generation)

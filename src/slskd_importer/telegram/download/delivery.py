@@ -156,12 +156,21 @@ async def _send_full_ogg(
 
         # The OGG is only the in-chat preview: Telegram bots cannot send
         # files above the configured limit. Approval saves the original.
-        caption = (
-            f"🎧 {label} OGG preview — Telegram only sends up to {file_limit // (1024 * 1024)}MB\n{quality_line}\n"
+        caption = self.t(
+            chat_id,
+            "ogg_caption",
+            label=label,
+            limit=file_limit // (1024 * 1024),
+            quality=quality_line,
         ) + (
-            (f"Save the untouched {file_size / (1024 * 1024):.0f}MB {result.extension.upper()} to the library?")
+            self.t(
+                chat_id,
+                "ogg_save",
+                size=f"{file_size / (1024 * 1024):.0f}",
+                fmt=result.extension.upper(),
+            )
             if can_save
-            else ("Sent to you — not saved to the library.")
+            else self.t(chat_id, "ogg_sent")
         )
         with open(ogg_path, "rb") as f:
             sent = await context.bot.send_audio(
@@ -196,10 +205,14 @@ async def _report_preview_failure(
     logger.error("Preview creation failed for %s, cannot send to Telegram", source_path)
     sent = await context.bot.send_message(
         chat_id=chat_id,
-        text=(
-            (f"❌ {label} Could not create preview for {file_size / (1024 * 1024):.0f}MB file.\n{quality_line}\n\n")
-            + (("Save to library anyway?") if can_save else ("Could not create a preview."))
-        ),
+        text=self.t(
+            chat_id,
+            "preview_failed",
+            label=label,
+            size=f"{file_size / (1024 * 1024):.0f}",
+            quality=quality_line,
+        )
+        + (self.t(chat_id, "preview_save_anyway") if can_save else self.t(chat_id, "preview_none")),
         reply_markup=reply_markup,
     )
     remember_approval_message(self, dl_id, sent.message_id)
@@ -221,9 +234,13 @@ async def _send_minute_preview(
     """Send a ~1 minute trimmed preview. Always removes the preview file."""
     try:
         preview_ext = os.path.splitext(preview_path)[1].lstrip(".")
-        caption = (f"🎧 {label} ~1 min preview (full file: {file_size / (1024 * 1024):.0f}MB)\n{quality_line}\n") + (
-            ("Save to library?") if can_save else ("Sent to you — not saved to the library.")
-        )
+        caption = self.t(
+            chat_id,
+            "preview_caption",
+            label=label,
+            size=f"{file_size / (1024 * 1024):.0f}",
+            quality=quality_line,
+        ) + (self.t(chat_id, "preview_save") if can_save else self.t(chat_id, "ogg_sent"))
         with open(preview_path, "rb") as f:
             sent = await context.bot.send_audio(
                 chat_id=chat_id,

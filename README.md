@@ -15,6 +15,7 @@
 - **Search by text or link** — free-text queries resolve via Spotify metadata; pasted Spotify track links resolve directly, and playlist/album links start an import
 - **Smart ranking** — results scored by duration match, audio quality, source reliability, and filename relevance; live/remix noise filtered out
 - **Quality preference** — `/quality` picks CD (16/44.1) or Hi-Res (24-bit) ranking per chat (persisted)
+- **Languages** — English (default), Spanish, Galician, German. First `/start` picks a language; `/lang` changes it later
 - **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart
 - **Live progress** — download messages update with a progress bar and queue state; `/status` shows everything in flight for the chat
 - **Library hygiene** — canonical tags on save, duplicate detection, `/undo` / `/history` ↩️ to remove saves, `/stats` for totals
@@ -62,6 +63,7 @@ uv run python -m slskd_importer run
 | *(Spotify track link)* | Resolve the link and search for it |
 | *(Spotify playlist/album link)* | Start the import flow (library users only) |
 | `/quality` | Prefer CD or Hi-Res when ranking results (per chat) |
+| `/lang` | Change language (`/language` also works) |
 | `/import <url>` | Import a Spotify playlist or album (library users only) |
 | `/import resume` | Continue a paused import after a restart |
 | `/undo` | Remove the last track saved to the library |

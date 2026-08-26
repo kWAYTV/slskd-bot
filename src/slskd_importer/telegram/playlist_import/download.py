@@ -40,11 +40,20 @@ async def do_import_download(
 
     async def _render_progress(pct: float) -> None:
         queued = pending_dl.transfer_state and "queued" in pending_dl.transfer_state.lower()
-        line = "⌛ queued at peer" if queued else f"⬇️ Downloading {pct:.0f}%\n{progress_bar(pct)}"
+        line = (
+            self.t(chat_id, "import_queued")
+            if queued
+            else self.t(chat_id, "import_pct", pct=f"{pct:.0f}", bar=progress_bar(pct))
+        )
         await safe_edit(
             status_msg,
-            (
-                f"📋 *Import track:* {escape_md(track.artist)} - {escape_md(track.title)}\n{line}\n`{md_code_safe(result.basename)}`"
+            self.t(
+                chat_id,
+                "import_progress",
+                artist=escape_md(track.artist),
+                title=escape_md(track.title),
+                line=line,
+                file=md_code_safe(result.basename),
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
@@ -54,9 +63,9 @@ async def do_import_download(
         if not outcome.enqueued:
             await safe_edit(
                 status_msg,
-                (f"❌ Failed to enqueue from `{md_code_safe(result.username)}`"),
+                self.t(chat_id, "import_enqueue_failed", user=md_code_safe(result.username)),
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
+                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id, locale=self.locale(chat_id)),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
             return
@@ -69,9 +78,9 @@ async def do_import_download(
             state = status.state if status else ("Timeout")
             await safe_edit(
                 status_msg,
-                (f"❌ Download failed: {state}\n`{md_code_safe(result.basename)}`"),
+                self.t(chat_id, "import_dl_failed", state=state, file=md_code_safe(result.basename)),
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_import_failure_keyboard(job_id, track_id, dl_id),
+                reply_markup=build_import_failure_keyboard(job_id, track_id, dl_id, locale=self.locale(chat_id)),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
             return
@@ -80,8 +89,8 @@ async def do_import_download(
         if not source_path:
             await safe_edit(
                 status_msg,
-                ("❌ Downloaded file not found on disk."),
-                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id),
+                self.t(chat_id, "import_file_missing"),
+                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id, locale=self.locale(chat_id)),
             )
             await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
             return
@@ -101,7 +110,7 @@ async def do_import_download(
         logger.exception(f"Import download failed for {result.basename}")
         await safe_edit(
             status_msg,
-            (f"❌ Error downloading `{md_code_safe(result.basename)}`"),
+            self.t(chat_id, "import_dl_error", file=md_code_safe(result.basename)),
             parse_mode=ParseMode.MARKDOWN,
         )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")
@@ -123,20 +132,24 @@ async def _deliver_import_preview(
     """Send the downloaded audio, or a size notice when it exceeds the Telegram limit."""
     file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
     quality_line = f"{result.quality_display} | {result.duration_display}"
-    keyboard = build_import_track_keyboard(job_id, track_id, dl_id)
+    keyboard = build_import_track_keyboard(job_id, track_id, dl_id, locale=self.locale(chat_id))
 
     if file_size > self.config.telegram_file_limit:
         await safe_edit(
             status_msg,
-            (
-                f"✅ Downloaded: `{md_code_safe(result.basename)}` ({file_size / (1024 * 1024):.0f}MB)\n{quality_line}\n\nFile too large to preview. Save to library?"
+            self.t(
+                chat_id,
+                "import_too_large",
+                file=md_code_safe(result.basename),
+                size=f"{file_size / (1024 * 1024):.0f}",
+                quality=quality_line,
             ),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=keyboard,
         )
         return
 
-    caption = f"📋 Import: {track.artist} - {track.title}\n{quality_line}"
+    caption = self.t(chat_id, "import_caption", artist=track.artist, title=track.title, quality=quality_line)
     await send_audio_or_document(
         context,
         chat_id,

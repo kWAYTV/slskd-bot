@@ -31,20 +31,20 @@ async def send_import_summary(self, context, chat_id: int, job_id: int):
     self._import_status_msg.pop(chat_id, None)
 
     lines = [
-        ("🏁 *Import complete!*") + "\n",
-        (f"✅ Saved: {completed}\n❌ Failed: {failed}\n⏭ Skipped: {skipped}\n📊 Total: {total}"),
+        self.t(chat_id, "import_complete") + "\n",
+        self.t(chat_id, "import_counts", saved=completed, failed=failed, skipped=skipped, total=total),
     ]
 
     reply_markup = None
     if failed:
         failed_tracks = await asyncio.to_thread(self.import_repo.get_failed_tracks, job_id)
         if failed_tracks:
-            lines.append("\n" + ("*Failed tracks:*"))
-            for t in failed_tracks[:5]:
-                lines.append(f"• {escape_md(t.artist)} - {escape_md(t.title)}")
+            lines.append("\n" + self.t(chat_id, "import_failed_header"))
+            for item in failed_tracks[:5]:
+                lines.append(f"• {escape_md(item.artist)} - {escape_md(item.title)}")
             if len(failed_tracks) > 5:
-                lines.append(f"…and {len(failed_tracks) - 5} more")
-            reply_markup = build_import_summary_keyboard(job_id, len(failed_tracks))
+                lines.append(self.t(chat_id, "import_and_more", n=len(failed_tracks) - 5))
+            reply_markup = build_import_summary_keyboard(job_id, len(failed_tracks), locale=self.locale(chat_id))
 
     await context.bot.send_message(
         chat_id=chat_id,

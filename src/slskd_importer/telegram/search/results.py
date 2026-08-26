@@ -34,13 +34,20 @@ async def present_search_results(
     )
 
     results_text = format_search_results(
-        track, ranked, is_fallback=is_fallback, page=0, page_size=self.config.max_results
+        track,
+        ranked,
+        is_fallback=is_fallback,
+        page=0,
+        page_size=self.config.max_results,
+        locale=self.locale(chat_id),
     )
     await safe_edit(
         searching_msg,
         results_text,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=build_results_keyboard(ranked, page=0, page_size=self.config.max_results),
+        reply_markup=build_results_keyboard(
+            ranked, page=0, page_size=self.config.max_results, locale=self.locale(chat_id)
+        ),
     )
 
 
@@ -49,7 +56,7 @@ async def handle_results_page(self, update, context, chat_id: int, data: str):
     query = update.callback_query
     pending = self.pending.get(chat_id)
     if not pending or not pending.track:
-        await query.edit_message_text("Search expired. Send a new query.")
+        await query.edit_message_text(self.t(chat_id, "search_expired"))
         return
 
     try:
@@ -64,9 +71,12 @@ async def handle_results_page(self, update, context, chat_id: int, data: str):
         is_fallback=pending.is_fallback,
         page=page,
         page_size=self.config.max_results,
+        locale=self.locale(chat_id),
     )
     await query.edit_message_text(
         results_text,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=build_results_keyboard(pending.results, page=page, page_size=self.config.max_results),
+        reply_markup=build_results_keyboard(
+            pending.results, page=page, page_size=self.config.max_results, locale=self.locale(chat_id)
+        ),
     )

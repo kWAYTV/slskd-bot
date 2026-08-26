@@ -64,9 +64,13 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
                 self,
                 context,
                 chat_id,
-                (
-                    f"📋 *Import [{position}/{total}]*\n"
-                    f"⏭ Already owned: *{escape_md(track_info.artist)} - {escape_md(track_info.title)}*"
+                self.t(
+                    chat_id,
+                    "import_owned",
+                    position=position,
+                    total=total,
+                    artist=escape_md(track_info.artist),
+                    title=escape_md(track_info.title),
                 ),
             )
             continue
@@ -86,10 +90,15 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
             self,
             context,
             chat_id,
-            (
-                f"📋 *Import [{position}/{total}]*\n"
-                f"🔍 Searching: *{escape_md(track_info.artist)} - {escape_md(track_info.title)}*\n"
-                f"Album: {escape_md(track_info.album)} ({escape_md(track_info.year)})"
+            self.t(
+                chat_id,
+                "import_searching",
+                position=position,
+                total=total,
+                artist=escape_md(track_info.artist),
+                title=escape_md(track_info.title),
+                album=escape_md(track_info.album),
+                year=escape_md(track_info.year),
             ),
         )
         await self._do_import_slskd_search(

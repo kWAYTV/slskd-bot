@@ -6,6 +6,7 @@ from slskd_importer.telegram.ui.keyboards import (
     build_approve_keyboard,
     build_history_keyboard,
     build_import_failure_keyboard,
+    build_language_keyboard,
     build_results_keyboard,
     build_spotify_keyboard,
 )
@@ -35,6 +36,14 @@ def _make_track(idx: int = 0) -> TrackInfo:
         spotify_url=f"https://open.spotify.com/track/{idx}",
         year="2024",
     )
+
+
+class TestBuildLanguageKeyboard:
+    def test_four_locales(self):
+        kb = build_language_keyboard()
+        buttons = [btn for row in kb.inline_keyboard for btn in row]
+        assert [btn.text for btn in buttons] == ["English", "Español", "Galego", "Deutsch"]
+        assert [btn.callback_data for btn in buttons] == ["lang:en", "lang:es", "lang:gl", "lang:de"]
 
 
 class TestBuildResultsKeyboard:

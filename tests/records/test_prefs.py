@@ -30,3 +30,21 @@ class TestChatPrefsRepository:
         repo.set_quality(1, "cd")
         repo.set_quality(2, "hires")
         assert repo.load_all_quality() == {1: "cd", 2: "hires"}
+
+    def test_set_locale_does_not_clobber_quality(self, repo):
+        repo.set_quality(123, "cd")
+        repo.set_locale(123, "es")
+        assert repo.get_quality(123) == "cd"
+        assert repo.get_locale(123) == "es"
+
+    def test_set_locale_alone_leaves_quality_unset(self, repo):
+        repo.set_locale(5, "de")
+        assert repo.get_quality(5) is None
+        assert repo.get_locale(5) == "de"
+        assert repo.load_all_quality() == {}
+        assert repo.load_all_locales() == {5: "de"}
+
+    def test_load_all_locales(self, repo):
+        repo.set_locale(1, "es")
+        repo.set_locale(2, "gl")
+        assert repo.load_all_locales() == {1: "es", 2: "gl"}

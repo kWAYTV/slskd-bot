@@ -30,12 +30,12 @@ async def notify_if_already_owned(self, context, chat_id: int, track: TrackInfo)
     if not exact and not history_hit:
         return
 
-    lines = [f"⚠️ *Already in the library:* {track_md(track)}"]
+    lines = [self.t(chat_id, "already_owned", track=track_md(track))]
     if exact:
         lines.append("\n".join(f"• `{f}`" for f in exact[:5]))
     if history_hit:
-        lines.append(f"Previously saved as `{history_hit.filename}`")
-    lines.append("Searching anyway — pick a result below or ignore.")
+        lines.append(self.t(chat_id, "already_owned_saved", filename=history_hit.filename))
+    lines.append(self.t(chat_id, "already_owned_anyway"))
     await context.bot.send_message(
         chat_id=chat_id,
         text="\n".join(lines),
@@ -64,17 +64,22 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
 
         await safe_edit(
             searching_msg,
-            (
-                f"🎵 {header}\nAlbum: {escape_md(track.album)} ({escape_md(track.year)})\nDuration: {track.duration_display}\n\nSearching slskd..."
+            self.t(
+                chat_id,
+                "searching_header",
+                track=header,
+                album=escape_md(track.album),
+                year=escape_md(track.year),
+                duration=track.duration_display,
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
 
         async def on_tier(kind: str):
             messages = {
-                "title-only": (f"🎵 {header}\n\nNo results with full query — retrying with song title only…"),
-                "keywords": (f"🎵 {header}\n\nStill no results — trying keyword variations with year…"),
-                "artist-keywords": (f"🎵 {header}\n\nStill no results — trying artist + keyword search…"),
+                "title-only": self.t(chat_id, "searching_title_only", track=header),
+                "keywords": self.t(chat_id, "searching_keywords", track=header),
+                "artist-keywords": self.t(chat_id, "searching_artist_kw", track=header),
             }
             await safe_edit(searching_msg, messages[kind], parse_mode=ParseMode.MARKDOWN)
 
@@ -94,11 +99,7 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
         if not ranked:
             await safe_edit(
                 searching_msg,
-                (
-                    f"🎵 {header} ({track.duration_display})\n\n"
-                    "No results found on Soulseek matching this track.\n"
-                    "Try a different search query."
-                ),
+                self.t(chat_id, "no_soulseek", track=header, duration=track.duration_display),
                 parse_mode=ParseMode.MARKDOWN,
             )
             return
@@ -119,7 +120,7 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
         self.pending.pop(chat_id, None)
         await safe_edit(
             searching_msg,
-            ("Cannot reach slskd. Check `SLSKD_HOST` and the API key."),
+            self.t(chat_id, "slskd_unreachable"),
             parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
@@ -127,5 +128,5 @@ async def do_slskd_search(self, context, chat_id: int, track: TrackInfo, searchi
         self.pending.pop(chat_id, None)
         await safe_edit(
             searching_msg,
-            ("Something went wrong during the search. Please try again."),
+            self.t(chat_id, "search_error"),
         )
