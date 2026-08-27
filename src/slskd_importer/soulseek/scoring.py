@@ -2,12 +2,15 @@
 
 Scoring (100 points):
   duration match (40) + audio quality (25) + source reliability (20) + filename (15)
+
+Format order is applied after scoring: FLAC, WAV, AIFF, then other audio.
 """
 
 import logging
 import re
 
 from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.library.formats import PREFERRED_EXTENSIONS, format_rank
 from slskd_importer.soulseek.parsing import parse_search_responses
 from slskd_importer.soulseek.result import SearchResult
 
@@ -24,9 +27,6 @@ SLOT_AVAILABLE_POINTS = 7.5
 SPEED_MAX_POINTS = 7.5
 QUEUE_MAX_POINTS = 5.0
 FILENAME_PART_POINTS = 7.5
-
-QUALITY_PREFER_HIRES = "hires"
-QUALITY_PREFER_CD = "cd"
 
 
 class ResultScorer:
@@ -55,21 +55,20 @@ class ResultScorer:
         results: list[SearchResult],
         track: TrackInfo,
         max_duration_diff: int | None = None,
-        quality_preference: str = QUALITY_PREFER_HIRES,
     ) -> list[SearchResult]:
         """
         Score and rank search results against the reference track.
-        Filters out unwanted results and sorts by score (highest first).
+        Filters out unwanted results and sorts by format, then score.
         """
         scored = []
         for result in results:
-            score = self._calculate_score(result, track, max_duration_diff, quality_preference)
+            score = self._calculate_score(result, track, max_duration_diff)
             if score is None:
                 continue
             result.score = score
             scored.append(result)
 
-        scored.sort(key=lambda r: r.score, reverse=True)
+        scored.sort(key=lambda r: (format_rank(r.extension), -r.score))
         deduplicated = _dedup_by_basename(scored)
 
         logger.info(f"Scored {len(scored)} results, {len(deduplicated)} after dedup (from {len(results)} total)")
@@ -80,7 +79,6 @@ class ResultScorer:
         result: SearchResult,
         track: TrackInfo,
         max_duration_diff: int | None = None,
-        quality_preference: str = QUALITY_PREFER_HIRES,
     ) -> float | None:
         """Calculate a score for a single result, or None to exclude it."""
         excluded = self._excluded_keyword(result, track)
@@ -93,12 +91,7 @@ class ResultScorer:
             logger.debug(f"Excluded (duration {result.length}s vs {track.duration_secs}s): {result.basename}")
             return None
 
-        score = (
-            duration
-            + _quality_points(result, quality_preference)
-            + _source_points(result)
-            + _filename_points(result, track)
-        )
+        score = duration + _quality_points(result) + _source_points(result) + _filename_points(result, track)
         return round(score, 2)
 
     def _excluded_keyword(self, result: SearchResult, track: TrackInfo) -> str | None:
@@ -136,7 +129,7 @@ class ResultScorer:
 
 
 def _dedup_by_basename(results: list[SearchResult]) -> list[SearchResult]:
-    """Keep the first (highest-scored) result per lowercased basename."""
+    """Keep the first (highest-ranked) result per lowercased basename."""
     seen: set[str] = set()
     deduplicated = []
     for result in results:
@@ -148,31 +141,30 @@ def _dedup_by_basename(results: list[SearchResult]) -> list[SearchResult]:
     return deduplicated
 
 
-def _quality_points(result: SearchResult, preference: str) -> float:
-    """Audio-quality points (25 max). ``cd`` preference favors 16/44.1 over hi-res."""
-    prefer_cd = preference == QUALITY_PREFER_CD
-    return _bit_depth_points(result.bit_depth, prefer_cd) + _sample_rate_points(result.sample_rate, prefer_cd)
+def _quality_points(result: SearchResult) -> float:
+    """Audio-quality points (25 max). Always prefers higher bit depth / sample rate."""
+    return _bit_depth_points(result.bit_depth) + _sample_rate_points(result.sample_rate)
 
 
-def _bit_depth_points(bit_depth: int | None, prefer_cd: bool) -> float:
+def _bit_depth_points(bit_depth: int | None) -> float:
     if not bit_depth:
         return 0.0
     if bit_depth >= 24:
-        return QUALITY_CD_POINTS if prefer_cd else QUALITY_HIRES_POINTS
+        return QUALITY_HIRES_POINTS
     if bit_depth == 16:
-        return QUALITY_HIRES_POINTS if prefer_cd else QUALITY_CD_POINTS
+        return QUALITY_CD_POINTS
     return SAMPLE_RATE_CD_POINTS
 
 
-def _sample_rate_points(sample_rate: int | None, prefer_cd: bool) -> float:
+def _sample_rate_points(sample_rate: int | None) -> float:
     if not sample_rate:
         return 0.0
     if sample_rate >= 88200:
-        return SAMPLE_RATE_CD_POINTS if prefer_cd else SAMPLE_RATE_HIRES_POINTS
+        return SAMPLE_RATE_HIRES_POINTS
     if sample_rate == 48000:
         return 7.0
     if sample_rate == 44100:
-        return SAMPLE_RATE_HIRES_POINTS if prefer_cd else 6.0
+        return 6.0
     return 3.0
 
 
@@ -206,19 +198,16 @@ def rank_responses(
     track: TrackInfo,
     scorer: ResultScorer,
     max_duration_diff: int | None = None,
-    quality_preference: str | None = None,
 ) -> tuple[list[SearchResult], bool]:
-    """Parse and score responses: FLAC first, any audio as fallback.
+    """Parse and score responses: preferred lossless first, any audio as fallback.
 
-    Returns (ranked results, used-non-FLAC-fallback).
+    Returns (ranked results, used-lossy-fallback).
     """
     score_kwargs = {"max_duration_diff": max_duration_diff} if max_duration_diff else {}
-    if quality_preference:
-        score_kwargs["quality_preference"] = quality_preference
-    flac_results = parse_search_responses(raw_responses, flac_only=True)
-    ranked = scorer.score_results(flac_results, track, **score_kwargs)
+    preferred = parse_search_responses(raw_responses, extensions=PREFERRED_EXTENSIONS)
+    ranked = scorer.score_results(preferred, track, **score_kwargs)
     if ranked:
         return ranked, False
-    all_audio = parse_search_responses(raw_responses, flac_only=False)
+    all_audio = parse_search_responses(raw_responses)
     ranked = scorer.score_results(all_audio, track, **score_kwargs)
     return ranked, bool(ranked)

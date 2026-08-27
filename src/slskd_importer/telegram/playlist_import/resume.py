@@ -1,4 +1,4 @@
-"""Resume persisted import jobs after a restart or /import resume."""
+"""Resume persisted import jobs after a restart or a bare /import."""
 
 from __future__ import annotations
 

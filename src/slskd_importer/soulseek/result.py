@@ -58,7 +58,7 @@ class SearchResult:
             parts.append(f"{self.bit_depth}bit/{self.sample_rate / 1000:.1f}kHz")
         if self.bit_rate:
             parts.append(f"{self.bit_rate}kbps")
-        return ", ".join(parts) if parts else "FLAC"
+        return ", ".join(parts) if parts else (self.extension.upper() or "?")
 
     def __str__(self) -> str:
         return f"{self.basename} ({self.duration_display}, {self.quality_display}, {self.size_mb:.1f}MB)"

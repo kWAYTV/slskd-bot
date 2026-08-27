@@ -14,7 +14,6 @@ def _commands_for(locale: str) -> list[BotCommand]:
     return [
         BotCommand("start", t(locale, "cmd_start")),
         BotCommand("help", t(locale, "cmd_help")),
-        BotCommand("quality", t(locale, "cmd_quality")),
         BotCommand("lang", t(locale, "cmd_lang")),
         BotCommand("status", t(locale, "cmd_status")),
         BotCommand("history", t(locale, "cmd_history")),

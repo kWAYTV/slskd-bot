@@ -22,14 +22,12 @@ class TestMusicBotCallbackHandler:
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
-    async def test_quality_toggle_persists(self, mock_slskd, mock_spotify):
+    async def test_unknown_callback_is_ignored(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         update = _make_callback_update(data="qp:cd")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert bot.quality_pref(update.effective_chat.id) == "cd"
-        assert bot.prefs_repo.get_quality(update.effective_chat.id) == "cd"
-        assert bot.quality_pref(99999) == "hires"
+        assert not bot.has_locale(update.effective_chat.id)
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -300,10 +298,10 @@ class TestMusicBotCallbackHandler:
         config = _make_config()
         config.telegram_allowed_users = {11111}
         bot = MusicBot(config)
-        update = _make_callback_update(user_id=99999, data="qp:cd")
+        update = _make_callback_update(user_id=99999, data="lang:en")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert bot.quality_pref(update.effective_chat.id) == "hires"
+        assert not bot.has_locale(update.effective_chat.id)
 
 
 class TestImportCallbackRouting:

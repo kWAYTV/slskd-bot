@@ -27,23 +27,10 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = update.message.text.split(maxsplit=1)
     extra = args[1].strip() if len(args) >= 2 else ""
 
-    if extra.lower() == "resume":
-        await resume_import_job(self, context, chat_id, notify=True)
-        return
-
-    if not extra:
+    if extra.lower() == "resume" or not extra:
         active = await asyncio.to_thread(self.import_repo.get_active_job, chat_id)
-        if active:
-            await update.message.reply_text(
-                self.t(
-                    chat_id,
-                    "import_unfinished",
-                    name=escape_md(active.name),
-                    done=active.completed_tracks,
-                    total=active.total_tracks,
-                ),
-                parse_mode=ParseMode.MARKDOWN,
-            )
+        if active or extra.lower() == "resume":
+            await resume_import_job(self, context, chat_id, notify=True)
             return
         await update.message.reply_text(
             self.t(chat_id, "import_usage"),

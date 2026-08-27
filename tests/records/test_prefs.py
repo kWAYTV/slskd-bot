@@ -15,34 +15,16 @@ def repo(tmp_path):
 
 class TestChatPrefsRepository:
     def test_get_missing_returns_none(self, repo):
-        assert repo.get_quality(123) is None
+        assert repo.get_locale(123) is None
 
-    def test_set_and_get(self, repo):
-        repo.set_quality(123, "cd")
-        assert repo.get_quality(123) == "cd"
-
-    def test_upsert(self, repo):
-        repo.set_quality(123, "cd")
-        repo.set_quality(123, "hires")
-        assert repo.get_quality(123) == "hires"
-
-    def test_load_all_quality(self, repo):
-        repo.set_quality(1, "cd")
-        repo.set_quality(2, "hires")
-        assert repo.load_all_quality() == {1: "cd", 2: "hires"}
-
-    def test_set_locale_does_not_clobber_quality(self, repo):
-        repo.set_quality(123, "cd")
+    def test_set_and_get_locale(self, repo):
         repo.set_locale(123, "es")
-        assert repo.get_quality(123) == "cd"
         assert repo.get_locale(123) == "es"
 
-    def test_set_locale_alone_leaves_quality_unset(self, repo):
-        repo.set_locale(5, "de")
-        assert repo.get_quality(5) is None
-        assert repo.get_locale(5) == "de"
-        assert repo.load_all_quality() == {}
-        assert repo.load_all_locales() == {5: "de"}
+    def test_locale_upsert(self, repo):
+        repo.set_locale(123, "es")
+        repo.set_locale(123, "de")
+        assert repo.get_locale(123) == "de"
 
     def test_load_all_locales(self, repo):
         repo.set_locale(1, "es")

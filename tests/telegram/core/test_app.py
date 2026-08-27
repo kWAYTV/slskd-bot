@@ -42,7 +42,7 @@ class TestMusicBotHelpers:
         track = _make_track()
         results = [_make_search_result()]
         text = format_search_results(track, results, is_fallback=True)
-        assert "No FLAC found" in text
+        assert "No lossless" in text
 
     def test_format_results_pagination(self):
         track = _make_track()
@@ -113,8 +113,8 @@ class TestMusicBotHelpers:
 
 
 class TestRankResponses:
-    def test_flac_found(self):
-        """When FLAC results exist, returns them with is_fallback=False."""
+    def test_preferred_found(self):
+        """When preferred lossless results exist, returns them with is_fallback=False."""
         track = _make_track()
         flac_result = [_make_search_result()]
         scorer = MagicMock()
@@ -123,12 +123,11 @@ class TestRankResponses:
         assert len(ranked) == 1
         assert is_fallback is False
 
-    def test_non_flac_fallback(self):
-        """When only non-FLAC exists, returns with is_fallback=True."""
+    def test_lossy_fallback(self):
+        """When only non-preferred audio exists, returns with is_fallback=True."""
         track = _make_track()
         mp3_result = [_make_search_result()]
         scorer = MagicMock()
-        # First call (flac_only=True) returns nothing scored, second call returns results
         scorer.score_results = MagicMock(side_effect=[[], mp3_result])
         ranked, is_fallback = rank_responses([], track, scorer)
         assert len(ranked) == 1
@@ -158,34 +157,7 @@ class TestRankResponses:
 # ---------------------------------------------------------------------------
 
 
-class TestPerChatQualityPref:
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    def test_quality_defaults_to_config(self, mock_slskd, mock_spotify):
-        config = _make_config()
-        config.quality_preference = "cd"
-        bot = MusicBot(config)
-        assert bot.quality_pref(67890) == "cd"
-        assert bot.quality_pref(11111) == "cd"
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    def test_override_beats_default(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot._quality_overrides[67890] = "cd"
-        assert bot.quality_pref(67890) == "cd"
-        assert bot.quality_pref(11111) == "hires"
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    def test_quality_reloaded_from_db(self, mock_slskd, mock_spotify):
-        config = _make_config()
-        bot = MusicBot(config)
-        bot.prefs_repo.set_quality(67890, "cd")
-        restarted = MusicBot(config)
-        assert restarted.quality_pref(67890) == "cd"
-        assert restarted.quality_pref(11111) == "hires"
-
+class TestPerChatLocale:
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     def test_locale_reloaded_from_db(self, mock_slskd, mock_spotify):

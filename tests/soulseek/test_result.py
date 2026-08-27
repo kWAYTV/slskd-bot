@@ -84,6 +84,10 @@ class TestSearchResult:
         r = SearchResult(username="u", filename="f.flac", size=100)
         assert r.quality_display == "FLAC"
 
+    def test_quality_display_no_info_uses_extension(self):
+        r = SearchResult(username="u", filename="f.wav", size=100)
+        assert r.quality_display == "WAV"
+
     def test_str(self):
         r = SearchResult(
             username="u",
