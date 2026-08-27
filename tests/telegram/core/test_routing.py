@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -35,22 +36,25 @@ class TestMusicBotCallbackHandler:
     @pytest.mark.asyncio
     async def test_spotify_cancel(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot._spotify_candidates[67890] = [_make_track()]
-        update = _make_callback_update(data="sp:cancel")
+        bot._spotify_candidates["1"] = [_make_track()]
+        bot.pending["1"] = PendingSearch(query="test", chat_id=67890, search_id="1")
+        update = _make_callback_update(data="sp:1:cancel")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert 67890 not in bot._spotify_candidates
+        assert "1" not in bot._spotify_candidates
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_spotify_select(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot._spotify_candidates[67890] = [_make_track(), _make_track()]
-        update = _make_callback_update(data="sp:0")
+        bot._spotify_candidates["1"] = [_make_track(), _make_track()]
+        bot.pending["1"] = PendingSearch(query="test", chat_id=67890, search_id="1")
+        update = _make_callback_update(data="sp:1:0")
         context = _make_context()
         bot._do_slskd_search = AsyncMock()
         await bot.handle_callback(update, context)
+        await asyncio.sleep(0)
         bot._do_slskd_search.assert_called_once()
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
@@ -58,8 +62,8 @@ class TestMusicBotCallbackHandler:
     @pytest.mark.asyncio
     async def test_spotify_select_invalid_index(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot._spotify_candidates[67890] = [_make_track()]
-        update = _make_callback_update(data="sp:99")
+        bot._spotify_candidates["1"] = [_make_track()]
+        update = _make_callback_update(data="sp:1:99")
         context = _make_context()
         await bot.handle_callback(update, context)
 
@@ -68,19 +72,19 @@ class TestMusicBotCallbackHandler:
     @pytest.mark.asyncio
     async def test_spotify_page(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot._spotify_candidates[67890] = [_make_track() for _ in range(12)]
-        bot._spotify_page[67890] = 0
-        update = _make_callback_update(data="sp_page:1")
+        bot._spotify_candidates["1"] = [_make_track() for _ in range(12)]
+        bot._spotify_page["1"] = 0
+        update = _make_callback_update(data="sp_page:1:1")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert bot._spotify_page[67890] == 1
+        assert bot._spotify_page["1"] == 1
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_spotify_page_expired(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        update = _make_callback_update(data="sp_page:0")
+        update = _make_callback_update(data="sp_page:1:0")
         context = _make_context()
         await bot.handle_callback(update, context)
         update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")
@@ -90,8 +94,8 @@ class TestMusicBotCallbackHandler:
     @pytest.mark.asyncio
     async def test_spotify_page_invalid(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot._spotify_candidates[67890] = [_make_track()]
-        update = _make_callback_update(data="sp_page:abc")
+        bot._spotify_candidates["1"] = [_make_track()]
+        update = _make_callback_update(data="sp_page:1:abc")
         context = _make_context()
         # Should not raise
         await bot.handle_callback(update, context)
@@ -101,11 +105,13 @@ class TestMusicBotCallbackHandler:
     @pytest.mark.asyncio
     async def test_download_cancel(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot.pending[67890] = PendingSearch(query="test", track=_make_track(), results=[_make_search_result()])
-        update = _make_callback_update(data="dl:cancel")
+        bot.pending["1"] = PendingSearch(
+            query="test", track=_make_track(), results=[_make_search_result()], chat_id=67890, search_id="1"
+        )
+        update = _make_callback_update(data="dl:1:cancel")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert 67890 not in bot.pending
+        assert "1" not in bot.pending
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -114,8 +120,8 @@ class TestMusicBotCallbackHandler:
         bot = MusicBot(_make_config())
         track = _make_track()
         result = _make_search_result()
-        bot.pending[67890] = PendingSearch(query="test", track=track, results=[result])
-        update = _make_callback_update(data="dl:0")
+        bot.pending["1"] = PendingSearch(query="test", track=track, results=[result], chat_id=67890, search_id="1")
+        update = _make_callback_update(data="dl:1:0")
         context = _make_context()
         # Mock the download to prevent actual execution
         bot._do_download = AsyncMock()
@@ -131,8 +137,8 @@ class TestMusicBotCallbackHandler:
         bot = MusicBot(_make_config())
         track = _make_track()
         result = _make_search_result()
-        bot.pending[67890] = PendingSearch(query="test", track=track, results=[result])
-        update = _make_callback_update(data="dl:auto")
+        bot.pending["1"] = PendingSearch(query="test", track=track, results=[result], chat_id=67890, search_id="1")
+        update = _make_callback_update(data="dl:1:auto")
         context = _make_context()
         bot._do_download = AsyncMock()
         context.application.create_task = MagicMock(return_value=MagicMock())
@@ -144,7 +150,7 @@ class TestMusicBotCallbackHandler:
     @pytest.mark.asyncio
     async def test_download_select_expired(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        update = _make_callback_update(data="dl:0")
+        update = _make_callback_update(data="dl:1:0")
         context = _make_context()
         await bot.handle_callback(update, context)
         update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")
@@ -154,8 +160,10 @@ class TestMusicBotCallbackHandler:
     @pytest.mark.asyncio
     async def test_download_select_invalid_index(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot.pending[67890] = PendingSearch(query="test", track=_make_track(), results=[_make_search_result()])
-        update = _make_callback_update(data="dl:99")
+        bot.pending["1"] = PendingSearch(
+            query="test", track=_make_track(), results=[_make_search_result()], chat_id=67890, search_id="1"
+        )
+        update = _make_callback_update(data="dl:1:99")
         context = _make_context()
         await bot.handle_callback(update, context)
 
@@ -166,18 +174,18 @@ class TestMusicBotCallbackHandler:
         bot = MusicBot(_make_config())
         track = _make_track()
         results = [_make_search_result(i) for i in range(15)]
-        bot.pending[67890] = PendingSearch(query="test", track=track, results=results)
-        update = _make_callback_update(data="dl_page:1")
+        bot.pending["1"] = PendingSearch(query="test", track=track, results=results, chat_id=67890, search_id="1")
+        update = _make_callback_update(data="dl_page:1:1")
         context = _make_context()
         await bot.handle_callback(update, context)
-        assert bot.pending[67890].page == 1
+        assert bot.pending["1"].page == 1
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_results_page_expired(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        update = _make_callback_update(data="dl_page:0")
+        update = _make_callback_update(data="dl_page:1:0")
         context = _make_context()
         await bot.handle_callback(update, context)
         update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")

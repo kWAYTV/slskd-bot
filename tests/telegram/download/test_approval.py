@@ -23,17 +23,27 @@ class TestMusicBotDismissOtherDownloads:
     @pytest.mark.asyncio
     async def test_dismiss(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot.pending[67890] = PendingSearch(query="test", track=_make_track(), message_id=100)
+        bot.pending["1"] = PendingSearch(
+            query="test", track=_make_track(), message_id=100, chat_id=67890, search_id="1"
+        )
         bot.downloads["2"] = PendingDownload(
             track=_make_track(),
             result=_make_search_result(),
             chat_id=67890,
             approval_message_id=200,
+            search_id="1",
+        )
+        bot.downloads["other"] = PendingDownload(
+            track=_make_track(),
+            result=_make_search_result(),
+            chat_id=67890,
+            search_id="2",
         )
         context = _make_context()
-        await bot._dismiss_other_downloads(context, 67890)
-        assert 67890 not in bot.pending
+        await bot._dismiss_other_downloads(context, 67890, search_id="1")
+        assert "1" not in bot.pending
         assert "2" not in bot.downloads
+        assert "other" in bot.downloads
 
 
 class TestMusicBotEditApprovalMessage:
@@ -96,8 +106,10 @@ class TestIDORProtection:
         bot = MusicBot(_make_config())
         track = _make_track()
         result = _make_search_result()
-        bot.downloads["1"] = PendingDownload(track=track, result=result, chat_id=111, result_index=0)
-        bot.pending[999] = PendingSearch(query="test", track=track, results=[result, _make_search_result(1)])
+        bot.pending["1"] = PendingSearch(
+            query="test", track=track, results=[result, _make_search_result(1)], chat_id=999, search_id="1"
+        )
+        bot.downloads["1"] = PendingDownload(track=track, result=result, chat_id=111, result_index=0, search_id="1")
         update = _make_callback_update(chat_id=999, data="next:1")
         context = _make_context()
         await bot.handle_callback(update, context)

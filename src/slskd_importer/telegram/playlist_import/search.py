@@ -12,8 +12,8 @@ from slskd_importer.playlist_import.job import TrackStatus
 from slskd_importer.soulseek.errors import SlskdUnavailableError
 from slskd_importer.soulseek.query import clean_search_title
 from slskd_importer.telegram.core.session import PendingDownload, PendingSearch
+from slskd_importer.telegram.playlist_import.keyboards import build_import_skip_keyboard
 from slskd_importer.telegram.ui.editing import safe_edit
-from slskd_importer.telegram.ui.keyboards import build_import_skip_keyboard
 from slskd_importer.telegram.ui.markdown import escape_md, md_code_safe
 
 logger = logging.getLogger(__name__)

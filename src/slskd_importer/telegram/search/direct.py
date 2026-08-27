@@ -12,8 +12,9 @@ from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.errors import SlskdUnavailableError
 from slskd_importer.soulseek.query import parse_query_artist_title
 from slskd_importer.soulseek.scoring import rank_responses
+from slskd_importer.telegram.core.session import split_search_callback
 from slskd_importer.telegram.search.results import present_search_results
-from slskd_importer.telegram.ui.editing import safe_edit
+from slskd_importer.telegram.ui.editing import safe_edit, safe_query_edit
 from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
@@ -22,18 +23,19 @@ logger = logging.getLogger(__name__)
 async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
     """Handle 'Search Soulseek directly' button — search slskd with metadata parsed from the query."""
     query = update.callback_query
-
-    pending = self.pending.get(chat_id)
+    parsed = split_search_callback(data)
+    search_id = parsed[0] if parsed else ""
+    pending = self.pending.get(search_id) if search_id else None
     if not pending:
-        await query.edit_message_text(self.t(chat_id, "search_expired"))
+        await safe_query_edit(query, self.t(chat_id, "search_expired"))
         return
 
     search_query = pending.query
-    logger.info("chat=%s direct Soulseek search %r", chat_id, search_query)
-    generation = self._chat_generation.get(chat_id, 0)
+    logger.info("chat=%s search=%s direct Soulseek search %r", chat_id, search_id, search_query)
     display_track = _synthetic_track(search_query, None)
 
-    await query.edit_message_text(
+    await safe_query_edit(
+        query,
         self.t(
             chat_id,
             "direct_searching",
@@ -45,9 +47,18 @@ async def handle_direct_search(self, update: Update, context: ContextTypes.DEFAU
     )
     searching_msg = query.message
 
-    await self._do_direct_slskd_search(
-        context, chat_id, search_query, searching_msg, generation, display_track=display_track
+    task = context.application.create_task(
+        self._do_direct_slskd_search(
+            context,
+            chat_id,
+            search_query,
+            searching_msg,
+            search_id=search_id,
+            display_track=display_track,
+        ),
+        update=update,
     )
+    self._track_task(chat_id, task)
 
 
 def _synthetic_track(query: str, display_track: TrackInfo | None) -> TrackInfo:
@@ -74,12 +85,21 @@ def _synthetic_track(query: str, display_track: TrackInfo | None) -> TrackInfo:
 
 
 async def do_direct_slskd_search(
-    self, context, chat_id: int, query: str, searching_msg, generation: int, display_track: TrackInfo | None = None
+    self,
+    context,
+    chat_id: int,
+    query: str,
+    searching_msg,
+    generation: int | None = None,
+    display_track: TrackInfo | None = None,
+    search_id: str | None = None,
 ):
     """Search slskd without Spotify metadata. Duration scoring gives flat 15 points."""
+    if generation is None:
+        generation = self._chat_generation.get(chat_id, 0)
     try:
         raw_responses = await self.slskd.search(query, timeout_secs=self.config.search_timeout_secs)
-        if self._is_stale(chat_id, generation):
+        if self._is_stale(chat_id, generation) or self._search_cancelled(search_id):
             return
 
         synthetic_track = _synthetic_track(query, display_track)
@@ -87,10 +107,12 @@ async def do_direct_slskd_search(
             raw_responses, synthetic_track, self.scorer, quality_preference=self.quality_pref(chat_id)
         )
 
-        if self._is_stale(chat_id, generation):
+        if self._is_stale(chat_id, generation) or self._search_cancelled(search_id):
             return
 
         if not ranked:
+            if search_id:
+                self._session.drop_search(search_id)
             await safe_edit(
                 searching_msg,
                 self.t(chat_id, "direct_no_results", query=query),
@@ -98,8 +120,18 @@ async def do_direct_slskd_search(
             )
             return
 
+        if search_id is None:
+            search_id = self._next_search_id()
         await present_search_results(
-            self, context, chat_id, synthetic_track, ranked, is_fallback, searching_msg, query=query
+            self,
+            context,
+            chat_id,
+            synthetic_track,
+            ranked,
+            is_fallback,
+            searching_msg,
+            query=query,
+            search_id=search_id,
         )
 
     except SlskdUnavailableError:

@@ -7,19 +7,43 @@ attributes in ``core.app``.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 
 logger = logging.getLogger(__name__)
 
 
-async def cancel_chat_operations(self, chat_id: int) -> bool:
-    had_work, stale = self._session.cancel_chat_operations(chat_id)
+async def cancel_chat_operations(self, chat_id: int, telegram_bot=None) -> bool:
+    had_work, stale, stale_searches = self._session.cancel_chat_operations(chat_id)
     if had_work:
         logger.info("Cancelled in-flight work for chat %s (%d download(s))", chat_id, len(stale))
+    notice = self.t(chat_id, "cancelled")
     for dl in stale:
         await self._cleanup_download_artifacts(dl)
+        if telegram_bot:
+            await _edit_gone(telegram_bot, chat_id, dl.approval_message_id, notice, caption=True)
+            await _edit_gone(telegram_bot, chat_id, dl.status_message_id, notice, caption=False)
+    if telegram_bot:
+        for search in stale_searches:
+            await _edit_gone(telegram_bot, chat_id, search.message_id, notice, caption=False)
     return had_work
+
+
+async def _edit_gone(bot, chat_id: int, message_id: int | None, text: str, *, caption: bool) -> None:
+    if not message_id:
+        return
+    try:
+        if caption:
+            await bot.edit_message_caption(chat_id=chat_id, message_id=message_id, caption=text)
+        else:
+            await bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
+    except Exception:
+        with contextlib.suppress(Exception):
+            if caption:
+                await bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text)
+            else:
+                await bot.edit_message_caption(chat_id=chat_id, message_id=message_id, caption=text)
 
 
 async def cleanup_download_artifacts(self, dl) -> None:

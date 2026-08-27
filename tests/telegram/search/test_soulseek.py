@@ -77,7 +77,7 @@ class TestDoSlskdSearch:
 
         context = _make_context()
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
-        assert 123 in bot.pending
+        assert any(s.chat_id == 123 and s.results for s in bot.pending.values())
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -121,7 +121,7 @@ class TestDoSlskdSearch:
 
         context = _make_context()
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
-        assert 123 not in bot.pending
+        assert not any(s.results for s in bot.pending.values())
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from slskd_importer.catalog.playlist import PlaylistInfo
@@ -44,7 +45,9 @@ class TestCmdImport:
         bot.import_repo.get_active_job = MagicMock(return_value=_make_import_job())
         update = _make_update(text="/import https://open.spotify.com/playlist/abc123")
         context = _make_context()
+        context.application.create_task = lambda coro, **kw: asyncio.ensure_future(coro)
         await bot.cmd_import(update, context)
+        await asyncio.sleep(0)
         update.message.reply_text.assert_awaited_once()
         assert "already have an active import" in update.message.reply_text.call_args[0][0]
 
@@ -57,7 +60,9 @@ class TestCmdImport:
         bot.playlist_resolver.resolve = MagicMock(return_value=None)
         update = _make_update(text="/import https://open.spotify.com/playlist/abc123")
         context = _make_context()
+        context.application.create_task = lambda coro, **kw: asyncio.ensure_future(coro)
         await bot.cmd_import(update, context)
+        await asyncio.sleep(0)
         mock_edit.assert_awaited()
         assert "Failed to resolve" in mock_edit.call_args[0][1]
 
@@ -81,7 +86,9 @@ class TestCmdImport:
         bot.playlist_resolver.resolve = MagicMock(return_value=playlist_info)
         update = _make_update(text="/import https://open.spotify.com/playlist/abc123")
         context = _make_context()
+        context.application.create_task = lambda coro, **kw: asyncio.ensure_future(coro)
         await bot.cmd_import(update, context)
+        await asyncio.sleep(0)
         bot.import_repo.create_job.assert_called_once()
         bot.import_repo.add_tracks.assert_called_once()
         call_args = bot.import_repo.add_tracks.call_args[0]

@@ -7,7 +7,7 @@ import pytest
 
 from slskd_importer.telegram.core import ttl
 from slskd_importer.telegram.core.app import MusicBot
-from slskd_importer.telegram.core.session import PendingDownload
+from slskd_importer.telegram.core.session import PendingDownload, PendingSearch
 from tests.telegram.helpers import _make_config, _make_search_result, _make_track
 
 
@@ -59,6 +59,54 @@ class TestExpireStaleApprovals:
         assert "fresh" in bot.downloads
         assert "inflight" in bot.downloads
         bot._cleanup_download_artifacts.assert_not_awaited()
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_expires_abandoned_search(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.config.approval_ttl_secs = 60
+        bot.pending["old"] = PendingSearch(
+            query="gone",
+            chat_id=67890,
+            search_id="old",
+            message_id=11,
+            created_at=time.time() - 120,
+        )
+        bot.pending["fresh"] = PendingSearch(
+            query="keep",
+            chat_id=67890,
+            search_id="fresh",
+            created_at=time.time(),
+        )
+        app = AsyncMock()
+        await bot.expire_stale_approvals(app)
+        assert "old" not in bot.pending
+        assert "fresh" in bot.pending
+        app.bot.edit_message_text.assert_awaited_once()
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_keeps_search_with_in_flight_download(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.config.approval_ttl_secs = 60
+        bot.pending["live"] = PendingSearch(
+            query="downloading",
+            chat_id=67890,
+            search_id="live",
+            created_at=time.time() - 9999,
+        )
+        bot.downloads["1"] = PendingDownload(
+            track=_make_track(),
+            result=_make_search_result(),
+            chat_id=67890,
+            search_id="live",
+            source_path=None,
+            created_at=time.time(),
+        )
+        await bot.expire_stale_approvals(AsyncMock())
+        assert "live" in bot.pending
 
 
 class TestApprovalTtlLifecycle:

@@ -60,8 +60,10 @@ class TestRetryResultIndex:
         bot = MusicBot(_make_config())
         track = _make_track()
         results = [_make_search_result(i) for i in range(5)]
-        bot.pending[67890] = PendingSearch(query="test", track=track, results=results)
-        bot.downloads["2"] = PendingDownload(track=track, result=results[2], chat_id=67890, result_index=2)
+        bot.pending["1"] = PendingSearch(query="test", track=track, results=results, chat_id=67890, search_id="1")
+        bot.downloads["2"] = PendingDownload(
+            track=track, result=results[2], chat_id=67890, result_index=2, search_id="1"
+        )
         update = _make_callback_update(chat_id=67890, data="next:2")
         context = _make_context()
 
@@ -81,8 +83,10 @@ class TestRetryResultIndex:
         bot = MusicBot(_make_config())
         track = _make_track()
         results = [_make_search_result(0)]
-        bot.pending[67890] = PendingSearch(query="test", track=track, results=results)
-        bot.downloads["1"] = PendingDownload(track=track, result=results[0], chat_id=67890, result_index=0)
+        bot.pending["1"] = PendingSearch(query="test", track=track, results=results, chat_id=67890, search_id="1")
+        bot.downloads["1"] = PendingDownload(
+            track=track, result=results[0], chat_id=67890, result_index=0, search_id="1"
+        )
         update = _make_callback_update(chat_id=67890, data="next:1")
         context = _make_context()
         await bot.handle_callback(update, context)

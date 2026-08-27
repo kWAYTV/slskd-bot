@@ -1,7 +1,8 @@
-"""Save-to-library approval: approve, reject, and dismissing stale downloads."""
+"""Save-to-library approval: approve, reject, and dismissing sibling downloads."""
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -39,8 +40,13 @@ async def save_to_library(self, pending_dl, chat_id: int) -> str | None:
     """
     track = pending_dl.track
     result = pending_dl.result
-    target_path = self.processor.process_file(
-        pending_dl.source_path, track.artist, track.title, album=track.album, year=track.year
+    target_path = await asyncio.to_thread(
+        self.processor.process_file,
+        pending_dl.source_path,
+        track.artist,
+        track.title,
+        album=track.album,
+        year=track.year,
     )
     if not target_path:
         return None
@@ -73,7 +79,7 @@ async def _approve_download(self, query, context, chat_id: int, dl_id: str, pend
 
     await self._edit_approval_message(query, self.t(chat_id, "saved", name=target_name))
     logger.info("chat=%s approved and saved: %s", chat_id, target_name)
-    await self._dismiss_other_downloads(context, chat_id)
+    await self._dismiss_other_downloads(context, chat_id, search_id=pending_dl.search_id)
 
 
 async def _reject_download(self, query, chat_id: int, pending_dl):
@@ -90,25 +96,30 @@ async def _reject_download(self, query, chat_id: int, pending_dl):
     logger.info("chat=%s rejected: %s - %s (%s)", chat_id, track.artist, track.title, result.basename)
 
 
-async def dismiss_other_downloads(self, context, chat_id: int):
-    """Cancel all remaining pending downloads for a chat after one is approved."""
-    pending = self.pending.pop(chat_id, None)
-    if pending and pending.message_id:
-        with contextlib.suppress(Exception):
-            await context.bot.edit_message_reply_markup(
-                chat_id=chat_id,
-                message_id=pending.message_id,
-            )
+async def dismiss_other_downloads(self, context, chat_id: int, search_id: str | None = None):
+    """Cancel sibling downloads from the same search after one is approved.
 
-    stale = [(k, v) for k, v in self.downloads.items() if v.chat_id == chat_id]
+    Other chats' work and unrelated searches in this chat are left alone.
+    """
+    if search_id:
+        pending = self._session.drop_search(search_id)
+        if pending and pending.message_id:
+            with contextlib.suppress(Exception):
+                await context.bot.edit_message_reply_markup(
+                    chat_id=chat_id,
+                    message_id=pending.message_id,
+                )
+
+    stale = [(k, v) for k, v in self.downloads.items() if v.chat_id == chat_id and v.search_id == search_id]
     for dl_id, dl in stale:
         del self.downloads[dl_id]
+        if dl.task is not None:
+            dl.task.cancel()
         await self._cleanup_download_artifacts(dl)
         if dl.approval_message_id:
             await _mark_message_cancelled(self, context, chat_id, dl.approval_message_id)
-
-    for task in self._active_tasks.pop(chat_id, set()):
-        task.cancel()
+        elif dl.status_message_id:
+            await _mark_message_cancelled(self, context, chat_id, dl.status_message_id)
 
 
 async def _mark_message_cancelled(self, context, chat_id: int, message_id: int):

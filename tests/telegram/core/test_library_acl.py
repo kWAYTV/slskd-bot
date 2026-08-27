@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -193,7 +194,11 @@ class TestUserIdThreading:
         """Single-match auto path must not lose user_id (library ACL depends on it)."""
         bot = MusicBot(_make_config(library_users={12345}))
         bot.spotify.search_multiple = MagicMock(return_value=[_make_track()])
-        bot.slskd.search = AsyncMock(return_value=[])
+
+        async def _slskd(*args, **kwargs):
+            assert bot.pending["1"].user_id == 12345
+
+        bot._do_slskd_search = _slskd
 
         update = MagicMock()
         update.effective_chat.id = 1
@@ -203,21 +208,23 @@ class TestUserIdThreading:
         context = MagicMock()
         context.bot.send_message = AsyncMock(return_value=searching_msg)
 
-        await bot._do_search(update, context, "Artist Title", generation=0)
-        assert bot.pending[1].user_id == 12345
+        await bot._do_search(update, context, "Artist Title", "1")
+        assert bot.pending["1"].user_id == 12345
 
     @pytest.mark.asyncio
     async def test_direct_search_keeps_user_id(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config(library_users={12345}))
         bot._do_direct_slskd_search = AsyncMock()
-        bot.pending[1] = PendingSearch(query="some query", track=None, user_id=12345)
+        bot.pending["1"] = PendingSearch(query="some query", track=None, user_id=12345, chat_id=1, search_id="1")
 
         update = MagicMock()
         update.callback_query.from_user.id = 12345
         update.callback_query.edit_message_text = AsyncMock()
         update.callback_query.message = MagicMock(message_id=7)
         context = MagicMock()
+        context.application.create_task = MagicMock(side_effect=lambda coro, **kw: asyncio.ensure_future(coro))
 
-        await bot._handle_direct_search(update, context, 1, "direct:search")
-        assert bot.pending[1].user_id == 12345
+        await bot._handle_direct_search(update, context, 1, "direct:1")
+        await asyncio.sleep(0)
+        assert bot.pending["1"].user_id == 12345
         bot._do_direct_slskd_search.assert_awaited_once()

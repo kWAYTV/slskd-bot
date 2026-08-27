@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.result import SearchResult
+from slskd_importer.telegram.core.session import PendingSearch
 
 
 def _make_config():
@@ -76,7 +77,19 @@ def _make_update(user_id=12345, chat_id=67890, text="Nancy Sinatra Bang Bang"):
     return update
 
 
-def _make_callback_update(user_id=12345, chat_id=67890, data="dl:0"):
+def _put_search(bot, chat_id=67890, search_id="1", **kwargs) -> PendingSearch:
+    """Store a PendingSearch under ``search_id`` (not chat_id)."""
+    search = PendingSearch(
+        query=kwargs.pop("query", "test"),
+        search_id=search_id,
+        chat_id=chat_id,
+        **kwargs,
+    )
+    bot.pending[search_id] = search
+    return search
+
+
+def _make_callback_update(user_id=12345, chat_id=67890, data="dl:1:0"):
     """Create a mock callback query Update."""
     update = MagicMock()
     update.effective_user.id = user_id

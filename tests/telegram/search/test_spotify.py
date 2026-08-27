@@ -8,6 +8,7 @@ import pytest
 
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.telegram.core.app import MusicBot
+from slskd_importer.telegram.core.session import PendingSearch
 from tests.telegram.helpers import (
     _make_config,
     _make_context,
@@ -29,8 +30,7 @@ class TestMusicBotDoSearch:
         msg = AsyncMock()
         msg.edit_text = AsyncMock()
         context.bot.send_message = AsyncMock(return_value=msg)
-        bot._chat_generation[67890] = 0
-        await bot._do_search(update, context, "nonexistent song", 0)
+        await bot._do_search(update, context, "nonexistent song", "1")
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -45,8 +45,7 @@ class TestMusicBotDoSearch:
         msg = AsyncMock()
         msg.edit_text = AsyncMock()
         context.bot.send_message = AsyncMock(return_value=msg)
-        bot._chat_generation[67890] = 0
-        await bot._do_search(update, context, "Nancy Sinatra Bang Bang", 0)
+        await bot._do_search(update, context, "Nancy Sinatra Bang Bang", "1")
         bot._do_slskd_search.assert_called_once()
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
@@ -63,9 +62,8 @@ class TestMusicBotDoSearch:
         msg = AsyncMock()
         msg.edit_text = AsyncMock()
         context.bot.send_message = AsyncMock(return_value=msg)
-        bot._chat_generation[67890] = 0
-        await bot._do_search(update, context, "Nancy Sinatra Bang Bang", 0)
-        assert 67890 in bot._spotify_candidates
+        await bot._do_search(update, context, "Nancy Sinatra Bang Bang", "1")
+        assert "1" in bot._spotify_candidates
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -80,8 +78,8 @@ class TestMusicBotDoSearch:
         msg = AsyncMock()
         msg.edit_text = AsyncMock()
         context.bot.send_message = AsyncMock(return_value=msg)
-        bot._chat_generation[67890] = 5  # Set generation ahead
-        await bot._do_search(update, context, "test", 0)  # generation 0 is stale
+        bot.pending["1"] = PendingSearch(query="test", chat_id=67890, search_id="1", cancelled=True)
+        await bot._do_search(update, context, "test", "1")
         bot._do_slskd_search.assert_not_called()
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
@@ -96,8 +94,7 @@ class TestMusicBotDoSearch:
         msg = AsyncMock()
         msg.edit_text = AsyncMock()
         context.bot.send_message = AsyncMock(return_value=msg)
-        bot._chat_generation[67890] = 0
-        await bot._do_search(update, context, "test", 0)
+        await bot._do_search(update, context, "test", "1")
         # Should not raise
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
@@ -118,7 +115,6 @@ class TestMusicBotDoSearch:
         msg = AsyncMock()
         msg.edit_text = AsyncMock()
         context.bot.send_message = AsyncMock(return_value=msg)
-        bot._chat_generation[67890] = 0
-        await bot._do_search(update, context, "Nancy Sinatra - Bang Bang", 0)
+        await bot._do_search(update, context, "Nancy Sinatra - Bang Bang", "1")
         # Should filter to only Nancy Sinatra -> single result -> auto slskd search
         bot._do_slskd_search.assert_called_once()

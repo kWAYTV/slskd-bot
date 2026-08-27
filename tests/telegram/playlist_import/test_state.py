@@ -24,11 +24,11 @@ class TestImportPendingSeparation:
         track = _make_track()
         results = [_make_search_result()]
         # Simulate active regular search
-        bot.pending[67890] = PendingSearch(query="regular", track=track, results=results)
+        bot.pending["1"] = PendingSearch(query="regular", track=track, results=results, chat_id=67890, search_id="1")
         # Simulate import storing its state
         bot._import_pending[67890] = PendingSearch(query="import", track=track, results=results)
         # Regular search should be untouched
-        assert bot.pending[67890].query == "regular"
+        assert bot.pending["1"].query == "regular"
         assert bot._import_pending[67890].query == "import"
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
@@ -38,10 +38,10 @@ class TestImportPendingSeparation:
         """Cancellation should clear both pending dicts."""
         bot = MusicBot(_make_config())
         track = _make_track()
-        bot.pending[67890] = PendingSearch(query="q", track=track, results=[])
+        bot.pending["1"] = PendingSearch(query="q", track=track, results=[], chat_id=67890, search_id="1")
         bot._import_pending[67890] = PendingSearch(query="i", track=track, results=[])
         await bot._cancel_chat_operations(67890)
-        assert 67890 not in bot.pending
+        assert "1" not in bot.pending
         assert 67890 not in bot._import_pending
 
 

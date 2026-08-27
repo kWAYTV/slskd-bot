@@ -14,9 +14,9 @@ from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.core.session import PendingDownload
 from slskd_importer.telegram.download.delivery import send_audio_or_document
 from slskd_importer.telegram.download.transfer import abort_transfer, fetch_from_peer, make_progress_callback
+from slskd_importer.telegram.playlist_import.keyboards import build_import_failure_keyboard, build_import_track_keyboard
 from slskd_importer.telegram.ui.editing import safe_edit
 from slskd_importer.telegram.ui.formatting import progress_bar
-from slskd_importer.telegram.ui.keyboards import build_import_failure_keyboard, build_import_track_keyboard
 from slskd_importer.telegram.ui.markdown import escape_md, md_code_safe
 
 logger = logging.getLogger(__name__)

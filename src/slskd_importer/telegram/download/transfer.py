@@ -87,7 +87,7 @@ async def fetch_from_peer(self, result: SearchResult, progress_callback) -> Tran
         if status is None or status.is_failed:
             return TransferOutcome(enqueued=True, status=status)
 
-        source_path = self.processor.find_downloaded_file(result.username, result.filename)
+        source_path = await asyncio.to_thread(self.processor.find_downloaded_file, result.username, result.filename)
         return TransferOutcome(enqueued=True, status=status, source_path=source_path)
 
 

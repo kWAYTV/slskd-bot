@@ -131,7 +131,7 @@ class TestMusicBotCommands:
     @pytest.mark.asyncio
     async def test_cmd_status_with_pending(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot.pending[67890] = PendingSearch(query="test", track=_make_track())
+        bot.pending["1"] = PendingSearch(query="test", track=_make_track(), chat_id=67890, search_id="1")
         update = _make_update()
         context = _make_context()
         await bot.cmd_status(update, context)
@@ -143,7 +143,7 @@ class TestMusicBotCommands:
     @pytest.mark.asyncio
     async def test_cmd_status_pending_without_track(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot.pending[67890] = PendingSearch(query="artist_with*md", track=None)
+        bot.pending["1"] = PendingSearch(query="artist_with*md", track=None, chat_id=67890, search_id="1")
         update = _make_update()
         context = _make_context()
         await bot.cmd_status(update, context)
@@ -155,7 +155,7 @@ class TestMusicBotCommands:
     @pytest.mark.asyncio
     async def test_cmd_status_ignores_other_chats(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot.pending[11111] = PendingSearch(query="secret", track=_make_track())
+        bot.pending["1"] = PendingSearch(query="secret", track=_make_track(), chat_id=11111, search_id="1")
         update = _make_update()
         context = _make_context()
         await bot.cmd_status(update, context)

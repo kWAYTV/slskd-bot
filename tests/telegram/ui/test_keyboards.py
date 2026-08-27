@@ -2,14 +2,10 @@
 
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.result import SearchResult
-from slskd_importer.telegram.ui.keyboards import (
-    build_approve_keyboard,
-    build_history_keyboard,
-    build_import_failure_keyboard,
-    build_language_keyboard,
-    build_results_keyboard,
-    build_spotify_keyboard,
-)
+from slskd_importer.telegram.commands.keyboards import build_history_keyboard, build_language_keyboard
+from slskd_importer.telegram.download.keyboards import build_approve_keyboard
+from slskd_importer.telegram.playlist_import.keyboards import build_import_failure_keyboard
+from slskd_importer.telegram.search.keyboards import build_results_keyboard, build_spotify_keyboard
 
 
 def _make_result(idx: int = 0) -> SearchResult:
@@ -49,22 +45,22 @@ class TestBuildLanguageKeyboard:
 class TestBuildResultsKeyboard:
     def test_single_result(self):
         results = [_make_result()]
-        kb = build_results_keyboard(results)
+        kb = build_results_keyboard(results, search_id="1")
         rows = kb.inline_keyboard
         # 1 result button + action row (auto-pick + cancel)
         assert len(rows) == 2
-        assert "dl:0" in rows[0][0].callback_data
+        assert rows[0][0].callback_data == "dl:1:0"
 
     def test_multiple_results(self):
         results = [_make_result(i) for i in range(3)]
-        kb = build_results_keyboard(results)
+        kb = build_results_keyboard(results, search_id="1")
         rows = kb.inline_keyboard
         # 3 result rows + action row
         assert len(rows) == 4
 
     def test_pagination_first_page(self):
         results = [_make_result(i) for i in range(15)]
-        kb = build_results_keyboard(results, page=0, page_size=10)
+        kb = build_results_keyboard(results, page=0, page_size=10, search_id="1")
         rows = kb.inline_keyboard
         # 10 result rows + nav row + action row
         nav_row = rows[-2]
@@ -73,7 +69,7 @@ class TestBuildResultsKeyboard:
 
     def test_pagination_second_page(self):
         results = [_make_result(i) for i in range(15)]
-        kb = build_results_keyboard(results, page=1, page_size=10)
+        kb = build_results_keyboard(results, page=1, page_size=10, search_id="1")
         rows = kb.inline_keyboard
         nav_row = rows[-2]
         assert any("Prev" in btn.text for btn in nav_row)
@@ -81,7 +77,7 @@ class TestBuildResultsKeyboard:
 
     def test_pagination_middle_page(self):
         results = [_make_result(i) for i in range(30)]
-        kb = build_results_keyboard(results, page=1, page_size=10)
+        kb = build_results_keyboard(results, page=1, page_size=10, search_id="1")
         rows = kb.inline_keyboard
         nav_row = rows[-2]
         assert any("Prev" in btn.text for btn in nav_row)
@@ -89,14 +85,14 @@ class TestBuildResultsKeyboard:
 
     def test_action_row_has_auto_and_cancel(self):
         results = [_make_result()]
-        kb = build_results_keyboard(results)
+        kb = build_results_keyboard(results, search_id="1")
         action_row = kb.inline_keyboard[-1]
         texts = [btn.text for btn in action_row]
         assert any("Auto" in t for t in texts)
         assert any("Cancel" in t for t in texts)
 
     def test_empty_results_has_cancel_only(self):
-        kb = build_results_keyboard([])
+        kb = build_results_keyboard([], search_id="1")
         action_row = kb.inline_keyboard[-1]
         assert len(action_row) == 1
         assert "Cancel" in action_row[0].text
@@ -119,17 +115,17 @@ class TestBuildApproveKeyboard:
 class TestBuildSpotifyKeyboard:
     def test_single_page(self):
         tracks = [_make_track(i) for i in range(3)]
-        kb = build_spotify_keyboard(tracks)
+        kb = build_spotify_keyboard(tracks, search_id="1")
         rows = kb.inline_keyboard
         # 3 track buttons + direct search row + cancel row
         assert len(rows) == 5
-        assert rows[0][0].callback_data == "sp:0"
-        assert rows[-2][0].callback_data == "direct:search"
-        assert rows[-1][0].callback_data == "sp:cancel"
+        assert rows[0][0].callback_data == "sp:1:0"
+        assert rows[-2][0].callback_data == "direct:1"
+        assert rows[-1][0].callback_data == "sp:1:cancel"
 
     def test_pagination_multiple_pages(self):
         tracks = [_make_track(i) for i in range(12)]
-        kb = build_spotify_keyboard(tracks, page=0, page_size=5)
+        kb = build_spotify_keyboard(tracks, page=0, page_size=5, search_id="1")
         rows = kb.inline_keyboard
         # 5 track rows + nav row + direct search row + cancel row
         nav_row = rows[-3]
@@ -137,7 +133,7 @@ class TestBuildSpotifyKeyboard:
 
     def test_pagination_last_page(self):
         tracks = [_make_track(i) for i in range(12)]
-        kb = build_spotify_keyboard(tracks, page=2, page_size=5)
+        kb = build_spotify_keyboard(tracks, page=2, page_size=5, search_id="1")
         rows = kb.inline_keyboard
         # 2 track rows + nav row + direct search row + cancel row
         nav_row = rows[-3]
@@ -153,7 +149,7 @@ class TestBuildSpotifyKeyboard:
             spotify_url="",
             year="2024",
         )
-        kb = build_spotify_keyboard([track])
+        kb = build_spotify_keyboard([track], search_id="1")
         label = kb.inline_keyboard[0][0].text
         assert len(label) <= 64
 

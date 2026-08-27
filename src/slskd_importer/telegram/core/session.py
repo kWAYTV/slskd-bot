@@ -1,4 +1,8 @@
-"""Per-chat conversation state and cancellation."""
+"""Per-chat conversation state and cancellation.
+
+Searches are keyed by ``search_id`` (not chat_id) so two queries in the same
+chat stay independent. ``/cancel`` still stops everything in that chat.
+"""
 
 from __future__ import annotations
 
@@ -10,9 +14,22 @@ from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.result import SearchResult
 
 
+def split_search_callback(data: str) -> tuple[str, str] | None:
+    """Parse ``prefix:search_id`` or ``prefix:search_id:rest``.
+
+    Returns ``(search_id, rest)`` where *rest* is ``""`` when absent.
+    """
+    parts = data.split(":", 2)
+    if len(parts) < 2:
+        return None
+    if len(parts) == 2:
+        return parts[1], ""
+    return parts[1], parts[2]
+
+
 @dataclass
 class PendingSearch:
-    """Holds state for an active search session."""
+    """Holds state for one search session (one Telegram result/picker message)."""
 
     query: str
     track: TrackInfo | None = None
@@ -21,6 +38,10 @@ class PendingSearch:
     is_fallback: bool = False
     page: int = 0
     user_id: int | None = None
+    search_id: str = ""
+    chat_id: int = 0
+    cancelled: bool = False
+    created_at: float = field(default_factory=time.time)
 
 
 @dataclass
@@ -39,17 +60,20 @@ class PendingDownload:
     progress_percent: float | None = None
     transfer_state: str | None = None
     created_at: float = field(default_factory=time.time)
+    search_id: str | None = None
+    task: asyncio.Task | None = None
 
 
 class ChatSession:
     """In-memory per-chat state for searches, downloads, and cancellation."""
 
     def __init__(self) -> None:
-        self.pending: dict[int, PendingSearch] = {}
+        self.pending: dict[str, PendingSearch] = {}
         self.downloads: dict[str, PendingDownload] = {}
         self._dl_counter = 0
-        self._spotify_candidates: dict[int, list[TrackInfo]] = {}
-        self._spotify_page: dict[int, int] = {}
+        self._search_counter = 0
+        self._spotify_candidates: dict[str, list[TrackInfo]] = {}
+        self._spotify_page: dict[str, int] = {}
         self._chat_generation: dict[int, int] = {}
         self._active_tasks: dict[int, set[asyncio.Task]] = {}
         self._active_import: dict[int, int] = {}
@@ -62,35 +86,54 @@ class ChatSession:
         self._dl_counter += 1
         return str(self._dl_counter)
 
-    def cancel_chat_operations(self, chat_id: int) -> tuple[bool, list[PendingDownload]]:
+    def next_search_id(self) -> str:
+        self._search_counter += 1
+        return str(self._search_counter)
+
+    def searches_for_chat(self, chat_id: int) -> list[PendingSearch]:
+        return [search for search in self.pending.values() if search.chat_id == chat_id]
+
+    def search_cancelled(self, search_id: str | None) -> bool:
+        if not search_id:
+            return False
+        search = self.pending.get(search_id)
+        return search is None or search.cancelled
+
+    def drop_search(self, search_id: str) -> PendingSearch | None:
+        search = self.pending.pop(search_id, None)
+        self._spotify_candidates.pop(search_id, None)
+        self._spotify_page.pop(search_id, None)
+        return search
+
+    def cancel_chat_operations(self, chat_id: int) -> tuple[bool, list[PendingDownload], list[PendingSearch]]:
         """Cancel all active operations for a chat.
 
         Bumps the generation counter and cancels tracked background tasks.
-        Returns (had_work, downloads that need slskd/disk cleanup).
+        Returns (had_work, downloads that need slskd/disk cleanup, searches to notify).
         """
-        had_work = bool(
-            self.pending.get(chat_id) or self._spotify_candidates.get(chat_id) or self._active_tasks.get(chat_id)
-        )
+        stale_searches = self.searches_for_chat(chat_id)
+        had_work = bool(stale_searches or self._active_tasks.get(chat_id) or self._import_pending.get(chat_id))
 
         self._chat_generation[chat_id] = self._chat_generation.get(chat_id, 0) + 1
 
         for task in self._active_tasks.pop(chat_id, set()):
             task.cancel()
 
-        self.pending.pop(chat_id, None)
+        for search in stale_searches:
+            search.cancelled = True
+            self.drop_search(search.search_id)
+
         self._import_pending.pop(chat_id, None)
         self._import_status_msg.pop(chat_id, None)
-        self._spotify_candidates.pop(chat_id, None)
-        self._spotify_page.pop(chat_id, None)
 
-        stale = [v for k, v in list(self.downloads.items()) if v.chat_id == chat_id]
+        stale = [v for v in self.downloads.values() if v.chat_id == chat_id]
         if stale:
             had_work = True
         stale_ids = [k for k, v in self.downloads.items() if v.chat_id == chat_id]
         for dl_id in stale_ids:
             del self.downloads[dl_id]
 
-        return had_work, stale
+        return had_work, stale, stale_searches
 
     def is_stale(self, chat_id: int, generation: int) -> bool:
         return self._chat_generation.get(chat_id, 0) != generation

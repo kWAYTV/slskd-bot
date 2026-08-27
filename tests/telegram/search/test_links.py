@@ -39,7 +39,7 @@ class TestLinkQueries:
         assert handled is True
         bot.spotify.get_track.assert_called_once_with("4uLU6hMCjMI75M1A2tKUQC")
         bot._do_slskd_search.assert_awaited_once()
-        assert bot.pending[67890].track is not None
+        assert any(s.track is not None and s.chat_id == 67890 for s in bot.pending.values())
 
     @pytest.mark.asyncio
     async def test_playlist_link_starts_import(self):

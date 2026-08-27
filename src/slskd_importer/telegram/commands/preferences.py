@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from slskd_importer.telegram.ui.keyboards import build_language_keyboard, build_quality_keyboard
+from slskd_importer.telegram.commands.keyboards import build_language_keyboard, build_quality_keyboard
 
 
 async def cmd_quality(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

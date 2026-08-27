@@ -46,7 +46,16 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
     )
 
     task = context.application.create_task(
-        self._do_download(context, chat_id, track, result, status_msg, result_index, user_id=pending_dl.user_id),
+        self._do_download(
+            context,
+            chat_id,
+            track,
+            result,
+            status_msg,
+            result_index,
+            user_id=pending_dl.user_id,
+            search_id=pending_dl.search_id,
+        ),
         update=update,
     )
     self._track_task(chat_id, task)
@@ -57,10 +66,16 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
     query = update.callback_query
     dl_id = data.split(":", 1)[1]
 
-    pending = self.pending.get(chat_id) or self._import_pending.get(chat_id)
     pending_dl = self.downloads.pop(dl_id, None)
+    pending = None
+    if pending_dl and pending_dl.search_id:
+        pending = self.pending.get(pending_dl.search_id)
+    if pending is None:
+        pending = self._import_pending.get(chat_id)
 
     if not pending or not pending.results or not pending_dl:
+        if pending_dl:
+            self.downloads[dl_id] = pending_dl
         await safe_query_edit(query, self.t(chat_id, "no_more_available"))
         return
 
@@ -94,7 +109,16 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
     )
 
     task = context.application.create_task(
-        self._do_download(context, chat_id, track, next_result, status_msg, next_idx, user_id=pending_dl.user_id),
+        self._do_download(
+            context,
+            chat_id,
+            track,
+            next_result,
+            status_msg,
+            next_idx,
+            user_id=pending_dl.user_id,
+            search_id=pending_dl.search_id,
+        ),
         update=update,
     )
     self._track_task(chat_id, task)

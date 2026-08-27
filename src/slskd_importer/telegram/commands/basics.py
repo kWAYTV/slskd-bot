@@ -6,8 +6,8 @@ from telegram import BotCommand, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from slskd_importer.telegram.commands.keyboards import build_language_keyboard
 from slskd_importer.telegram.i18n import DEFAULT_LOCALE, LOCALES, normalize_locale, t
-from slskd_importer.telegram.ui.keyboards import build_language_keyboard
 
 
 def _commands_for(locale: str) -> list[BotCommand]:

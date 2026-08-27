@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from telegram import Update
@@ -9,67 +10,72 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from slskd_importer.catalog.track import TrackInfo
-from slskd_importer.telegram.core.session import PendingSearch
-from slskd_importer.telegram.ui.editing import safe_edit
+from slskd_importer.telegram.core.session import PendingSearch, split_search_callback
+from slskd_importer.telegram.search.keyboards import build_direct_search_keyboard, build_spotify_keyboard
+from slskd_importer.telegram.ui.editing import safe_edit, safe_query_edit
 from slskd_importer.telegram.ui.formatting import format_spotify_results, track_md
-from slskd_importer.telegram.ui.keyboards import build_direct_search_keyboard, build_spotify_keyboard
 
 logger = logging.getLogger(__name__)
 
 
-async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, generation: int):
+async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, search_id: str):
     """Resolve metadata via Spotify, then proceed to slskd search."""
     chat_id = update.effective_chat.id
+    search = self.pending.get(search_id)
+    if search is None:
+        search = PendingSearch(
+            query=query,
+            chat_id=chat_id,
+            search_id=search_id,
+            user_id=update.effective_user.id,
+        )
+        self.pending[search_id] = search
 
     searching_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=self.t(chat_id, "looking_up", query=query),
         parse_mode=ParseMode.MARKDOWN,
     )
+    search.message_id = searching_msg.message_id
 
     try:
-        tracks = self.spotify.search_multiple(query, limit=50)
-        if self._is_stale(chat_id, generation):
+        tracks = await asyncio.to_thread(self.spotify.search_multiple, query, 50)
+        if self._search_cancelled(search_id):
             return
 
-        logger.info("chat=%s Spotify returned %d track(s) for %r", chat_id, len(tracks), query)
+        logger.info("chat=%s search=%s Spotify returned %d track(s) for %r", chat_id, search_id, len(tracks), query)
         if not tracks:
             await safe_edit(
                 searching_msg,
                 self.t(chat_id, "spotify_not_found", query=query),
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_direct_search_keyboard(locale=self.locale(chat_id)),
+                reply_markup=build_direct_search_keyboard(search_id, locale=self.locale(chat_id)),
             )
-            self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
             return
 
         unique_tracks = _filter_candidates(query, tracks)
 
-        logger.debug("chat=%s Spotify candidates after filter: %d", chat_id, len(unique_tracks))
+        logger.debug("chat=%s search=%s Spotify candidates after filter: %d", chat_id, search_id, len(unique_tracks))
         if len(unique_tracks) == 1:
-            self.pending[chat_id] = PendingSearch(
-                query=query,
-                track=unique_tracks[0],
-                user_id=update.effective_user.id,
-            )
-            await self._do_slskd_search(context, chat_id, unique_tracks[0], searching_msg, generation)
+            search.track = unique_tracks[0]
+            await self._do_slskd_search(context, chat_id, unique_tracks[0], searching_msg, search_id=search_id)
             return
 
-        self._spotify_candidates[chat_id] = unique_tracks
-        self._spotify_page[chat_id] = 0
-        self.pending[chat_id] = PendingSearch(query=query, track=None, user_id=update.effective_user.id)
+        self._spotify_candidates[search_id] = unique_tracks
+        self._spotify_page[search_id] = 0
         await safe_edit(
             searching_msg,
             format_spotify_results(unique_tracks, page=0, locale=self.locale(chat_id)),
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=True,
-            reply_markup=build_spotify_keyboard(unique_tracks, page=0, locale=self.locale(chat_id)),
+            reply_markup=build_spotify_keyboard(
+                unique_tracks, page=0, search_id=search_id, locale=self.locale(chat_id)
+            ),
         )
 
     except Exception:
         logger.exception(f"Unexpected error in _do_search for: {query}")
-        self._spotify_candidates.pop(chat_id, None)
-        self._spotify_page.pop(chat_id, None)
+        self._session.drop_search(search_id)
         await safe_edit(searching_msg, self.t(chat_id, "something_wrong"))
 
 
@@ -116,35 +122,47 @@ def _filter_candidates(query: str, tracks: list[TrackInfo]) -> list[TrackInfo]:
 async def handle_spotify_page(self, update, context, chat_id: int, data: str):
     """Handle Spotify page navigation (◀️ / ▶️)."""
     query = update.callback_query
-    candidates = self._spotify_candidates.get(chat_id)
+    parsed = split_search_callback(data)
+    if not parsed:
+        return
+    search_id, page_raw = parsed
+    candidates = self._spotify_candidates.get(search_id)
     if not candidates:
-        await query.edit_message_text(self.t(chat_id, "search_expired"))
+        await safe_query_edit(query, self.t(chat_id, "search_expired"))
         return
 
     try:
-        page = int(data.split(":", 1)[1])
+        page = int(page_raw)
     except ValueError:
         return
 
-    self._spotify_page[chat_id] = page
-    await query.edit_message_text(
+    self._spotify_page[search_id] = page
+    await safe_query_edit(
+        query,
         format_spotify_results(candidates, page=page, locale=self.locale(chat_id)),
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
-        reply_markup=build_spotify_keyboard(candidates, page=page, locale=self.locale(chat_id)),
+        reply_markup=build_spotify_keyboard(candidates, page=page, search_id=search_id, locale=self.locale(chat_id)),
     )
 
 
 async def handle_spotify_selection(self, update, context, chat_id: int, data: str):
     """Handle Spotify track selection from multiple results."""
     query = update.callback_query
-    action = data.split(":", 1)[1]
+    parsed = split_search_callback(data)
+    if not parsed:
+        return
+    search_id, action = parsed
 
-    candidates = self._spotify_candidates.pop(chat_id, None)
-    self._spotify_page.pop(chat_id, None)
+    if action == "cancel":
+        self._session.drop_search(search_id)
+        await safe_query_edit(query, self.t(chat_id, "cancelled"))
+        return
 
-    if action == "cancel" or not candidates:
-        await query.edit_message_text(self.t(chat_id, "cancelled"))
+    candidates = self._spotify_candidates.get(search_id)
+    if not candidates:
+        self._session.drop_search(search_id)
+        await safe_query_edit(query, self.t(chat_id, "cancelled"))
         return
 
     try:
@@ -155,8 +173,14 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
     if index >= len(candidates):
         return
 
+    self._spotify_candidates.pop(search_id, None)
+    self._spotify_page.pop(search_id, None)
     track = candidates[index]
-    await query.edit_message_text(
+    search = self.pending.get(search_id)
+    if search:
+        search.track = track
+    await safe_query_edit(
+        query,
         self.t(chat_id, "spotify_selected", track=track_md(track), duration=track.duration_display),
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -166,5 +190,10 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
         text=self.t(chat_id, "searching_slskd"),
         parse_mode=ParseMode.MARKDOWN,
     )
-    generation = self._chat_generation.get(chat_id, 0)
-    await self._do_slskd_search(context, chat_id, track, searching_msg, generation)
+    if search:
+        search.message_id = searching_msg.message_id
+    task = context.application.create_task(
+        self._do_slskd_search(context, chat_id, track, searching_msg, search_id=search_id),
+        update=update,
+    )
+    self._track_task(chat_id, task)

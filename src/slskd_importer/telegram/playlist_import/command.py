@@ -10,9 +10,9 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from slskd_importer.catalog.playlist import PlaylistResolver
+from slskd_importer.telegram.playlist_import.keyboards import build_import_confirm_keyboard
 from slskd_importer.telegram.playlist_import.resume import resume_import_job
 from slskd_importer.telegram.ui.editing import safe_edit
-from slskd_importer.telegram.ui.keyboards import build_import_confirm_keyboard
 from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,11 @@ async def cmd_import(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(self.t(chat_id, "import_invalid_url"))
         return
 
-    await start_import_from_url(self, update, context, chat_id, url)
+    task = context.application.create_task(
+        start_import_from_url(self, update, context, chat_id, url),
+        update=update,
+    )
+    self._track_task(chat_id, task)
 
 
 async def start_import_from_url(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, url: str):

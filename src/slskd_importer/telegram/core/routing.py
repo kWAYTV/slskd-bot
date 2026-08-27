@@ -10,10 +10,10 @@ from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
+from slskd_importer.telegram.commands.keyboards import build_quality_keyboard
 from slskd_importer.telegram.i18n import LABELS, LOCALES
 from slskd_importer.telegram.ui.editing import safe_query_edit
 from slskd_importer.telegram.ui.formatting import welcome_text
-from slskd_importer.telegram.ui.keyboards import build_quality_keyboard
 
 logger = logging.getLogger(__name__)
 

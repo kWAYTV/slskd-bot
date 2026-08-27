@@ -8,7 +8,7 @@ import logging
 from telegram.constants import ParseMode
 
 from slskd_importer.playlist_import.job import JobStatus
-from slskd_importer.telegram.ui.keyboards import build_import_summary_keyboard
+from slskd_importer.telegram.playlist_import.keyboards import build_import_summary_keyboard
 from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)

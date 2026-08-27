@@ -23,7 +23,7 @@ from slskd_importer.records.prefs import ChatPrefsRepository
 from slskd_importer.settings.config import Config
 from slskd_importer.soulseek.client import SlskdClient
 from slskd_importer.soulseek.scoring import ResultScorer
-from slskd_importer.telegram.commands import activity, basics, preferences
+from slskd_importer.telegram.commands import basics, cancel, history, preferences, status, undo
 from slskd_importer.telegram.core import access, cleanup, routing, ttl
 from slskd_importer.telegram.core.session import ChatSession
 from slskd_importer.telegram.download import approval, delivery, retry, run, selection, transfer
@@ -109,11 +109,17 @@ class MusicBot:
     def _is_stale(self, chat_id: int, generation: int) -> bool:
         return self._session.is_stale(chat_id, generation)
 
+    def _search_cancelled(self, search_id: str | None) -> bool:
+        return self._session.search_cancelled(search_id)
+
     def _track_task(self, chat_id: int, task: asyncio.Task):
         self._session.track_task(chat_id, task)
 
     def _next_dl_id(self) -> str:
         return self._session.next_dl_id()
+
+    def _next_search_id(self) -> str:
+        return self._session.next_search_id()
 
     # --- conversation handlers, composed from feature modules ------------------
 
@@ -132,12 +138,12 @@ class MusicBot:
     cmd_start = basics.cmd_start
     cmd_quality = preferences.cmd_quality
     cmd_lang = preferences.cmd_lang
-    cmd_undo = activity.cmd_undo
-    cmd_status = activity.cmd_status
-    cmd_history = activity.cmd_history
-    cmd_stats = activity.cmd_stats
-    cmd_cancel = activity.cmd_cancel
-    _handle_history_undo = activity.handle_history_undo
+    cmd_undo = undo.cmd_undo
+    cmd_status = status.cmd_status
+    cmd_history = history.cmd_history
+    cmd_stats = status.cmd_stats
+    cmd_cancel = cancel.cmd_cancel
+    _handle_history_undo = undo.handle_history_undo
     cmd_import = import_command.cmd_import
 
     handle_text = text.handle_text

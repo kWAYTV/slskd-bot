@@ -43,7 +43,7 @@ The package is organized by **what the app does** (Screaming Architecture), not 
 src/slskd_importer/
   catalog/           # Track identity — Spotify lookup, playlists, TrackInfo
   soulseek/          # Find and fetch files — search lifecycle, transfers, ranking, fallbacks
-  library/           # Organize the collection — rename, formats, artwork, FLAC, previews
+  library/           # Organize the collection — rename, tags, formats, artwork, FLAC, previews
   history/           # Download history records
   playlist_import/   # Playlist/album import jobs
   records/           # Shared SQLite connection used by history + import
@@ -57,14 +57,16 @@ Telegram is a delivery mechanism, not the domain. The `telegram/` package contai
 ```
 telegram/
   core/              # MusicBot composition root (app), callback routing, access, cleanup, session
-  ui/                # markdown escaping, safe edits, text formatting, inline keyboards
-  commands/          # basics (/start /help), preferences (/quality), activity (/status /history /stats /undo /cancel)
+  ui/                # presentation primitives only — markdown, safe edits, text formatting
+  commands/          # one module per command family: basics, preferences, status, history, undo, cancel
   search/            # text entry, pasted links, Spotify pick, Soulseek search, direct search, results
-  download/          # selection, run (orchestration), transfer (shared pipeline + history), delivery (send/preview/artwork), approval, retry
+  download/          # selection, run, transfer, delivery, approval, retry
   playlist_import/   # /import command, callbacks, job queue, per-track search/download, summary, resume
+  i18n/              # per-locale string modules (en/es/gl/de) + thin catalog lookup
 ```
 
 - `telegram/core/app.py` wires domain services into `MusicBot` and binds the conversation handlers from the feature modules as class attributes (handler functions take the bot as `self`)
+- Inline keyboards live with the feature that owns the callback prefix (`search/keyboards.py`, `download/keyboards.py`, `playlist_import/keyboards.py`, `commands/keyboards.py`) — not in a generic UI dump
 - The shared download pipeline (`download/transfer.py`, `download/delivery.py`) and the save sequence (`download/approval.save_to_library`) are reused by the playlist import flow — never duplicate enqueue/wait/progress/save logic
 - Soulseek search policy (FLAC-first ranking, four-tier query fallbacks) lives in `soulseek/scoring.py` and `soulseek/fallbacks.py`, not in the Telegram layer
 - Domain packages do not import Telegram

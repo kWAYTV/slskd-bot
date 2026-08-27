@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -34,8 +35,10 @@ class TestMusicBotHandleText:
         update = _make_update(text="Artist Song")
         context = _make_context()
         await bot.handle_text(update, context)
+        await asyncio.sleep(0)
         bot._do_search.assert_awaited_once()
         assert bot._do_search.await_args.args[2] == "Artist Song"
+        assert bot._do_search.await_args.args[3] in bot.pending
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")

@@ -1,1 +1,1 @@
-"""Slash-command handlers: basics, preferences, activity."""
+"""Slash-command handlers: start, prefs, status, history, undo, cancel."""

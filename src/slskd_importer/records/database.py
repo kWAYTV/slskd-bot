@@ -6,7 +6,10 @@ import logging
 import os
 import shutil
 import sqlite3
+import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -93,6 +96,7 @@ class Database:
     def __init__(self, db_path: str) -> None:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._db_path = db_path
+        self._lock = threading.RLock()
         try:
             self._conn = _open_connection(db_path)
             self._init_schema()
@@ -122,6 +126,12 @@ class Database:
     @property
     def connection(self) -> sqlite3.Connection:
         return self._conn
+
+    @contextmanager
+    def locked(self) -> Iterator[sqlite3.Connection]:
+        """Serialize all SQLite access. Needed when history/import writes run in to_thread."""
+        with self._lock:
+            yield self._conn
 
     def _init_schema(self) -> None:
         self._conn.executescript(_SCHEMA)

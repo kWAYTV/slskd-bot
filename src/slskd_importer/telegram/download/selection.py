@@ -8,6 +8,8 @@ import logging
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 
+from slskd_importer.telegram.core.session import split_search_callback
+from slskd_importer.telegram.ui.editing import safe_query_edit
 from slskd_importer.telegram.ui.markdown import escape_md, md_code_safe
 
 logger = logging.getLogger(__name__)
@@ -16,16 +18,18 @@ logger = logging.getLogger(__name__)
 async def handle_download_selection(self, update, context, chat_id: int, data: str):
     """Handle when user picks a file to download from results."""
     query = update.callback_query
-    pending = self.pending.get(chat_id)
+    parsed = split_search_callback(data)
+    if not parsed:
+        return
+    search_id, action = parsed
+    pending = self.pending.get(search_id)
     if not pending:
-        await query.edit_message_text(self.t(chat_id, "search_expired"))
+        await safe_query_edit(query, self.t(chat_id, "search_expired"))
         return
 
-    action = data.split(":", 1)[1]
-
     if action == "cancel":
-        del self.pending[chat_id]
-        await query.edit_message_text(self.t(chat_id, "cancelled"))
+        self._session.drop_search(search_id)
+        await safe_query_edit(query, self.t(chat_id, "cancelled"))
         return
 
     index = _parse_result_index(action)
@@ -36,8 +40,9 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     track = pending.track
     user_id = pending.user_id or query.from_user.id
     logger.info(
-        "chat=%s selected #%d %s from %s",
+        "chat=%s search=%s selected #%d %s from %s",
         chat_id,
+        search_id,
         index + 1,
         result.basename,
         result.username,
@@ -61,7 +66,7 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     )
 
     task = context.application.create_task(
-        self._do_download(context, chat_id, track, result, status_msg, index, user_id=user_id),
+        self._do_download(context, chat_id, track, result, status_msg, index, user_id=user_id, search_id=search_id),
         update=update,
     )
     self._track_task(chat_id, task)
@@ -77,6 +82,8 @@ def _parse_result_index(action: str) -> int | None:
         return None
 
 
-def has_next_result(self, chat_id: int, current_index: int) -> bool:
-    pending = self.pending.get(chat_id)
+def has_next_result(self, chat_id: int, current_index: int, search_id: str | None = None) -> bool:
+    pending = self.pending.get(search_id) if search_id else None
+    if pending is None:
+        pending = self._import_pending.get(chat_id)
     return pending is not None and current_index + 1 < len(pending.results)

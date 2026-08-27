@@ -7,6 +7,7 @@ import mutagen.flac
 import pytest
 
 from slskd_importer.library.files import FileProcessor
+from slskd_importer.library.tags import dedup_flac_tags
 
 
 class TestFileProcessor:
@@ -184,7 +185,7 @@ class TestFileProcessor:
         flac_path = str(tmp_path / "test.flac")
         _create_test_flac(flac_path, {"artist": ["Le Tigre", "Le Tigre"], "title": ["Deceptacon", "Deceptacon"]})
 
-        FileProcessor._dedup_flac_tags(flac_path)
+        dedup_flac_tags(flac_path)
 
         audio = mutagen.flac.FLAC(flac_path)
         assert audio["artist"] == ["Le Tigre"]
@@ -195,7 +196,7 @@ class TestFileProcessor:
         flac_path = str(tmp_path / "test.flac")
         _create_test_flac(flac_path, {"artist": ["Bad Computer", "Danyka Nadeau"], "genre": ["EDM", "Drum and Bass"]})
 
-        FileProcessor._dedup_flac_tags(flac_path)
+        dedup_flac_tags(flac_path)
 
         audio = mutagen.flac.FLAC(flac_path)
         assert audio["artist"] == ["Bad Computer", "Danyka Nadeau"]
@@ -212,7 +213,7 @@ class TestFileProcessor:
             },
         )
 
-        FileProcessor._dedup_flac_tags(flac_path)
+        dedup_flac_tags(flac_path)
 
         audio = mutagen.flac.FLAC(flac_path)
         assert audio["artist"] == ["Coldplay"]
@@ -224,7 +225,7 @@ class TestFileProcessor:
         with open(mp3_path, "wb") as f:
             f.write(b"\x00" * 100)
         # Should not raise (mutagen will fail to parse, caught by try/except)
-        FileProcessor._dedup_flac_tags(mp3_path)
+        dedup_flac_tags(mp3_path)
 
     def test_sanitize_filename(self):
         """Test filename sanitization."""

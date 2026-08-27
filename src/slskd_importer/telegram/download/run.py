@@ -12,6 +12,11 @@ from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.core.session import PendingDownload
 from slskd_importer.telegram.download.delivery import send_audio_or_document
+from slskd_importer.telegram.download.keyboards import (
+    build_approve_keyboard,
+    build_retry_keyboard,
+    build_retry_next_keyboard,
+)
 from slskd_importer.telegram.download.transfer import (
     abort_transfer,
     fetch_from_peer,
@@ -20,11 +25,6 @@ from slskd_importer.telegram.download.transfer import (
 )
 from slskd_importer.telegram.ui.editing import safe_edit
 from slskd_importer.telegram.ui.formatting import format_flac_verdict, format_result_reasons, progress_bar
-from slskd_importer.telegram.ui.keyboards import (
-    build_approve_keyboard,
-    build_retry_keyboard,
-    build_retry_next_keyboard,
-)
 from slskd_importer.telegram.ui.markdown import escape_md, md_code_safe
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ async def do_download(
     status_msg,
     result_index: int = 0,
     user_id: int | None = None,
+    search_id: str | None = None,
 ):
     """Download a file, send it to Telegram for preview, and ask for approval."""
     dl_id = self._next_dl_id()
@@ -54,6 +55,8 @@ async def do_download(
         status_message_id=status_msg.message_id,
         result_index=result_index,
         user_id=user_id,
+        search_id=search_id,
+        task=asyncio.current_task(),
     )
     self.downloads[dl_id] = pending_dl
     logger.info(
@@ -73,7 +76,7 @@ async def do_download(
         outcome = await fetch_from_peer(self, result, make_progress_callback(pending_dl, render_progress))
         if not outcome.enqueued:
             logger.warning("chat=%s enqueue failed for %s from %s", chat_id, result.basename, result.username)
-            await _report_enqueue_failure(self, status_msg, chat_id, result, result_index, dl_id)
+            await _report_enqueue_failure(self, status_msg, chat_id, result, result_index, dl_id, search_id)
             return
 
         status = outcome.status
@@ -83,7 +86,7 @@ async def do_download(
         if outcome.failed:
             state = status.state if status else ("Timeout")
             logger.warning("chat=%s transfer failed (%s): %s", chat_id, state, result.basename)
-            await _report_download_failure(self, status_msg, chat_id, result, result_index, dl_id, state)
+            await _report_download_failure(self, status_msg, chat_id, result, result_index, dl_id, state, search_id)
             await self._add_history(track, result, "failed", chat_id=chat_id)
             return
 
@@ -111,7 +114,18 @@ async def do_download(
         )
 
         delivered = await _deliver_preview(
-            self, context, chat_id, track, result, source_path, quality_line, label, dl_id, result_index, can_save
+            self,
+            context,
+            chat_id,
+            track,
+            result,
+            source_path,
+            quality_line,
+            label,
+            dl_id,
+            result_index,
+            can_save,
+            search_id,
         )
 
         if not can_save:
@@ -122,6 +136,7 @@ async def do_download(
     except asyncio.CancelledError:
         logger.info("Download cancelled for %s", result.basename)
         await abort_transfer(self, dl_id, result, transfer_id)
+        await safe_edit(status_msg, self.t(chat_id, "cancelled"))
         raise
     except Exception:
         logger.exception(f"Download failed for {result.basename}")
@@ -129,7 +144,7 @@ async def do_download(
             status_msg,
             self.t(chat_id, "download_error", file=md_code_safe(result.basename)),
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
+            reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id, search_id),
         )
 
 
@@ -160,30 +175,39 @@ def _progress_renderer(self, status_msg, label: str, track: TrackInfo, result: S
     return _render
 
 
-def _retry_keyboard(self, chat_id: int, result_index: int, dl_id: str):
+def _retry_keyboard(self, chat_id: int, result_index: int, dl_id: str, search_id: str | None = None):
     locale = self.locale(chat_id)
-    if self._has_next_result(chat_id, result_index):
+    if self._has_next_result(chat_id, result_index, search_id=search_id):
         return build_retry_next_keyboard(dl_id, locale=locale)
     return build_retry_keyboard(dl_id, locale=locale)
 
 
-async def _report_enqueue_failure(self, status_msg, chat_id: int, result: SearchResult, result_index: int, dl_id: str):
+async def _report_enqueue_failure(
+    self, status_msg, chat_id: int, result: SearchResult, result_index: int, dl_id: str, search_id: str | None = None
+):
     await safe_edit(
         status_msg,
         self.t(chat_id, "enqueue_failed", user=md_code_safe(result.username)),
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
+        reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id, search_id),
     )
 
 
 async def _report_download_failure(
-    self, status_msg, chat_id: int, result: SearchResult, result_index: int, dl_id: str, state: str
+    self,
+    status_msg,
+    chat_id: int,
+    result: SearchResult,
+    result_index: int,
+    dl_id: str,
+    state: str,
+    search_id: str | None = None,
 ):
     await safe_edit(
         status_msg,
         self.t(chat_id, "download_failed", state=state, file=md_code_safe(result.basename)),
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id),
+        reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id, search_id),
     )
 
 
@@ -214,12 +238,15 @@ async def _deliver_preview(
     dl_id: str,
     result_index: int,
     can_save: bool,
+    search_id: str | None = None,
 ) -> bool:
     """Send the downloaded audio (or a preview for over-limit files). Returns delivery success."""
     file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
     markup = (
         build_approve_keyboard(
-            dl_id, has_next=self._has_next_result(chat_id, result_index), locale=self.locale(chat_id)
+            dl_id,
+            has_next=self._has_next_result(chat_id, result_index, search_id=search_id),
+            locale=self.locale(chat_id),
         )
         if can_save
         else None

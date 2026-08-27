@@ -1,4 +1,4 @@
-"""Music library: place files, embed artwork, analyze FLAC, build previews."""
+"""Music library: place files, write tags, embed artwork, analyze FLAC, build previews."""
 
 from slskd_importer.library.artwork import embed_artwork_into_file, fetch_spotify_artwork
 from slskd_importer.library.files import FileProcessor

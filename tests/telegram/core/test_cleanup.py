@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -31,10 +31,10 @@ class TestMusicBotCancellation:
     @pytest.mark.asyncio
     async def test_cancel_chat_operations_with_pending(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
-        bot.pending[12345] = PendingSearch(query="test")
+        bot.pending["1"] = PendingSearch(query="test", chat_id=12345, search_id="1")
         had_work = await bot._cancel_chat_operations(12345)
         assert had_work is True
-        assert 12345 not in bot.pending
+        assert "1" not in bot.pending
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -54,6 +54,23 @@ class TestMusicBotCancellation:
         await bot._cancel_chat_operations(12345)
         assert "1" not in bot.downloads
         assert "2" in bot.downloads
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_cancel_edits_search_and_download_messages(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot.pending["1"] = PendingSearch(query="test", chat_id=12345, search_id="1", message_id=10)
+        bot.downloads["1"] = PendingDownload(
+            track=_make_track(),
+            result=_make_search_result(),
+            chat_id=12345,
+            status_message_id=20,
+        )
+        telegram_bot = AsyncMock()
+        await bot._cancel_chat_operations(12345, telegram_bot)
+        assert telegram_bot.edit_message_text.await_count >= 2
+        assert {c.kwargs["message_id"] for c in telegram_bot.edit_message_text.await_args_list} >= {10, 20}
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")

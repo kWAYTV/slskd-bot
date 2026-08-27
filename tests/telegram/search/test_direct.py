@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from slskd_importer.telegram.core.session import PendingSearch
@@ -27,12 +28,16 @@ class TestHandleDirectSearch:
     async def test_direct_search_starts_immediately(self):
         bot = _setup_bot()
         chat_id = 67890
-        bot.pending[chat_id] = PendingSearch(query="nancy sinatra - bang bang", track=_make_track())
+        bot.pending["1"] = PendingSearch(
+            query="nancy sinatra - bang bang", track=_make_track(), chat_id=chat_id, search_id="1"
+        )
         bot._do_direct_slskd_search = AsyncMock()
         update = _make_update(chat_id=chat_id)
         update.callback_query.message = MagicMock(message_id=7)
         context = _make_context()
-        await bot._handle_direct_search(update, context, chat_id, "direct:search")
+        context.application.create_task = MagicMock(side_effect=lambda coro, **kw: asyncio.ensure_future(coro))
+        await bot._handle_direct_search(update, context, chat_id, "direct:1")
+        await asyncio.sleep(0)
         update.callback_query.edit_message_text.assert_awaited_once()
         msg = update.callback_query.edit_message_text.call_args[0][0]
         assert "Saving as" in msg
@@ -70,6 +75,6 @@ class TestDoDirectSlskdSearch:
         mock_rank.return_value = (results, False)
         searching_msg = MagicMock(message_id=100)
         await bot._do_direct_slskd_search(_make_context(), chat_id, "test query", searching_msg, generation=0)
-        assert chat_id in bot.pending
-        assert bot.pending[chat_id].results == results
+        stored = next(s for s in bot.pending.values() if s.chat_id == chat_id and s.results)
+        assert stored.results == results
         mock_edit.assert_awaited()
