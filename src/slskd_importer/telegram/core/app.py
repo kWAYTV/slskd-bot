@@ -70,7 +70,6 @@ class MusicBot:
         self._active_import = session._active_import
         self._import_pending = session._import_pending
         self._import_status_msg = session._import_status_msg
-        self._quality_overrides = session._quality_overrides
         self._locales = session._locales
         self._download_sem = asyncio.Semaphore(config.max_concurrent_downloads)
 
@@ -78,15 +77,10 @@ class MusicBot:
         self.history_repo = HistoryRepository(self.db)
         self.import_repo = ImportRepository(self.db)
         self.prefs_repo = ChatPrefsRepository(self.db)
-        self._quality_overrides.update(self.prefs_repo.load_all_quality())
         self._locales.update(self.prefs_repo.load_all_locales())
         self.playlist_resolver = PlaylistResolver(self.spotify)
 
     # --- per-chat preferences -------------------------------------------------
-
-    def quality_pref(self, chat_id: int) -> str:
-        """Effective audio quality preference for a chat: per-chat toggle, else config default."""
-        return self._quality_overrides.get(chat_id, self.config.quality_preference)
 
     def locale(self, chat_id: int) -> str:
         """Persisted locale for a chat, or English if the user has not chosen one."""
@@ -136,7 +130,6 @@ class MusicBot:
     expire_stale_approvals = ttl.expire_stale_approvals
 
     cmd_start = basics.cmd_start
-    cmd_quality = preferences.cmd_quality
     cmd_lang = preferences.cmd_lang
     cmd_undo = undo.cmd_undo
     cmd_status = status.cmd_status
@@ -210,7 +203,6 @@ def create_bot(config: Config) -> Application:
     app.bot_data["music_bot"] = bot
 
     app.add_handler(CommandHandler(["start", "help"], bot.cmd_start))
-    app.add_handler(CommandHandler("quality", bot.cmd_quality))
     app.add_handler(CommandHandler(["lang", "language"], bot.cmd_lang))
     app.add_handler(CommandHandler("undo", bot.cmd_undo))
     app.add_handler(CommandHandler("status", bot.cmd_status))

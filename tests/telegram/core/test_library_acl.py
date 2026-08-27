@@ -28,7 +28,6 @@ def _make_config(*, library_users=None):
     config.max_results = 5
     config.max_concurrent_downloads = 3
     config.approval_ttl_secs = 86400
-    config.quality_preference = "hires"
     config.duration_tolerance_secs = 5
     config.exclude_keywords = ["live"]
     config.download_dir = os.path.join(td, "downloads")

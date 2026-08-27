@@ -6,17 +6,16 @@
   <a href="https://github.com/kWAYTV/slskd-bot/pkgs/container/slskd-bot"><img src="https://img.shields.io/badge/ghcr.io-kwaytv%2Fslskd--bot-blue?logo=github" alt="GHCR"/></a>
 </p>
 
-<p align="center"><strong>Telegram bot that finds music on Soulseek. Send a song name or Spotify link, get a scored list of FLAC matches from <a href="https://github.com/slskd/slskd">slskd</a>, and save the best one to your library as <code>Artist - Title.flac</code>.</strong></p>
+<p align="center"><strong>Telegram bot that finds music on Soulseek. Send a song name or Spotify link, get a scored list of matches from <a href="https://github.com/slskd/slskd">slskd</a> (FLAC, WAV, AIFF, then the best available), and save the pick to your library as <code>Artist - Title</code>.</strong></p>
 
 > This is a fork of [GeiserX/telegram-slskd-local-bot](https://github.com/GeiserX/telegram-slskd-local-bot), heavily reworked since. Credit for the original idea and foundation goes upstream.
 
 ## Features
 
-- **Search by text or link** — free-text queries resolve via Spotify metadata; pasted Spotify track links resolve directly, and playlist/album links start an import
-- **Smart ranking** — results scored by duration match, audio quality, source reliability, and filename relevance; live/remix noise filtered out
-- **Quality preference** — `/quality` picks CD (16/44.1) or Hi-Res (24-bit) ranking per chat (persisted)
+- **Search by text or link** — free-text queries resolve via catalog metadata (Spotify today); pasted Spotify track links resolve directly, and playlist/album links start an import
+- **Smart ranking** — prefers FLAC, then WAV, then AIFF, then the best remaining format; scored by duration, hi-res quality, source reliability, and filename relevance; live/remix noise filtered out
 - **Languages** — English (default), Spanish, Galician, German. First `/start` picks a language; `/lang` changes it later
-- **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart
+- **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart (`/import` with no URL continues an unfinished job)
 - **Live progress** — download messages update with a progress bar and queue state; `/status` shows everything in flight for the chat
 - **Library hygiene** — canonical tags on save, duplicate detection, `/undo` / `/history` ↩️ to remove saves, `/stats` for totals
 - **Large files** — files over Telegram's 50 MB limit fall back to OGG Opus previews, or upload untouched (up to 2000 MB) via a self-hosted Bot API server
@@ -62,10 +61,8 @@ uv run python -m slskd_importer run
 | *(any text)* | Search for a song and show download options |
 | *(Spotify track link)* | Resolve the link and search for it |
 | *(Spotify playlist/album link)* | Start the import flow (library users only) |
-| `/quality` | Prefer CD or Hi-Res when ranking results (per chat) |
 | `/lang` | Change language (`/language` also works) |
 | `/import <url>` | Import a Spotify playlist or album (library users only) |
-| `/import resume` | Continue a paused import after a restart |
 | `/undo` | Remove the last track saved to the library |
 | `/status` | Active searches, downloads (with progress), and imports |
 | `/history` | Recent downloads — tap ↩️ to remove one |
@@ -86,7 +83,6 @@ uv run python -m slskd_importer run
 | `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads |
 | `OUTPUT_DIR` | No | `/music` | Where renamed files are placed |
 | `DATA_DIR` | No | `/data` | SQLite directory (history, imports) |
-| `QUALITY_PREFERENCE` | No | `hires` | Default for the per-chat `/quality` toggle (`hires` or `cd`) |
 | `MAX_CONCURRENT_DOWNLOADS` | No | `3` | Cap on simultaneous slskd transfers |
 | `APPROVAL_TTL_SECS` | No | `86400` | Discard unapproved downloads after this many seconds |
 | `MAX_RESULTS` | No | `5` | Search results shown per query |

@@ -12,7 +12,7 @@ from slskd_importer.soulseek.result import DownloadStatus, SearchResult
 class TestParseSearchResponses:
     """Test parsing raw slskd responses into SearchResult objects."""
 
-    def test_parse_flac_only(self):
+    def test_parse_preferred_only(self):
         responses = [
             {
                 "username": "user1",
@@ -27,13 +27,15 @@ class TestParseSearchResponses:
                         "bitDepth": 16,
                         "sampleRate": 44100,
                     },
+                    {"filename": "\\Music\\Song.wav", "size": 40_000_000, "length": 180},
                     {"filename": "\\Music\\Song.mp3", "size": 10_000_000, "length": 180, "bitRate": 320},
                 ],
             }
         ]
-        results = parse_search_responses(responses, flac_only=True)
-        assert len(results) == 1
-        assert results[0].extension == "flac"
+        from slskd_importer.library.formats import PREFERRED_EXTENSIONS
+
+        results = parse_search_responses(responses, extensions=PREFERRED_EXTENSIONS)
+        assert {r.extension for r in results} == {"flac", "wav"}
 
     def test_parse_all_audio(self):
         responses = [
@@ -50,13 +52,13 @@ class TestParseSearchResponses:
                 ],
             }
         ]
-        results = parse_search_responses(responses, flac_only=False)
+        results = parse_search_responses(responses)
         assert len(results) == 3
         exts = {r.extension for r in results}
         assert "jpg" not in exts
 
     def test_parse_empty_responses(self):
-        assert parse_search_responses([], flac_only=True) == []
+        assert parse_search_responses([]) == []
 
     def test_parse_preserves_user_info(self):
         responses = [
@@ -70,7 +72,7 @@ class TestParseSearchResponses:
                 ],
             }
         ]
-        results = parse_search_responses(responses, flac_only=True)
+        results = parse_search_responses(responses)
         assert results[0].username == "cooluser"
         assert results[0].has_free_slot is True
         assert results[0].upload_speed == 9_000_000
@@ -83,7 +85,7 @@ class TestParseSearchResponses:
                 "files": [{"filename": "\\Song.flac", "size": 0}],
             }
         ]
-        results = parse_search_responses(responses, flac_only=True)
+        results = parse_search_responses(responses)
         assert len(results) == 1
         assert results[0].has_free_slot is False
         assert results[0].upload_speed == 0

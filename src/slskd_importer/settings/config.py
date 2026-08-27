@@ -55,9 +55,6 @@ class Config:
 
         self.filename_template = os.getenv("FILENAME_TEMPLATE", "{artist} - {title}")
 
-        quality_pref = os.getenv("QUALITY_PREFERENCE", "hires").strip().lower()
-        self.quality_preference = quality_pref if quality_pref in ("hires", "cd") else "hires"
-
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         if log_level == "WARN":
             log_level = "WARNING"
@@ -69,13 +66,12 @@ class Config:
 
     def _log_summary(self, limit_mb: int) -> None:
         logger.info(
-            "Config: download_dir=%s output_dir=%s data_dir=%s quality=%s "
+            "Config: download_dir=%s output_dir=%s data_dir=%s "
             "max_results=%s search_timeout=%ss download_timeout=%ss duration_tol=%ss "
             "file_limit=%sMB concurrent=%s approval_ttl=%ss",
             self.download_dir,
             self.output_dir,
             self.data_dir,
-            self.quality_preference,
             self.max_results,
             self.search_timeout_secs,
             self.download_timeout_secs,

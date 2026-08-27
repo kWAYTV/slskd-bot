@@ -30,18 +30,17 @@ async def search_with_fallbacks(
     track: TrackInfo,
     *,
     timeout_secs: int,
-    quality_preference: str,
     is_cancelled: Callable[[], bool],
     on_tier: OnTier | None = None,
 ) -> tuple[list[SearchResult], bool, bool]:
-    """Run the tiered search. Returns (ranked, used-non-FLAC-fallback, cancelled)."""
+    """Run the tiered search. Returns (ranked, used-lossy-fallback, cancelled)."""
     clean_title = clean_search_title(track.title)
     search_query = f"{track.artist} {clean_title}"
 
     raw_responses = await client.search(search_query, timeout_secs=timeout_secs)
     if is_cancelled():
         return [], False, True
-    ranked, is_fallback = rank_responses(raw_responses, track, scorer, quality_preference=quality_preference)
+    ranked, is_fallback = rank_responses(raw_responses, track, scorer)
     if ranked:
         return ranked, is_fallback, False
 
@@ -51,7 +50,7 @@ async def search_with_fallbacks(
     raw_responses = await client.search(clean_title, timeout_secs=timeout_secs)
     if is_cancelled():
         return [], False, True
-    ranked, is_fallback = rank_responses(raw_responses, track, scorer, quality_preference=quality_preference)
+    ranked, is_fallback = rank_responses(raw_responses, track, scorer)
     if ranked:
         return ranked, is_fallback, False
 
@@ -65,9 +64,7 @@ async def search_with_fallbacks(
                 if is_cancelled():
                     return [], False, True
                 raw_responses = await client.search(fallback_query, timeout_secs=timeout_secs)
-                ranked, is_fallback = rank_responses(
-                    raw_responses, track, scorer, quality_preference=quality_preference
-                )
+                ranked, is_fallback = rank_responses(raw_responses, track, scorer)
                 if ranked:
                     logger.info("Keyword-reduction fallback hit: '%s'", fallback_query)
                     return ranked, is_fallback, False
@@ -80,9 +77,7 @@ async def search_with_fallbacks(
     raw_responses = await client.search(fb4_query, timeout_secs=timeout_secs, response_limit=150)
     if is_cancelled():
         return [], False, True
-    ranked, is_fallback = rank_responses(
-        raw_responses, track, scorer, max_duration_diff=120, quality_preference=quality_preference
-    )
+    ranked, is_fallback = rank_responses(raw_responses, track, scorer, max_duration_diff=120)
     if ranked:
         logger.info("Artist-keyword fallback hit: '%s'", fb4_query)
     return ranked, is_fallback, False

@@ -82,7 +82,6 @@ class ChatSession:
         self._active_import: dict[int, int] = {}
         self._import_pending: dict[int, PendingSearch] = {}
         self._import_status_msg: dict[int, object] = {}
-        self._quality_overrides: dict[int, str] = {}
         self._locales: dict[int, str] = {}
 
     def next_dl_id(self) -> str:

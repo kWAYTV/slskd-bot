@@ -132,10 +132,21 @@ class TestCmdImport:
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_cmd_import_no_args_with_active_job(self, mock_thread):
         bot = _setup_bot()
-        bot.import_repo.get_active_job = MagicMock(return_value=_make_import_job())
+        job = _make_import_job()
+        bot.import_repo.get_active_job = MagicMock(return_value=job)
+        bot.import_repo.reset_in_flight_tracks = MagicMock(return_value=2)
+        bot.import_repo.update_job_status = MagicMock()
+        bot._process_next_import_track = AsyncMock()
         update = _make_update(text="/import")
         context = _make_context()
+
+        def _create_task(coro, **kw):
+            if hasattr(coro, "close"):
+                coro.close()
+            return MagicMock()
+
+        context.application.create_task = _create_task
         await bot.cmd_import(update, context)
-        text = update.message.reply_text.call_args[0][0]
-        assert "unfinished import" in text
-        assert "/import resume" in text
+        bot.import_repo.reset_in_flight_tracks.assert_called_once_with(job.id)
+        context.bot.send_message.assert_awaited()
+        assert "Resuming" in context.bot.send_message.call_args.kwargs["text"]

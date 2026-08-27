@@ -1,4 +1,4 @@
-"""Slash commands: /start /help /quality /status /history /stats /undo."""
+"""Slash commands: /start /help /status /history /stats /undo."""
 
 from __future__ import annotations
 
@@ -61,6 +61,8 @@ class TestMusicBotCommands:
         assert "Send a song title" in text
         assert "/lang" in text
         assert "/import" in text
+        assert "/quality" not in text
+        assert "/import resume" not in text
         assert "/auto" not in text
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
@@ -311,30 +313,6 @@ class TestCmdStatusDetails:
 # ---------------------------------------------------------------------------
 # _remove_download_file (read-only DOWNLOAD_DIR fallback)
 # ---------------------------------------------------------------------------
-
-
-class TestQualityCommand:
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    def test_default_pref_from_config(self, mock_slskd, mock_spotify):
-        config = _make_config()
-        config.quality_preference = "hires"
-        bot = MusicBot(config)
-        assert bot.quality_pref(1) == "hires"
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_qp_callback_sets_override(self, mock_slskd, mock_spotify):
-        config = _make_config()
-        config.quality_preference = "hires"
-        bot = MusicBot(config)
-        update = _make_callback_update(data="qp:cd")
-        context = _make_context()
-        await bot.handle_callback(update, context)
-        assert bot.quality_pref(update.effective_chat.id) == "cd"
-        # Other chats keep the default.
-        assert bot.quality_pref(99999) == "hires"
 
 
 class TestUndoCommand:

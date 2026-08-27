@@ -50,7 +50,6 @@ async def search_with_fallbacks(self, track: TrackInfo, chat_id: int, generation
         self.scorer,
         track,
         timeout_secs=self.config.search_timeout_secs,
-        quality_preference=self.quality_pref(chat_id),
         is_cancelled=lambda: self._is_stale(chat_id, generation) or self._search_cancelled(search_id),
         on_tier=on_tier,
     )

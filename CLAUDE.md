@@ -1,7 +1,7 @@
 # CLAUDE.md — telegram-slskd-local-bot
 
 ## Overview
-Telegram bot that automates music discovery and download. Resolves track metadata from Spotify, searches and downloads FLAC files from Soulseek via slskd, renames them to `Artist - Title.flac`, and places them in a music library directory.
+Telegram bot that automates music discovery and download. Resolves track metadata from catalogs like Spotify, searches and downloads audio from Soulseek via slskd (FLAC, WAV, AIFF, then the best available), renames them to `Artist - Title`, and places them in a music library directory.
 
 ## Tech Stack
 - Python 3.11+
@@ -68,7 +68,7 @@ telegram/
 - `telegram/core/app.py` wires domain services into `MusicBot` and binds the conversation handlers from the feature modules as class attributes (handler functions take the bot as `self`)
 - Inline keyboards live with the feature that owns the callback prefix (`search/keyboards.py`, `download/keyboards.py`, `playlist_import/keyboards.py`, `commands/keyboards.py`) — not in a generic UI dump
 - The shared download pipeline (`download/transfer.py`, `download/delivery.py`) and the save sequence (`download/approval.save_to_library`) are reused by the playlist import flow — never duplicate enqueue/wait/progress/save logic
-- Soulseek search policy (FLAC-first ranking, four-tier query fallbacks) lives in `soulseek/scoring.py` and `soulseek/fallbacks.py`, not in the Telegram layer
+- Soulseek search policy (FLAC → WAV → AIFF, then any audio; four-tier query fallbacks) lives in `soulseek/scoring.py` and `soulseek/fallbacks.py`, not in the Telegram layer
 - Domain packages do not import Telegram
 - Audio format allow-list is defined once in `library/formats.py`
 
@@ -80,8 +80,8 @@ telegram/
 
 ## Scoring Algorithm
 
-Search results are ranked by 4 factors (total 100 points):
-1. **Duration match** (40 pts): Compared to Spotify reference duration
+Search results are ranked by format first (FLAC → WAV → AIFF → other), then 4 score factors (total 100 points):
+1. **Duration match** (40 pts): Compared to catalog reference duration
 2. **Audio quality** (25 pts): Higher bit depth and sample rate score more (24/96 over CD 16/44.1)
 3. **Source reliability** (20 pts): Free slots, upload speed, queue
 4. **Filename relevance** (15 pts): Artist/title word matching
@@ -90,20 +90,20 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 
 ## Soulseek (slskd) Search Patterns
 
-- **Single query, local filtering**: Never append format keywords (e.g. "flac") to the slskd search query -- Soulseek matches keywords against full file paths, which is unreliable. Instead, search with `artist title` and filter results locally by file extension (`.flac` preferred, fall back to other audio formats)
+- **Single query, local filtering**: Never append format keywords (e.g. "flac") to the slskd search query -- Soulseek matches keywords against full file paths, which is unreliable. Instead, search with `artist title` and filter results locally by file extension (`.flac` / `.wav` / `.aiff` preferred, fall back to other audio formats)
 - **Search lifecycle**: `search_text()` -> poll `state()` -> `stop()` on timeout -> grab partial results from `search_responses()` -> `delete()` cleanup
 - **Async wrapping**: All synchronous `slskd-api` calls must be wrapped with `asyncio.to_thread()` to avoid blocking the Telegram bot event loop
 - **Timeouts**: Hard timeout via `asyncio.wait_for()` around the entire search+poll loop; `searches.stop()` actively cancels the server-side search on timeout
 - **Cleanup**: Stale slskd searches are deleted only when their IDs are not in `_active_search_ids` (serialized with search start)
 - **Import search**: Playlist import uses the same four-tier fallbacks as manual search (`search_with_fallbacks`)
-- **Import resume**: Active jobs auto-resume on startup; `/import resume` continues the chat's pending/active job after resetting `searching` / `awaiting_approval` tracks
+- **Import resume**: Active jobs auto-resume on startup; `/import` with no URL (or the hidden `resume` argument) continues the chat's pending/active job after resetting `searching` / `awaiting_approval` tracks
 ## Telegram UX Patterns
 
 - **Markdown escaping**: Dynamic text (filenames, paths from Soulseek) must be escaped with `escape_md()` or wrapped in backtick code spans via `code_span()` / `md_code_safe()` (plain backtick wrapping breaks when the value itself contains a backtick) to avoid `BadRequest` from Telegram's Markdown parser
 - **Safe edits**: Always use the `safe_edit()` / `safe_query_edit()` wrappers (catch `BadRequest`, `TimedOut`, `NetworkError`) instead of raw `msg.edit_text()`
 - **Result identification**: Download messages must include `#number` labels matching the result list so users can tell concurrent downloads apart
 - **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps or on transfer-state change) with a `progress_bar()` and update `PendingDownload.progress_percent` / `transfer_state` for `/status`
-- **Quality preference**: `/quality` toggles CD-vs-Hi-Res ranking per chat (`MusicBot.quality_pref(chat_id)`); persisted in `chat_prefs`. `QUALITY_PREFERENCE` env is only the default. Scoring lives in `soulseek/scoring.py` (`_quality_points`)
+- **Quality ranking**: always prefers higher bit depth / sample rate. Format order is FLAC, then WAV, then AIFF (`library/formats.py` + `soulseek/scoring.py`)
 - **Canonical tags**: `FileProcessor.process_file` writes artist/title/album/year via mutagen at save time
 - **Import skip-owned**: `process_next_import_track` skips tracks already in the library (`find_exact`) or successful history (`find_success`)
 - **Import progress**: one in-place status message per job (`_import_status_msg`); extra messages only when the user must act

@@ -10,7 +10,6 @@ from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
-from slskd_importer.telegram.commands.keyboards import build_quality_keyboard
 from slskd_importer.telegram.i18n import LABELS, LOCALES
 from slskd_importer.telegram.ui.editing import safe_query_edit
 from slskd_importer.telegram.ui.formatting import welcome_text
@@ -63,10 +62,6 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         await _switch_locale(self, query, chat_id, data)
         return
 
-    if data.startswith("qp:"):
-        await _switch_quality_preference(self, query, chat_id, data)
-        return
-
     logger.warning("Unknown callback prefix %r from chat %s", prefix, chat_id)
 
 
@@ -84,19 +79,4 @@ async def _switch_locale(self, query, chat_id: int, data: str) -> None:
         query,
         self.t(chat_id, "lang_set", language=LABELS[self.locale(chat_id)]),
         parse_mode="Markdown",
-    )
-
-
-async def _switch_quality_preference(self, query, chat_id: int, data: str) -> None:
-    pref = data.split(":", 1)[1]
-    if pref in ("cd", "hires"):
-        self._quality_overrides[chat_id] = pref
-        await asyncio.to_thread(self.prefs_repo.set_quality, chat_id, pref)
-    logger.info("chat=%s quality=%s", chat_id, self.quality_pref(chat_id))
-    label_key = "quality_cd" if self.quality_pref(chat_id) == "cd" else "quality_hires"
-    await safe_query_edit(
-        query,
-        self.t(chat_id, "quality_short", label=self.t(chat_id, label_key)),
-        parse_mode="Markdown",
-        reply_markup=build_quality_keyboard(self.quality_pref(chat_id), locale=self.locale(chat_id)),
     )

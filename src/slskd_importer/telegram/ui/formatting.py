@@ -127,8 +127,8 @@ def _results_header(track: TrackInfo, total: int, is_fallback: bool, locale: str
 def _match_count_line(total: int, is_fallback: bool, locale: str) -> str:
     noun = t(locale, "noun_match") if total == 1 else t(locale, "noun_matches")
     if is_fallback:
-        return t(locale, "results_no_flac", total=total, noun=noun)
-    return t(locale, "results_flac", total=total, noun=noun)
+        return t(locale, "results_lossy", total=total, noun=noun)
+    return t(locale, "results_found", total=total, noun=noun)
 
 
 def format_search_results(
@@ -159,7 +159,7 @@ def format_search_results(
         else:
             slot_icon = "🟢" if r.has_free_slot else "🔴"
         fmt = r.extension.upper()
-        format_tag = f"  [{fmt}]" if is_fallback else ""
+        format_tag = f"  [{fmt}]" if fmt else ""
         folder = r.parent_dir
         # MD V1 italic (`_folder_`) breaks on Soulseek names with `_` / `[`.
         folder_line = f"\n    {code_span(folder)}" if folder else ""

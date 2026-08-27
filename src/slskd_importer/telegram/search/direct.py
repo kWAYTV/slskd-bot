@@ -103,9 +103,7 @@ async def do_direct_slskd_search(
             return
 
         synthetic_track = _synthetic_track(query, display_track)
-        ranked, is_fallback = rank_responses(
-            raw_responses, synthetic_track, self.scorer, quality_preference=self.quality_pref(chat_id)
-        )
+        ranked, is_fallback = rank_responses(raw_responses, synthetic_track, self.scorer)
 
         if self._is_stale(chat_id, generation) or self._search_cancelled(search_id):
             return

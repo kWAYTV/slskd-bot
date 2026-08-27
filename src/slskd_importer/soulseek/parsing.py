@@ -2,16 +2,19 @@
 
 import logging
 
-from slskd_importer.library.formats import AUDIO_EXTENSIONS
+from slskd_importer.library.formats import AUDIO_EXTENSIONS, PREFERRED_EXTENSIONS
 from slskd_importer.soulseek.result import SearchResult
 
 logger = logging.getLogger(__name__)
 
 
-def parse_search_responses(responses: list[dict], flac_only: bool = True) -> list[SearchResult]:
+def parse_search_responses(
+    responses: list[dict],
+    extensions: set[str] | frozenset[str] | None = None,
+) -> list[SearchResult]:
     """Extract audio files from raw slskd responses, filtering by extension locally."""
+    allowed = AUDIO_EXTENSIONS if extensions is None else extensions
     results = []
-    allowed = {"flac"} if flac_only else AUDIO_EXTENSIONS
 
     for response in responses:
         username = response.get("username", "")
@@ -41,6 +44,6 @@ def parse_search_responses(responses: list[dict], flac_only: bool = True) -> lis
                 )
             )
 
-    label = "FLAC" if flac_only else "audio"
+    label = "preferred" if allowed is PREFERRED_EXTENSIONS or allowed == PREFERRED_EXTENSIONS else "audio"
     logger.info(f"Parsed {len(results)} {label} results from {len(responses)} responses")
     return results
