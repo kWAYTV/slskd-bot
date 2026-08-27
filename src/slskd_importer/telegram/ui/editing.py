@@ -10,39 +10,47 @@ from telegram.error import BadRequest, NetworkError, TimedOut
 logger = logging.getLogger(__name__)
 
 
-async def safe_edit(msg: Message, text: str, **kwargs) -> bool:
-    """Edit a Telegram message, swallowing common failures.
+def _is_entity_parse_error(exc: BadRequest) -> bool:
+    return "can't parse entities" in str(exc).lower()
 
-    Returns True on success, False if the edit failed (logged as warning).
-    """
+
+async def _edit_text(edit, text: str, **kwargs) -> bool:
+    """Run a Telegram text edit, retrying without parse_mode on Markdown errors."""
     try:
-        await msg.edit_text(text, **kwargs)
+        await edit(text, **kwargs)
         return True
     except BadRequest as exc:
-        logger.warning(f"Telegram edit failed (BadRequest): {exc}")
+        if _is_entity_parse_error(exc) and kwargs.get("parse_mode"):
+            logger.warning("Telegram edit failed (BadRequest): %s — retrying without parse_mode", exc)
+            kwargs = {**kwargs, "parse_mode": None}
+            try:
+                await edit(text, **kwargs)
+                return True
+            except BadRequest as retry_exc:
+                logger.warning("Telegram edit failed (BadRequest): %s", retry_exc)
+                return False
+        logger.warning("Telegram edit failed (BadRequest): %s", exc)
         return False
     except TimedOut:
         logger.warning("Telegram edit timed out")
         return False
     except NetworkError as exc:
-        logger.warning(f"Telegram edit network error: {exc}")
+        logger.warning("Telegram edit network error: %s", exc)
         return False
+
+
+async def safe_edit(msg: Message, text: str, **kwargs) -> bool:
+    """Edit a Telegram message, swallowing common failures.
+
+    Returns True on success, False if the edit failed (logged as warning).
+    Entity-parse errors retry once without parse_mode so the user still sees results.
+    """
+    return await _edit_text(msg.edit_text, text, **kwargs)
 
 
 async def safe_query_edit(query, text: str, **kwargs) -> bool:
     """Edit a callback query message, swallowing transient Telegram errors."""
-    try:
-        await query.edit_message_text(text, **kwargs)
-        return True
-    except BadRequest as exc:
-        logger.warning(f"Telegram query edit failed (BadRequest): {exc}")
-        return False
-    except TimedOut:
-        logger.warning("Telegram query edit timed out")
-        return False
-    except NetworkError as exc:
-        logger.warning(f"Telegram query edit network error: {exc}")
-        return False
+    return await _edit_text(query.edit_message_text, text, **kwargs)
 
 
 async def edit_approval_message(query, text: str):

@@ -28,6 +28,23 @@ class TestSafeEdit:
         assert result is False
 
     @pytest.mark.asyncio
+    async def test_entity_parse_error_retries_without_parse_mode(self):
+        from telegram.constants import ParseMode
+        from telegram.error import BadRequest
+
+        msg = AsyncMock()
+        msg.edit_text = AsyncMock(
+            side_effect=[
+                BadRequest("Can't parse entities: can't find end of the entity starting at byte offset 268"),
+                None,
+            ]
+        )
+        result = await _safe_edit(msg, "*broken_text*", parse_mode=ParseMode.MARKDOWN)
+        assert result is True
+        assert msg.edit_text.call_count == 2
+        assert msg.edit_text.call_args.kwargs.get("parse_mode") is None
+
+    @pytest.mark.asyncio
     async def test_timed_out(self):
         from telegram.error import TimedOut
 

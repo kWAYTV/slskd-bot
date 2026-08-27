@@ -7,7 +7,7 @@ from telegram.constants import ParseMode
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.core.session import PendingSearch
-from slskd_importer.telegram.ui.editing import safe_edit
+from slskd_importer.telegram.ui.editing import safe_edit, safe_query_edit
 from slskd_importer.telegram.ui.formatting import format_search_results
 from slskd_importer.telegram.ui.keyboards import build_results_keyboard
 
@@ -73,7 +73,8 @@ async def handle_results_page(self, update, context, chat_id: int, data: str):
         page_size=self.config.max_results,
         locale=self.locale(chat_id),
     )
-    await query.edit_message_text(
+    await safe_query_edit(
+        query,
         results_text,
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=build_results_keyboard(

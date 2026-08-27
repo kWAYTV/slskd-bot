@@ -132,7 +132,8 @@ def format_search_results(
         fmt = r.extension.upper()
         format_tag = f" [{fmt}]" if is_fallback else ""
         folder = r.parent_dir
-        folder_line = f"\n    _{escape_md(folder)}_" if folder else ""
+        # MD V1 italic (`_folder_`) breaks on Soulseek names with `_` / `[`.
+        folder_line = f"\n    {code_span(folder)}" if folder else ""
         lines.append(
             f"*#{i + 1}* {slot_icon} `{r.duration_display}` | "
             f"{r.quality_display}{format_tag} | {r.size_mb:.0f}MB\n"

@@ -113,6 +113,20 @@ class TestFormatSearchResults:
         text = format_search_results(_make_track(), [result])
         assert "2009 Remaster 24-96" in text
 
+    def test_soulseek_folder_specials_use_code_span(self):
+        """Folders with `_` / `[` must not be wrapped in italic — Telegram MD V1
+        cannot close `_foo_bar_` and the results edit then silently fails."""
+        from slskd_importer.telegram.ui.formatting import format_search_results
+        from slskd_importer.telegram.ui.markdown import code_span
+
+        result = _make_search_result()
+        result.filename = "\\@@abc\\Oscar_Mulero_-_Curation_One_[WEB_FLAC]\\01 - Reaction Pair.flac"
+        text = format_search_results(_make_track(), [result])
+        folder = "Oscar_Mulero_-_Curation_One_[WEB_FLAC]"
+        assert code_span(folder) in text
+        assert f"_{folder}_" not in text
+        assert "_Oscar_Mulero" not in text
+
 
 # ---------------------------------------------------------------------------
 # Pasted link handling
