@@ -40,7 +40,7 @@ class TestHandleDirectSearch:
         await asyncio.sleep(0)
         update.callback_query.edit_message_text.assert_awaited_once()
         msg = update.callback_query.edit_message_text.call_args[0][0]
-        assert "Saving as" in msg
+        assert "Save as" in msg
         bot._do_direct_slskd_search.assert_awaited_once()
         assert bot._do_direct_slskd_search.await_args.args[2] == "nancy sinatra - bang bang"
         display_track = bot._do_direct_slskd_search.await_args.kwargs["display_track"]
@@ -63,7 +63,7 @@ class TestDoDirectSlskdSearch:
         searching_msg = MagicMock(message_id=100)
         await bot._do_direct_slskd_search(_make_context(), chat_id, "test query", searching_msg, generation=0)
         mock_edit.assert_awaited()
-        assert "No results" in mock_edit.call_args[0][1]
+        assert "No matches" in mock_edit.call_args[0][1]
 
     @patch("slskd_importer.telegram.search.direct.rank_responses")
     @patch("slskd_importer.telegram.search.direct.safe_edit", new_callable=AsyncMock, return_value=True)

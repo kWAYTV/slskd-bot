@@ -24,8 +24,9 @@ from slskd_importer.telegram.download.transfer import (
     remember_approval_message,
 )
 from slskd_importer.telegram.ui.editing import safe_edit
-from slskd_importer.telegram.ui.formatting import format_flac_verdict, format_result_reasons, progress_bar
-from slskd_importer.telegram.ui.markdown import escape_md, md_code_safe
+from slskd_importer.telegram.ui.formatting import format_flac_verdict, format_result_reasons, progress_bar, track_chip
+from slskd_importer.telegram.ui.markdown import md_code_safe
+from slskd_importer.telegram.ui.reply import collapse_status_message
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,11 @@ async def do_download(
     """Download a file, send it to Telegram for preview, and ask for approval."""
     dl_id = self._next_dl_id()
     label = f"#{result_index + 1}"
+    chip = track_chip(track, label)
     can_save = self._can_save_library(user_id)
     transfer_id = None
+    search = self.pending.get(search_id) if search_id else None
+    origin_id = search.message_id if search else None
 
     # Register up front so /status and /cancel see in-flight downloads.
     pending_dl = PendingDownload(
@@ -57,6 +61,7 @@ async def do_download(
         user_id=user_id,
         search_id=search_id,
         task=asyncio.current_task(),
+        origin_message_id=origin_id,
     )
     self.downloads[dl_id] = pending_dl
     logger.info(
@@ -70,13 +75,14 @@ async def do_download(
         result.basename,
     )
 
-    render_progress = _progress_renderer(self, status_msg, label, track, result, pending_dl)
+    render_progress = _progress_renderer(self, status_msg, chip, result, pending_dl)
 
     try:
         outcome = await fetch_from_peer(self, result, make_progress_callback(pending_dl, render_progress))
         if not outcome.enqueued:
             logger.warning("chat=%s enqueue failed for %s from %s", chat_id, result.basename, result.username)
             await _report_enqueue_failure(self, status_msg, chat_id, result, result_index, dl_id, search_id)
+            await self._set_results_pick_state(context, search_id, result_index, "failed")
             return
 
         status = outcome.status
@@ -88,6 +94,7 @@ async def do_download(
             logger.warning("chat=%s transfer failed (%s): %s", chat_id, state, result.basename)
             await _report_download_failure(self, status_msg, chat_id, result, result_index, dl_id, state, search_id)
             await self._add_history(track, result, "failed", chat_id=chat_id)
+            await self._set_results_pick_state(context, search_id, result_index, "failed")
             return
 
         source_path = outcome.source_path
@@ -99,6 +106,7 @@ async def do_download(
                 self.t(chat_id, "file_missing"),
             )
             await self._add_history(track, result, "file_not_found", chat_id=chat_id)
+            await self._set_results_pick_state(context, search_id, result_index, "failed")
             return
 
         pending_dl.source_path = source_path
@@ -107,9 +115,7 @@ async def do_download(
         quality_line = await _build_quality_line(self, chat_id, track, result, source_path)
         await safe_edit(
             status_msg,
-            self.t(
-                chat_id, "downloaded_sending", label=label, file=md_code_safe(result.basename), quality=quality_line
-            ),
+            self.t(chat_id, "downloaded_sending", chip=chip, file=md_code_safe(result.basename), quality=quality_line),
             parse_mode=ParseMode.MARKDOWN,
         )
 
@@ -122,10 +128,12 @@ async def do_download(
             source_path,
             quality_line,
             label,
+            chip,
             dl_id,
             result_index,
             can_save,
             search_id,
+            origin_id,
         )
 
         if not can_save:
@@ -146,16 +154,17 @@ async def do_download(
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id, search_id),
         )
+        await self._set_results_pick_state(context, search_id, result_index, "failed")
 
 
-def _progress_renderer(self, status_msg, label: str, track: TrackInfo, result: SearchResult, pending_dl):
+def _progress_renderer(self, status_msg, chip: str, result: SearchResult, pending_dl):
     async def _render(pct: float) -> None:
         state = pending_dl.transfer_state or ""
         queued = "queued" in state.lower()
         headline = (
-            self.t(pending_dl.chat_id, "download_queued_headline", label=label)
+            self.t(pending_dl.chat_id, "download_queued_headline", chip=chip)
             if queued
-            else self.t(pending_dl.chat_id, "download_headline", label=label, pct=f"{pct:.0f}")
+            else self.t(pending_dl.chat_id, "download_headline", chip=chip, pct=f"{pct:.0f}")
         )
         extra = self.t(pending_dl.chat_id, "download_queued_extra") if queued else progress_bar(pct)
         await safe_edit(
@@ -165,8 +174,6 @@ def _progress_renderer(self, status_msg, label: str, track: TrackInfo, result: S
                 "download_progress",
                 headline=headline,
                 extra=extra,
-                artist=escape_md(track.artist),
-                title=escape_md(track.title),
                 file=md_code_safe(result.basename),
             ),
             parse_mode=ParseMode.MARKDOWN,
@@ -212,7 +219,7 @@ async def _report_download_failure(
 
 
 async def _build_quality_line(self, chat_id: int, track: TrackInfo, result: SearchResult, source_path: str) -> str:
-    quality_line = f"Quality: {result.quality_display} | {result.duration_display}"
+    quality_line = f"{result.quality_display}  ·  {result.duration_display}"
     locale = self.locale(chat_id)
     reasons = format_result_reasons(track, result, locale=locale)
     if reasons:
@@ -235,10 +242,12 @@ async def _deliver_preview(
     source_path: str,
     quality_line: str,
     label: str,
+    chip: str,
     dl_id: str,
     result_index: int,
     can_save: bool,
     search_id: str | None = None,
+    origin_id: int | None = None,
 ) -> bool:
     """Send the downloaded audio (or a preview for over-limit files). Returns delivery success."""
     file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
@@ -253,7 +262,7 @@ async def _deliver_preview(
     )
 
     if file_size > self.config.telegram_file_limit:
-        return await self._send_large_file(
+        delivered = await self._send_large_file(
             context,
             chat_id,
             track,
@@ -265,12 +274,16 @@ async def _deliver_preview(
             dl_id,
             reply_markup=markup,
             can_save=can_save,
+            chip=chip,
+            reply_to_message_id=origin_id,
         )
+        await _after_preview(self, context, chat_id, dl_id, search_id, result_index, delivered)
+        return delivered
 
     caption = self.t(
         chat_id,
         "caption_save" if can_save else "caption_sent",
-        label=label,
+        chip=chip,
         quality=quality_line,
     )
     sent = await send_audio_or_document(
@@ -283,9 +296,30 @@ async def _deliver_preview(
         duration=track.duration_secs,
         caption=caption,
         reply_markup=markup,
+        reply_to_message_id=origin_id,
     )
     remember_approval_message(self, dl_id, sent.message_id)
+    await _after_preview(self, context, chat_id, dl_id, search_id, result_index, True)
     return True
+
+
+async def _after_preview(
+    self, context, chat_id: int, dl_id: str, search_id: str | None, result_index: int, delivered: bool
+) -> None:
+    """Collapse the progress text and mark the results card once a preview exists."""
+    pending_dl = self.downloads.get(dl_id)
+    if pending_dl and pending_dl.status_message_id and pending_dl.status_message_id != pending_dl.origin_message_id:
+        await collapse_status_message(
+            context.bot,
+            chat_id,
+            pending_dl.status_message_id,
+            fallback=self.t(chat_id, "status_preview_below"),
+        )
+        pending_dl.status_message_id = None
+    if delivered:
+        await self._set_results_pick_state(context, search_id, result_index, "awaiting")
+    else:
+        await self._set_results_pick_state(context, search_id, result_index, "failed")
 
 
 async def _forget_local_copy(

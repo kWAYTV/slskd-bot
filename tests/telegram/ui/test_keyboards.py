@@ -5,7 +5,11 @@ from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.commands.keyboards import build_history_keyboard, build_language_keyboard
 from slskd_importer.telegram.download.keyboards import build_approve_keyboard
 from slskd_importer.telegram.playlist_import.keyboards import build_import_failure_keyboard
-from slskd_importer.telegram.search.keyboards import build_results_keyboard, build_spotify_keyboard
+from slskd_importer.telegram.search.keyboards import (
+    build_results_keyboard,
+    build_results_status_keyboard,
+    build_spotify_keyboard,
+)
 
 
 def _make_result(idx: int = 0) -> SearchResult:
@@ -88,8 +92,18 @@ class TestBuildResultsKeyboard:
         kb = build_results_keyboard(results, search_id="1")
         action_row = kb.inline_keyboard[-1]
         texts = [btn.text for btn in action_row]
-        assert any("Auto" in t for t in texts)
+        assert any("Best" in t for t in texts)
         assert any("Cancel" in t for t in texts)
+
+    def test_status_keyboard_locks_pick(self):
+        kb = build_results_status_keyboard(label="⬇️ #2 downloading…", search_id="1", show_cancel=True)
+        rows = kb.inline_keyboard
+        assert rows[0][0].callback_data == "lock:1"
+        assert rows[1][0].callback_data == "dl:1:cancel"
+
+    def test_status_keyboard_saved_has_no_cancel(self):
+        kb = build_results_status_keyboard(label="✅ #2 saved", search_id="1", show_cancel=False)
+        assert len(kb.inline_keyboard) == 1
 
     def test_empty_results_has_cancel_only(self):
         kb = build_results_keyboard([], search_id="1")

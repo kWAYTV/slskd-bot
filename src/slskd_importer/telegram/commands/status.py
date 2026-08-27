@@ -63,7 +63,7 @@ def _search_lines(self, chat_id: int) -> list[str]:
     lines = [self.t(chat_id, "status_searches") + "\n"]
     for pending in searches:
         if pending.track:
-            lines.append(f"• {escape_md(pending.track.artist)} - {escape_md(pending.track.title)}")
+            lines.append(f"• {escape_md(pending.track.artist)} — {escape_md(pending.track.title)}")
         else:
             lines.append(f"• {code_span(pending.query)}")
     return lines
@@ -75,8 +75,9 @@ def _download_lines(self, chat_id: int) -> list[str]:
         return []
     lines = ["\n" + self.t(chat_id, "status_downloads") + "\n"]
     for dl in chat_downloads:
-        name = f"{escape_md(dl.track.artist)} - {escape_md(dl.track.title)}"
-        lines.append(f"• {name} — {_download_state(self, chat_id, dl)} ({code_span(dl.result.basename)})")
+        label = f"#{dl.result_index + 1}"
+        name = f"{escape_md(dl.track.artist)} — {escape_md(dl.track.title)}"
+        lines.append(f"• {label} · {name} — {_download_state(self, chat_id, dl)}")
     return lines
 
 

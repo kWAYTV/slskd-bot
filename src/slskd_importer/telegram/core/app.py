@@ -153,6 +153,8 @@ class MusicBot:
     _handle_spotify_page = spotify.handle_spotify_page
     _handle_spotify_selection = spotify.handle_spotify_selection
     _handle_results_page = results.handle_results_page
+    _set_results_pick_state = results.set_results_pick_state
+    _restore_results_picks = results.restore_results_picks
     _handle_direct_search = direct.handle_direct_search
     _do_direct_slskd_search = direct.do_direct_slskd_search
 

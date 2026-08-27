@@ -8,7 +8,9 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from slskd_importer.telegram.ui.editing import safe_query_edit
+from slskd_importer.telegram.ui.formatting import track_chip
 from slskd_importer.telegram.ui.markdown import md_code_safe
+from slskd_importer.telegram.ui.reply import reply_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -31,19 +33,22 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
     track = pending_dl.track
     result_index = pending_dl.result_index
     label = f"#{result_index + 1}"
+    chip = track_chip(track, label)
     logger.info("chat=%s retrying %s %s", chat_id, label, result.basename)
 
     await safe_query_edit(
         query,
-        self.t(chat_id, "retrying", label=label, file=md_code_safe(result.basename)),
+        self.t(chat_id, "retrying", chip=chip, file=md_code_safe(result.basename)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=self.t(chat_id, "redownloading", label=label, user=md_code_safe(result.username)),
+        text=self.t(chat_id, "redownloading", chip=chip, user=md_code_safe(result.username)),
         parse_mode=ParseMode.MARKDOWN,
+        **reply_kwargs(pending_dl.origin_message_id),
     )
+    await self._set_results_pick_state(context, pending_dl.search_id, result_index, "downloading")
 
     task = context.application.create_task(
         self._do_download(
@@ -94,19 +99,22 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
     next_result = pending.results[next_idx]
     track = pending_dl.track
     label = f"#{next_idx + 1}"
+    chip = track_chip(track, label)
     logger.info("chat=%s trying next result %s %s", chat_id, label, next_result.basename)
 
     await safe_query_edit(
         query,
-        self.t(chat_id, "trying_next", label=label, file=md_code_safe(next_result.basename)),
+        self.t(chat_id, "trying_next", chip=chip, file=md_code_safe(next_result.basename)),
         parse_mode=ParseMode.MARKDOWN,
     )
 
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=self.t(chat_id, "downloading_next", label=label, user=md_code_safe(next_result.username)),
+        text=self.t(chat_id, "downloading_next", chip=chip, user=md_code_safe(next_result.username)),
         parse_mode=ParseMode.MARKDOWN,
+        **reply_kwargs(pending_dl.origin_message_id or pending.message_id),
     )
+    await self._set_results_pick_state(context, pending_dl.search_id, next_idx, "downloading")
 
     task = context.application.create_task(
         self._do_download(

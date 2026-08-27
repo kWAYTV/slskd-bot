@@ -13,6 +13,7 @@ from slskd_importer.playlist_import.job import JobStatus, TrackStatus
 from slskd_importer.telegram.download.approval import save_to_library
 from slskd_importer.telegram.ui.editing import safe_query_edit
 from slskd_importer.telegram.ui.markdown import md_code_safe
+from slskd_importer.telegram.ui.reply import reply_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -117,10 +118,12 @@ async def handle_import_retry(self, update, context, chat_id: int, job_id: int, 
         parse_mode=ParseMode.MARKDOWN,
     )
 
+    origin = getattr(self._import_status_msg.get(chat_id), "message_id", None)
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=self.t(chat_id, "import_redownloading", user=md_code_safe(result.username)),
         parse_mode=ParseMode.MARKDOWN,
+        **reply_kwargs(origin or pending_dl.origin_message_id),
     )
 
     await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.searching)

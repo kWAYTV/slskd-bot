@@ -27,7 +27,7 @@ class TestDoImportSlskdSearch:
             _make_context(), chat_id, track, searching_msg, generation=0, job_id=1, track_id=5
         )
         mock_edit.assert_awaited()
-        assert "No results" in mock_edit.call_args[0][1]
+        assert "No matches" in mock_edit.call_args[0][1]
         bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.awaiting_approval)
         assert bot.slskd.search.await_count >= 1
 

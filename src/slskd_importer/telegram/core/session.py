@@ -42,6 +42,8 @@ class PendingSearch:
     chat_id: int = 0
     cancelled: bool = False
     created_at: float = field(default_factory=time.time)
+    picked_index: int | None = None
+    pick_state: str = ""
 
 
 @dataclass
@@ -62,6 +64,7 @@ class PendingDownload:
     created_at: float = field(default_factory=time.time)
     search_id: str | None = None
     task: asyncio.Task | None = None
+    origin_message_id: int | None = None
 
 
 class ChatSession:

@@ -87,7 +87,7 @@ class TestMusicBotCallbackHandler:
         update = _make_callback_update(data="sp_page:1:0")
         context = _make_context()
         await bot.handle_callback(update, context)
-        update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")
+        update.callback_query.edit_message_text.assert_called_with("This search has expired. Send a new query.")
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -120,7 +120,9 @@ class TestMusicBotCallbackHandler:
         bot = MusicBot(_make_config())
         track = _make_track()
         result = _make_search_result()
-        bot.pending["1"] = PendingSearch(query="test", track=track, results=[result], chat_id=67890, search_id="1")
+        bot.pending["1"] = PendingSearch(
+            query="test", track=track, results=[result], chat_id=67890, search_id="1", message_id=50
+        )
         update = _make_callback_update(data="dl:1:0")
         context = _make_context()
         # Mock the download to prevent actual execution
@@ -128,7 +130,20 @@ class TestMusicBotCallbackHandler:
         context.application.create_task = MagicMock(return_value=MagicMock())
         await bot.handle_callback(update, context)
         context.application.create_task.assert_called_once()
-        update.callback_query.edit_message_reply_markup.assert_awaited()
+        update.callback_query.edit_message_text.assert_awaited()
+        send_kwargs = context.bot.send_message.call_args.kwargs
+        assert send_kwargs["reply_parameters"].message_id == 50
+        assert "#1 · Nancy Sinatra — Bang Bang" in send_kwargs["text"]
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_lock_callback_is_noop(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        update = _make_callback_update(data="lock:1")
+        context = _make_context()
+        await bot.handle_callback(update, context)
+        context.bot.send_message.assert_not_called()
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -153,7 +168,7 @@ class TestMusicBotCallbackHandler:
         update = _make_callback_update(data="dl:1:0")
         context = _make_context()
         await bot.handle_callback(update, context)
-        update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")
+        update.callback_query.edit_message_text.assert_called_with("This search has expired. Send a new query.")
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -188,7 +203,7 @@ class TestMusicBotCallbackHandler:
         update = _make_callback_update(data="dl_page:1:0")
         context = _make_context()
         await bot.handle_callback(update, context)
-        update.callback_query.edit_message_text.assert_called_with("Search expired. Send a new query.")
+        update.callback_query.edit_message_text.assert_called_with("This search has expired. Send a new query.")
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -371,7 +386,7 @@ class TestHistoryUndoCallback:
         update = _make_callback_update(chat_id=67890, data=f"hu:{row_id}")
         await bot.handle_callback(update, _make_context())
         text = update.callback_query.edit_message_text.call_args[0][0]
-        assert "isn't yours" in text
+        assert "not yours" in text
         assert bot.history_repo.get_recent(1, 11111)[0].status == "success"
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")

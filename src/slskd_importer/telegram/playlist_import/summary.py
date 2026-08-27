@@ -41,7 +41,7 @@ async def send_import_summary(self, context, chat_id: int, job_id: int):
         if failed_tracks:
             lines.append("\n" + self.t(chat_id, "import_failed_header"))
             for item in failed_tracks[:5]:
-                lines.append(f"• {escape_md(item.artist)} - {escape_md(item.title)}")
+                lines.append(f"• {escape_md(item.artist)} — {escape_md(item.title)}")
             if len(failed_tracks) > 5:
                 lines.append(self.t(chat_id, "import_and_more", n=len(failed_tracks) - 5))
             reply_markup = build_import_summary_keyboard(job_id, len(failed_tracks), locale=self.locale(chat_id))

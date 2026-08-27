@@ -23,7 +23,9 @@ def build_results_keyboard(
     buttons = []
     for i, result in enumerate(page_results):
         absolute_idx = start + i
-        label = f"#{absolute_idx + 1} {result.duration_display} | {result.quality_display} | {result.size_mb:.0f}MB"
+        label = (
+            f"#{absolute_idx + 1}  {result.duration_display}  ·  {result.quality_display}  ·  {result.size_mb:.0f} MB"
+        )
         buttons.append([InlineKeyboardButton(label, callback_data=f"dl:{search_id}:{absolute_idx}")])
 
     nav_row = []
@@ -59,7 +61,7 @@ def build_spotify_keyboard(
     buttons = []
     for i, item in enumerate(page_tracks):
         absolute_idx = start + i
-        label = f"#{absolute_idx + 1} {item.artist} - {item.title} ({item.duration_display})"
+        label = f"#{absolute_idx + 1}  {item.artist} — {item.title}"
         if len(label) > 64:
             label = label[:61] + "..."
         buttons.append([InlineKeyboardButton(label, callback_data=f"sp:{search_id}:{absolute_idx}")])
@@ -75,6 +77,22 @@ def build_spotify_keyboard(
     buttons.append([InlineKeyboardButton(t(locale, "btn_direct"), callback_data=f"direct:{search_id}")])
     buttons.append([InlineKeyboardButton(t(locale, "btn_cancel"), callback_data=f"sp:{search_id}:cancel")])
     return InlineKeyboardMarkup(buttons)
+
+
+def build_results_status_keyboard(
+    *,
+    label: str,
+    search_id: str,
+    show_cancel: bool,
+    locale: str = DEFAULT_LOCALE,
+) -> InlineKeyboardMarkup:
+    """Locked results keyboard after a pick — identity + optional cancel."""
+    if len(label) > 64:
+        label = label[:61] + "..."
+    rows = [[InlineKeyboardButton(label, callback_data=f"lock:{search_id}")]]
+    if show_cancel:
+        rows.append([InlineKeyboardButton(t(locale, "btn_cancel"), callback_data=f"dl:{search_id}:cancel")])
+    return InlineKeyboardMarkup(rows)
 
 
 def build_direct_search_keyboard(search_id: str, *, locale: str = DEFAULT_LOCALE) -> InlineKeyboardMarkup:

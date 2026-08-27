@@ -127,6 +127,32 @@ class TestFormatSearchResults:
         assert f"_{folder}_" not in text
         assert "_Oscar_Mulero" not in text
 
+    def test_highlights_picked_row_and_status(self):
+        from slskd_importer.telegram.ui.formatting import format_search_results
+
+        result = _make_search_result()
+        text = format_search_results(
+            _make_track(),
+            [result],
+            picked_index=0,
+            pick_state="downloading",
+            status_line="⬇️ Downloading #1 · Nancy Sinatra — Bang Bang",
+        )
+        assert "*#1*  ⬇️" in text
+        assert "Downloading #1" in text
+
+
+class TestTrackChip:
+    def test_with_label(self):
+        from slskd_importer.telegram.ui.formatting import track_chip
+
+        assert track_chip(_make_track(), "#2") == "#2 · Nancy Sinatra — Bang Bang"
+
+    def test_without_label(self):
+        from slskd_importer.telegram.ui.formatting import track_chip
+
+        assert track_chip(_make_track()) == "Nancy Sinatra — Bang Bang"
+
 
 # ---------------------------------------------------------------------------
 # Pasted link handling
