@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import contextlib
 import logging
 
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
 
 from slskd_importer.telegram.core.session import split_search_callback
+from slskd_importer.telegram.search.results import render_results_card
 from slskd_importer.telegram.ui.editing import safe_query_edit
-from slskd_importer.telegram.ui.markdown import escape_md, md_code_safe
+from slskd_importer.telegram.ui.formatting import track_chip
+from slskd_importer.telegram.ui.markdown import md_code_safe
+from slskd_importer.telegram.ui.reply import reply_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
         return
 
     if action == "cancel":
-        self._session.drop_search(search_id)
+        await self._dismiss_other_downloads(context, chat_id, search_id=search_id)
         await safe_query_edit(query, self.t(chat_id, "cancelled"))
         return
 
@@ -39,6 +40,7 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     result = pending.results[index]
     track = pending.track
     user_id = pending.user_id or query.from_user.id
+    label = f"#{index + 1}"
     logger.info(
         "chat=%s search=%s selected #%d %s from %s",
         chat_id,
@@ -48,21 +50,23 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
         result.username,
     )
 
-    with contextlib.suppress(BadRequest):
-        await query.edit_message_reply_markup(reply_markup=None)
+    pending.picked_index = index
+    pending.pick_state = "downloading"
+    text, markup = render_results_card(self, pending)
+    await safe_query_edit(query, text, parse_mode=ParseMode.MARKDOWN, reply_markup=markup)
 
+    chip = track_chip(track, label)
     status_msg = await context.bot.send_message(
         chat_id=chat_id,
         text=self.t(
             chat_id,
             "downloading",
-            label=f"#{index + 1}",
-            artist=escape_md(track.artist),
-            title=escape_md(track.title),
+            chip=chip,
             user=md_code_safe(result.username),
             file=md_code_safe(result.basename),
         ),
         parse_mode=ParseMode.MARKDOWN,
+        **reply_kwargs(pending.message_id),
     )
 
     task = context.application.create_task(

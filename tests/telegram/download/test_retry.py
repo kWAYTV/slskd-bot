@@ -91,7 +91,7 @@ class TestRetryResultIndex:
         context = _make_context()
         await bot.handle_callback(update, context)
         edit_call = update.callback_query.edit_message_text
-        assert "No more results" in edit_call.call_args[0][0]
+        assert "No further results" in edit_call.call_args[0][0]
 
 
 # ---------------------------------------------------------------------------

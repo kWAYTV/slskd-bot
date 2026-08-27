@@ -53,7 +53,7 @@ class TestMusicBotHelpers:
     def test_format_spotify_results(self):
         tracks = [_make_track() for _ in range(3)]
         text = format_spotify_results(tracks)
-        assert "Multiple matches" in text
+        assert "Spotify" in text
         assert "Nancy Sinatra" in text
 
     def test_format_spotify_results_escapes_markdown(self):

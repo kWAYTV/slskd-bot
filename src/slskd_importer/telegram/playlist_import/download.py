@@ -33,6 +33,8 @@ async def do_import_download(
     job_id: int,
     track_id: int,
     dl_id: str,
+    position: int = 0,
+    total: int = 0,
 ):
     """Download a file within an import flow."""
     # Registered by the import search; fall back to a detached record if expired.
@@ -50,6 +52,8 @@ async def do_import_download(
             self.t(
                 chat_id,
                 "import_progress",
+                position=position or "?",
+                total=total or "?",
                 artist=escape_md(track.artist),
                 title=escape_md(track.title),
                 line=line,
@@ -100,7 +104,18 @@ async def do_import_download(
         await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
 
         await _deliver_import_preview(
-            self, context, chat_id, track, result, status_msg, source_path, job_id, track_id, dl_id
+            self,
+            context,
+            chat_id,
+            track,
+            result,
+            status_msg,
+            source_path,
+            job_id,
+            track_id,
+            dl_id,
+            position=position,
+            total=total,
         )
 
     except asyncio.CancelledError:
@@ -128,11 +143,14 @@ async def _deliver_import_preview(
     job_id,
     track_id,
     dl_id,
+    position: int = 0,
+    total: int = 0,
 ):
     """Send the downloaded audio, or a size notice when it exceeds the Telegram limit."""
     file_size = os.path.getsize(source_path) if os.path.isfile(source_path) else 0
     quality_line = f"{result.quality_display} | {result.duration_display}"
     keyboard = build_import_track_keyboard(job_id, track_id, dl_id, locale=self.locale(chat_id))
+    origin_id = getattr(status_msg, "message_id", None)
 
     if file_size > self.config.telegram_file_limit:
         await safe_edit(
@@ -149,7 +167,15 @@ async def _deliver_import_preview(
         )
         return
 
-    caption = self.t(chat_id, "import_caption", artist=track.artist, title=track.title, quality=quality_line)
+    caption = self.t(
+        chat_id,
+        "import_caption",
+        position=position or "?",
+        total=total or "?",
+        artist=track.artist,
+        title=track.title,
+        quality=quality_line,
+    )
     await send_audio_or_document(
         context,
         chat_id,
@@ -160,4 +186,5 @@ async def _deliver_import_preview(
         duration=track.duration_secs,
         caption=caption,
         reply_markup=keyboard,
+        reply_to_message_id=origin_id,
     )

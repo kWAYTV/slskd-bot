@@ -96,7 +96,7 @@ class TestCanSaveLibrary:
         result = await bot._check_library_auth(update)
         assert result is False
         update.message.reply_text.assert_awaited()
-        assert "library users" in update.message.reply_text.call_args[0][0]
+        assert "library access" in update.message.reply_text.call_args[0][0]
 
 
 @patch("slskd_importer.telegram.core.app.SpotifyResolver")

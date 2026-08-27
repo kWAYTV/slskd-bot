@@ -58,7 +58,7 @@ class TestMusicBotCommands:
         context = _make_context()
         await bot.cmd_start(update, context)
         text = update.message.reply_text.call_args[0][0]
-        assert "Send me a song name" in text
+        assert "Send a song title" in text
         assert "/lang" in text
         assert "/import" in text
         assert "/auto" not in text
@@ -88,7 +88,7 @@ class TestMusicBotCommands:
         await bot.handle_callback(update, context)
         assert bot.locale(67890) == "es"
         text = update.callback_query.edit_message_text.call_args[0][0]
-        assert "Envíame el nombre de una canción" in text
+        assert "Envía el título de una canción" in text
         assert bot.prefs_repo.get_locale(67890) == "es"
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")

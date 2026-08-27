@@ -102,7 +102,15 @@ async def process_next_import_track(self, context, chat_id: int, job_id: int, ge
             ),
         )
         await self._do_import_slskd_search(
-            context, chat_id, track_info, searching_msg, generation, job_id, next_track.id
+            context,
+            chat_id,
+            track_info,
+            searching_msg,
+            generation,
+            job_id,
+            next_track.id,
+            position=position,
+            total=total,
         )
         return
 

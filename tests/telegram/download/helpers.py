@@ -72,6 +72,7 @@ def _make_context():
     context.bot.edit_message_reply_markup = AsyncMock()
     context.bot.edit_message_caption = AsyncMock()
     context.bot.edit_message_text = AsyncMock()
+    context.bot.delete_message = AsyncMock()
     context.application = MagicMock()
     context.application.create_task = MagicMock(return_value=MagicMock())
     return context

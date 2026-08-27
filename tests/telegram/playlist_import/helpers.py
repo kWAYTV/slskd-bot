@@ -75,6 +75,7 @@ def _make_context():
     context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=999))
     context.bot.send_audio = AsyncMock()
     context.bot.send_document = AsyncMock()
+    context.bot.delete_message = AsyncMock()
     context.application = MagicMock()
     context.application.create_task = MagicMock(return_value=MagicMock())
     return context

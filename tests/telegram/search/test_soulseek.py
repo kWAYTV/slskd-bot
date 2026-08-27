@@ -158,4 +158,4 @@ class TestDoSlskdSearch:
         context = _make_context()
         await bot._do_slskd_search(context, 123, _make_track(), msg, 0)
         edited = " ".join(str(c) for c in msg.edit_text.call_args_list)
-        assert "Cannot reach slskd" in edited
+        assert "slskd is unreachable" in edited

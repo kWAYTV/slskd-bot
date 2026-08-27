@@ -9,7 +9,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from slskd_importer.telegram.commands.keyboards import build_history_keyboard
-from slskd_importer.telegram.ui.markdown import code_span
+from slskd_importer.telegram.ui.markdown import code_span, escape_md
 
 _STATUS_ICONS = {
     "success": "✅",
@@ -34,8 +34,12 @@ async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(self.t(chat_id, "history_empty"))
         return
 
-    lines = [self.t(chat_id, "history_header") + "\n"]
-    lines.extend(f"{_STATUS_ICONS.get(entry.status, '❌')} {code_span(entry.filename)}" for entry in records)
+    lines = [self.t(chat_id, "history_header"), ""]
+    for entry in records:
+        icon = _STATUS_ICONS.get(entry.status, "❌")
+        artist = escape_md(entry.artist)
+        title = escape_md(entry.title)
+        lines.append(f"{icon}  *{artist} — {title}*\n    {code_span(entry.filename)}")
 
     await update.message.reply_text(
         "\n".join(lines),

@@ -128,6 +128,7 @@ class TestDoDownload:
             result = _make_result()
             await bot._do_download(context, 123, _make_track(), result, status_msg)
             context.bot.send_audio.assert_called_once()
+            context.bot.delete_message.assert_awaited_once()
         finally:
             os.unlink(source_path)
 

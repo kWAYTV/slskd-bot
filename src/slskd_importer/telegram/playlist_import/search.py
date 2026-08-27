@@ -20,7 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 async def do_import_slskd_search(
-    self, context, chat_id: int, track: TrackInfo, searching_msg, generation: int, job_id: int, track_id: int
+    self,
+    context,
+    chat_id: int,
+    track: TrackInfo,
+    searching_msg,
+    generation: int,
+    job_id: int,
+    track_id: int,
+    position: int = 0,
+    total: int = 0,
 ):
     """Search slskd for an import track using the same four-tier fallbacks as manual search."""
     try:
@@ -32,7 +41,14 @@ async def do_import_slskd_search(
         if not ranked:
             await safe_edit(
                 searching_msg,
-                self.t(chat_id, "import_no_results", artist=escape_md(track.artist), title=escape_md(track.title)),
+                self.t(
+                    chat_id,
+                    "import_no_results",
+                    position=position or "?",
+                    total=total or "?",
+                    artist=escape_md(track.artist),
+                    title=escape_md(track.title),
+                ),
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=build_import_skip_keyboard(job_id, track_id, locale=self.locale(chat_id)),
             )
@@ -56,6 +72,7 @@ async def do_import_slskd_search(
             chat_id=chat_id,
             source_path=None,
             status_message_id=searching_msg.message_id,
+            origin_message_id=searching_msg.message_id,
         )
         self.downloads[dl_id] = pending_dl
 
@@ -65,6 +82,8 @@ async def do_import_slskd_search(
                 self.t(
                     chat_id,
                     "import_downloading",
+                    position=position or "?",
+                    total=total or "?",
                     artist=escape_md(track.artist),
                     title=escape_md(track.title),
                     file=md_code_safe(best.basename),
@@ -76,7 +95,19 @@ async def do_import_slskd_search(
         )
 
         task = context.application.create_task(
-            self._do_import_download(context, chat_id, track, best, searching_msg, generation, job_id, track_id, dl_id),
+            self._do_import_download(
+                context,
+                chat_id,
+                track,
+                best,
+                searching_msg,
+                generation,
+                job_id,
+                track_id,
+                dl_id,
+                position=position,
+                total=total,
+            ),
             update=None,
         )
         self._track_task(chat_id, task)
@@ -94,7 +125,12 @@ async def do_import_slskd_search(
         logger.exception(f"Import search failed for: {track.artist} - {track.title}")
         await safe_edit(
             searching_msg,
-            self.t(chat_id, "import_search_failed", artist=track.artist, title=track.title),
+            self.t(
+                chat_id,
+                "import_search_failed",
+                artist=escape_md(track.artist),
+                title=escape_md(track.title),
+            ),
         )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Search error")
         await self._process_next_import_track(context, chat_id, job_id, generation)

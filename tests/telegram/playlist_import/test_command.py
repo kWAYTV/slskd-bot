@@ -25,7 +25,7 @@ class TestCmdImport:
         context = _make_context()
         await bot.cmd_import(update, context)
         update.message.reply_text.assert_awaited_once()
-        assert "Usage" in update.message.reply_text.call_args[0][0]
+        assert "/import" in update.message.reply_text.call_args[0][0]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
@@ -35,7 +35,7 @@ class TestCmdImport:
         context = _make_context()
         await bot.cmd_import(update, context)
         update.message.reply_text.assert_awaited_once()
-        assert "valid Spotify" in update.message.reply_text.call_args[0][0]
+        assert "Spotify playlist or album URL" in update.message.reply_text.call_args[0][0]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
@@ -49,7 +49,7 @@ class TestCmdImport:
         await bot.cmd_import(update, context)
         await asyncio.sleep(0)
         update.message.reply_text.assert_awaited_once()
-        assert "already have an active import" in update.message.reply_text.call_args[0][0]
+        assert "already running" in update.message.reply_text.call_args[0][0]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
@@ -64,7 +64,7 @@ class TestCmdImport:
         await bot.cmd_import(update, context)
         await asyncio.sleep(0)
         mock_edit.assert_awaited()
-        assert "Failed to resolve" in mock_edit.call_args[0][1]
+        assert "could not be resolved" in mock_edit.call_args[0][1]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     @patch("slskd_importer.telegram.playlist_import.command.safe_edit", new_callable=AsyncMock, return_value=True)
@@ -118,7 +118,7 @@ class TestCmdImport:
         bot.import_repo.reset_in_flight_tracks.assert_called_once_with(job.id)
         assert bot._active_import[67890] == job.id
         context.bot.send_message.assert_awaited()
-        assert "Resuming import" in context.bot.send_message.call_args.kwargs["text"]
+        assert "Resuming" in context.bot.send_message.call_args.kwargs["text"]
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     async def test_cmd_import_resume_nothing(self, mock_thread):

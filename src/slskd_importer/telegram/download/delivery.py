@@ -15,6 +15,7 @@ from slskd_importer.library.flac import FlacVerdict, analyze_flac
 from slskd_importer.library.preview import convert_to_ogg, create_preview_clip
 from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.download.transfer import remember_approval_message
+from slskd_importer.telegram.ui.reply import reply_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +73,10 @@ async def send_audio_or_document(
     duration: int,
     caption: str,
     reply_markup=None,
+    reply_to_message_id: int | None = None,
 ):
     """send_audio with a send_document fallback on BadRequest. Returns the sent message."""
+    extra = reply_kwargs(reply_to_message_id)
     try:
         with open(source_path, "rb") as f:
             return await context.bot.send_audio(
@@ -85,6 +88,7 @@ async def send_audio_or_document(
                 duration=duration,
                 caption=caption,
                 reply_markup=reply_markup,
+                **extra,
             )
     except BadRequest:
         logger.info("send_audio failed, falling back to send_document for %s", filename)
@@ -95,6 +99,7 @@ async def send_audio_or_document(
                 filename=filename,
                 caption=caption,
                 reply_markup=reply_markup,
+                **extra,
             )
 
 
@@ -111,6 +116,8 @@ async def send_large_file(
     dl_id: str,
     reply_markup=None,
     can_save: bool = True,
+    chip: str = "",
+    reply_to_message_id: int | None = None,
 ) -> bool:
     """Convert an over-limit file to OGG and send. Trim only as last resort.
 
@@ -118,19 +125,55 @@ async def send_large_file(
     """
     ogg_path = await self._convert_to_ogg(source_path)
     if ogg_path and await _send_full_ogg(
-        self, context, chat_id, track, result, ogg_path, file_size, quality_line, label, dl_id, reply_markup, can_save
+        self,
+        context,
+        chat_id,
+        track,
+        result,
+        ogg_path,
+        file_size,
+        quality_line,
+        label,
+        dl_id,
+        reply_markup,
+        can_save,
+        chip,
+        reply_to_message_id,
     ):
         return True
 
     preview_path = await self._create_preview(source_path, duration_secs=60.0)
     if not preview_path:
         await _report_preview_failure(
-            self, context, chat_id, source_path, file_size, quality_line, label, dl_id, reply_markup, can_save
+            self,
+            context,
+            chat_id,
+            source_path,
+            file_size,
+            quality_line,
+            label,
+            dl_id,
+            reply_markup,
+            can_save,
+            chip,
+            reply_to_message_id,
         )
         return False
 
     return await _send_minute_preview(
-        self, context, chat_id, track, preview_path, file_size, quality_line, label, dl_id, reply_markup, can_save
+        self,
+        context,
+        chat_id,
+        track,
+        preview_path,
+        file_size,
+        quality_line,
+        label,
+        dl_id,
+        reply_markup,
+        can_save,
+        chip,
+        reply_to_message_id,
     )
 
 
@@ -147,6 +190,8 @@ async def _send_full_ogg(
     dl_id: str,
     reply_markup,
     can_save: bool,
+    chip: str,
+    reply_to_message_id: int | None,
 ) -> bool:
     """Send the whole file as OGG if it fits the limit. Always removes the OGG."""
     file_limit = self.config.telegram_file_limit
@@ -159,7 +204,7 @@ async def _send_full_ogg(
         caption = self.t(
             chat_id,
             "ogg_caption",
-            label=label,
+            chip=chip or label,
             limit=file_limit // (1024 * 1024),
             quality=quality_line,
         ) + (
@@ -182,6 +227,7 @@ async def _send_full_ogg(
                 duration=track.duration_secs,
                 caption=caption,
                 reply_markup=reply_markup,
+                **reply_kwargs(reply_to_message_id),
             )
         remember_approval_message(self, dl_id, sent.message_id)
         return True
@@ -201,6 +247,8 @@ async def _report_preview_failure(
     dl_id: str,
     reply_markup,
     can_save: bool,
+    chip: str,
+    reply_to_message_id: int | None,
 ) -> None:
     logger.error("Preview creation failed for %s, cannot send to Telegram", source_path)
     sent = await context.bot.send_message(
@@ -208,12 +256,13 @@ async def _report_preview_failure(
         text=self.t(
             chat_id,
             "preview_failed",
-            label=label,
+            chip=chip or label,
             size=f"{file_size / (1024 * 1024):.0f}",
             quality=quality_line,
         )
         + (self.t(chat_id, "preview_save_anyway") if can_save else self.t(chat_id, "preview_none")),
         reply_markup=reply_markup,
+        **reply_kwargs(reply_to_message_id),
     )
     remember_approval_message(self, dl_id, sent.message_id)
 
@@ -230,6 +279,8 @@ async def _send_minute_preview(
     dl_id: str,
     reply_markup,
     can_save: bool,
+    chip: str,
+    reply_to_message_id: int | None,
 ) -> bool:
     """Send a ~1 minute trimmed preview. Always removes the preview file."""
     try:
@@ -237,7 +288,7 @@ async def _send_minute_preview(
         caption = self.t(
             chat_id,
             "preview_caption",
-            label=label,
+            chip=chip or label,
             size=f"{file_size / (1024 * 1024):.0f}",
             quality=quality_line,
         ) + (self.t(chat_id, "preview_save") if can_save else self.t(chat_id, "ogg_sent"))
@@ -251,6 +302,7 @@ async def _send_minute_preview(
                 duration=60,
                 caption=caption,
                 reply_markup=reply_markup,
+                **reply_kwargs(reply_to_message_id),
             )
         remember_approval_message(self, dl_id, sent.message_id)
         return True

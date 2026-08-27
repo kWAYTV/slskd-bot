@@ -7,6 +7,7 @@ import contextlib
 import logging
 import os
 
+from slskd_importer.telegram.ui.formatting import track_chip
 from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ async def handle_approval(self, update, context, chat_id: int, data: str):
         await _approve_download(self, query, context, chat_id, dl_id, pending_dl)
         return
     if action == "reject":
-        await _reject_download(self, query, chat_id, pending_dl)
+        await _reject_download(self, query, context, chat_id, pending_dl)
 
 
 async def save_to_library(self, pending_dl, chat_id: int) -> str | None:
@@ -79,10 +80,11 @@ async def _approve_download(self, query, context, chat_id: int, dl_id: str, pend
 
     await self._edit_approval_message(query, self.t(chat_id, "saved", name=target_name))
     logger.info("chat=%s approved and saved: %s", chat_id, target_name)
+    await self._set_results_pick_state(context, pending_dl.search_id, pending_dl.result_index, "saved")
     await self._dismiss_other_downloads(context, chat_id, search_id=pending_dl.search_id)
 
 
-async def _reject_download(self, query, chat_id: int, pending_dl):
+async def _reject_download(self, query, context, chat_id: int, pending_dl):
     """Discard a rejected download and its local artifacts."""
     track = pending_dl.track
     result = pending_dl.result
@@ -94,6 +96,12 @@ async def _reject_download(self, query, chat_id: int, pending_dl):
     )
     await self._add_history(track, result, "rejected", chat_id=chat_id)
     logger.info("chat=%s rejected: %s - %s (%s)", chat_id, track.artist, track.title, result.basename)
+    note = self.t(
+        chat_id,
+        "results_status_discarded",
+        chip=track_chip(track, f"#{pending_dl.result_index + 1}"),
+    )
+    await self._restore_results_picks(context, pending_dl.search_id, note=note)
 
 
 async def dismiss_other_downloads(self, context, chat_id: int, search_id: str | None = None):
@@ -102,13 +110,7 @@ async def dismiss_other_downloads(self, context, chat_id: int, search_id: str | 
     Other chats' work and unrelated searches in this chat are left alone.
     """
     if search_id:
-        pending = self._session.drop_search(search_id)
-        if pending and pending.message_id:
-            with contextlib.suppress(Exception):
-                await context.bot.edit_message_reply_markup(
-                    chat_id=chat_id,
-                    message_id=pending.message_id,
-                )
+        self._session.drop_search(search_id)
 
     stale = [(k, v) for k, v in self.downloads.items() if v.chat_id == chat_id and v.search_id == search_id]
     for dl_id, dl in stale:

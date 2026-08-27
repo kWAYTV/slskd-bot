@@ -52,6 +52,9 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         "hu": self._handle_history_undo,
     }.get(prefix)
 
+    if prefix == "lock":
+        return
+
     if handler:
         await handler(update, context, chat_id, data)
         return

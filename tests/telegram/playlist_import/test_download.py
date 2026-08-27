@@ -44,7 +44,7 @@ class TestDoImportDownload:
             dl_id=dl_id,
         )
         mock_edit.assert_awaited()
-        assert "Failed to enqueue" in mock_edit.call_args[0][1]
+        assert "Could not queue" in mock_edit.call_args[0][1]
         bot.import_repo.update_track_status.assert_called_with(5, TrackStatus.awaiting_approval)
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
@@ -169,7 +169,7 @@ class TestDoImportDownload:
             dl_id=dl_id,
         )
         mock_edit.assert_awaited()
-        assert "too large" in mock_edit.call_args[0][1]
+        assert "Too large" in mock_edit.call_args[0][1]
         os.unlink(source.name)
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
