@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 
 from telegram.constants import ParseMode
@@ -13,6 +15,29 @@ from slskd_importer.telegram.ui.markdown import md_code_safe
 from slskd_importer.telegram.ui.reply import reply_kwargs
 
 logger = logging.getLogger(__name__)
+
+
+async def replace_search_downloads(self, search_id: str | None) -> None:
+    """Cancel the download still running for this result list.
+
+    Retry / Try next / a new pick then owns the chain. Other searches in the
+    same chat are left alone. Awaits the cancelled tasks so slskd cleanup
+    finishes before the replacement enqueues the same file.
+    """
+    if not search_id:
+        return
+    tasks: list[asyncio.Task] = []
+    for dl in list(self.downloads.values()):
+        if dl.search_id != search_id:
+            continue
+        task = dl.task
+        if task is None or task.done():
+            continue
+        task.cancel()
+        tasks.append(task)
+    for task in tasks:
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task
 
 
 async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
@@ -49,6 +74,7 @@ async def handle_retry(self, update, context: ContextTypes.DEFAULT_TYPE, chat_id
         **reply_kwargs(pending_dl.origin_message_id),
     )
     await self._set_results_pick_state(context, pending_dl.search_id, result_index, "downloading")
+    await self._replace_search_downloads(pending_dl.search_id)
 
     task = context.application.create_task(
         self._do_download(
@@ -115,6 +141,7 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
         **reply_kwargs(pending_dl.origin_message_id or pending.message_id),
     )
     await self._set_results_pick_state(context, pending_dl.search_id, next_idx, "downloading")
+    await self._replace_search_downloads(pending_dl.search_id)
 
     task = context.application.create_task(
         self._do_download(

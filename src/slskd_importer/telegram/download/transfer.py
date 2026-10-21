@@ -12,6 +12,11 @@ from slskd_importer.telegram.core.session import PendingDownload
 
 PROGRESS_EDIT_STEP_PCT = 10.0
 
+# slskd marks a transfer complete a moment before it moves the file out of
+# incomplete/, so the first disk lookup can miss it.
+LOCATE_RETRY_SECS = 10.0
+LOCATE_RETRY_STEP_SECS = 0.5
+
 
 @dataclass
 class TransferOutcome:
@@ -71,6 +76,22 @@ async def abort_transfer(self, dl_id: str, result: SearchResult, transfer_id: st
     await asyncio.to_thread(self.slskd.cancel_transfer, result.username, result.filename, transfer_id)
 
 
+async def locate_landed(find: Callable[[], str | None], *, sleep=asyncio.sleep) -> str | None:
+    """Retry a disk lookup until slskd finishes moving the completed file."""
+    waited = 0.0
+    while True:
+        path = await asyncio.to_thread(find)
+        if path is not None or waited >= LOCATE_RETRY_SECS:
+            return path
+        await sleep(LOCATE_RETRY_STEP_SECS)
+        waited += LOCATE_RETRY_STEP_SECS
+
+
+async def give_up_transfer(self, result: SearchResult, transfer_id: str | None = None) -> None:
+    """Stop a transfer the bot no longer waits on so slskd does not keep fetching it."""
+    await asyncio.to_thread(self.slskd.cancel_transfer, result.username, result.filename, transfer_id)
+
+
 async def fetch_from_peer(self, result: SearchResult, progress_callback) -> TransferOutcome:
     """Enqueue on slskd, wait for completion, and locate the file on disk."""
     async with self._download_sem:
@@ -78,16 +99,21 @@ async def fetch_from_peer(self, result: SearchResult, progress_callback) -> Tran
         if not success:
             return TransferOutcome(enqueued=False)
 
-        status = await self.slskd.wait_for_download(
-            username=result.username,
-            filename=result.filename,
-            timeout_secs=self.config.download_timeout_secs,
-            progress_callback=progress_callback,
-        )
+        try:
+            status = await self.slskd.wait_for_download(
+                username=result.username,
+                filename=result.filename,
+                timeout_secs=self.config.download_timeout_secs,
+                progress_callback=progress_callback,
+            )
+        except BaseException:
+            await give_up_transfer(self, result)
+            raise
         if status is None or status.is_failed:
+            await give_up_transfer(self, result, status.transfer_id if status else None)
             return TransferOutcome(enqueued=True, status=status)
 
-        source_path = await asyncio.to_thread(self.processor.find_downloaded_file, result.username, result.filename)
+        source_path = await locate_landed(lambda: self.processor.find_downloaded_file(result.username, result.filename))
         return TransferOutcome(enqueued=True, status=status, source_path=source_path)
 
 

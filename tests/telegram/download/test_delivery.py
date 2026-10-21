@@ -161,3 +161,65 @@ class TestSendLargeFile:
             "dl1",
         )
         context.bot.send_message.assert_called_once()
+
+
+class TestSendAudioOrDocument:
+    @pytest.mark.asyncio
+    async def test_flood_control_waits_then_sends_audio(self, tmp_path):
+        from telegram.error import BadRequest
+
+        from slskd_importer.telegram.download.delivery import send_audio_or_document
+
+        source = tmp_path / "song.flac"
+        source.write_bytes(b"audio")
+        sent = MagicMock(message_id=9)
+        context = _make_context()
+        context.bot.send_audio = AsyncMock(side_effect=[BadRequest("Too many requests: retry after 8"), sent])
+        slept: list[float] = []
+
+        async def fake_sleep(secs):
+            slept.append(secs)
+
+        with patch("slskd_importer.telegram.download.delivery.asyncio.sleep", fake_sleep):
+            result = await send_audio_or_document(
+                context,
+                123,
+                str(source),
+                filename="Artist - Title.flac",
+                title="Title",
+                performer="Artist",
+                duration=180,
+                caption="cap",
+            )
+
+        assert result is sent
+        assert slept == [8.5]
+        assert context.bot.send_audio.await_count == 2
+        context.bot.send_document.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_non_flood_bad_request_falls_back_to_document(self, tmp_path):
+        from telegram.error import BadRequest
+
+        from slskd_importer.telegram.download.delivery import send_audio_or_document
+
+        source = tmp_path / "song.flac"
+        source.write_bytes(b"audio")
+        sent = MagicMock(message_id=9)
+        context = _make_context()
+        context.bot.send_audio = AsyncMock(side_effect=BadRequest("file too large"))
+        context.bot.send_document = AsyncMock(return_value=sent)
+
+        result = await send_audio_or_document(
+            context,
+            123,
+            str(source),
+            filename="Artist - Title.flac",
+            title="Title",
+            performer="Artist",
+            duration=180,
+            caption="cap",
+        )
+
+        assert result is sent
+        context.bot.send_document.assert_awaited_once()

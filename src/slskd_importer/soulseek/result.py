@@ -86,7 +86,7 @@ class DownloadStatus:
     @property
     def is_failed(self) -> bool:
         state_lower = self.state.lower()
-        return any(kw in state_lower for kw in ("errored", "rejected", "timedout", "cancelled"))
+        return any(kw in state_lower for kw in ("errored", "rejected", "timedout", "cancelled", "removed"))
 
     @property
     def is_active(self) -> bool:

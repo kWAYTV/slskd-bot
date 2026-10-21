@@ -82,7 +82,8 @@ class TestDoDownload:
         status_msg.message_id = 1
 
         context = _make_context()
-        await bot._do_download(context, 123, _make_track(), _make_result(), status_msg)
+        with patch("slskd_importer.telegram.download.transfer.LOCATE_RETRY_SECS", 0):
+            await bot._do_download(context, 123, _make_track(), _make_result(), status_msg)
         records = bot.history_repo.get_recent(1)
         assert any(r.status == "file_not_found" for r in records)
 

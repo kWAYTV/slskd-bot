@@ -160,6 +160,7 @@ class MusicBot:
     _edit_approval_message = staticmethod(edit_approval_message)
     _handle_retry = retry.handle_retry
     _handle_next_result = retry.handle_next_result
+    _replace_search_downloads = retry.replace_search_downloads
     _analyze_flac = staticmethod(delivery.analyze_flac_async)
     _convert_to_ogg = staticmethod(delivery.convert_to_ogg_async)
     _create_preview = staticmethod(delivery.create_preview_async)

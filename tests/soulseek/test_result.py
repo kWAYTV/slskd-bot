@@ -144,6 +144,11 @@ class TestDownloadStatus:
         s = DownloadStatus(username="u", filename="f", state="Cancelled")
         assert s.is_failed is True
 
+    def test_is_failed_removed(self):
+        s = DownloadStatus(username="u", filename="f", state="Removed from slskd")
+        assert s.is_failed is True
+        assert s.is_active is False
+
     def test_is_failed_normal(self):
         s = DownloadStatus(username="u", filename="f", state="InProgress")
         assert s.is_failed is False
