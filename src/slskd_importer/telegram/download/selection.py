@@ -54,6 +54,7 @@ async def handle_download_selection(self, update, context, chat_id: int, data: s
     pending.pick_state = "downloading"
     text, markup = render_results_card(self, pending)
     await safe_query_edit(query, text, parse_mode=ParseMode.MARKDOWN, reply_markup=markup)
+    await self._replace_search_downloads(search_id)
 
     chip = track_chip(track, label)
     status_msg = await context.bot.send_message(

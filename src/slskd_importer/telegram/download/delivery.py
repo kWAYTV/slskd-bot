@@ -6,8 +6,9 @@ import asyncio
 import contextlib
 import logging
 import os
+import re
 
-from telegram.error import BadRequest
+from telegram.error import BadRequest, RetryAfter
 
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.library.artwork import embed_artwork_into_file, fetch_spotify_artwork
@@ -18,6 +19,19 @@ from slskd_importer.telegram.download.transfer import remember_approval_message
 from slskd_importer.telegram.ui.reply import reply_kwargs
 
 logger = logging.getLogger(__name__)
+
+# Local Bot API servers return flood control as a 400 ("retry after N"), not RetryAfter.
+_RETRY_AFTER_RE = re.compile(r"retry after (\d+)", re.IGNORECASE)
+
+
+def flood_wait_secs(exc: BaseException) -> float | None:
+    """Seconds to wait before a second send, or None when this is not flood control."""
+    if isinstance(exc, RetryAfter):
+        return float(exc.retry_after) + 0.5
+    match = _RETRY_AFTER_RE.search(str(exc))
+    if match:
+        return float(match.group(1)) + 0.5
+    return None
 
 
 async def analyze_flac_async(filepath: str) -> FlacVerdict | None:
@@ -75,23 +89,40 @@ async def send_audio_or_document(
     reply_markup=None,
     reply_to_message_id: int | None = None,
 ):
-    """send_audio with a send_document fallback on BadRequest. Returns the sent message."""
+    """send_audio with a send_document fallback on BadRequest. Returns the sent message.
+
+    Flood control (``RetryAfter`` or a 400 whose text says ``retry after N``) waits
+    the asked seconds and retries as audio before falling back to a document.
+    """
     extra = reply_kwargs(reply_to_message_id)
-    try:
+    audio_kwargs = {
+        "chat_id": chat_id,
+        "filename": filename,
+        "title": title,
+        "performer": performer,
+        "duration": duration,
+        "caption": caption,
+        "reply_markup": reply_markup,
+        **extra,
+    }
+
+    async def _send_audio():
         with open(source_path, "rb") as f:
-            return await context.bot.send_audio(
-                chat_id=chat_id,
-                audio=f,
-                filename=filename,
-                title=title,
-                performer=performer,
-                duration=duration,
-                caption=caption,
-                reply_markup=reply_markup,
-                **extra,
-            )
-    except BadRequest:
-        logger.info("send_audio failed, falling back to send_document for %s", filename)
+            return await context.bot.send_audio(audio=f, **audio_kwargs)
+
+    try:
+        return await _send_audio()
+    except (BadRequest, RetryAfter) as exc:
+        wait = flood_wait_secs(exc)
+        if wait is not None:
+            logger.info("Telegram flood control: waiting %.1fs before retrying %s", wait, filename)
+            await asyncio.sleep(wait)
+            try:
+                return await _send_audio()
+            except (BadRequest, RetryAfter):
+                logger.info("send_audio still refused after flood wait, falling back to document for %s", filename)
+        else:
+            logger.info("send_audio failed, falling back to send_document for %s", filename)
         with open(source_path, "rb") as f:
             return await context.bot.send_document(
                 chat_id=chat_id,

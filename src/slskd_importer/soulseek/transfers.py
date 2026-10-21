@@ -11,6 +11,14 @@ logger = logging.getLogger(__name__)
 
 StatusGetter = Callable[[str, str], DownloadStatus | None]
 
+# slskd 404s the peer's transfer list when another chain (or the UI) removed it.
+REMOVED_STATE = "Removed from slskd"
+
+
+def _transfer_removed(exc: BaseException) -> bool:
+    """True when slskd says this peer has no downloads listed (HTTP 404)."""
+    return getattr(getattr(exc, "response", None), "status_code", None) == 404
+
 
 def enqueue(api, result: SearchResult) -> bool:
     """Enqueue a file for download via slskd."""
@@ -48,7 +56,10 @@ def get_status(api, username: str, filename: str) -> DownloadStatus | None:
 
         return None
 
-    except Exception:
+    except Exception as exc:
+        if _transfer_removed(exc):
+            logger.info("slskd no longer lists %s from %s: its transfer was removed", filename, username)
+            return DownloadStatus(username=username, filename=filename, state=REMOVED_STATE)
         logger.exception(f"Failed to get download status for {filename}")
         return None
 

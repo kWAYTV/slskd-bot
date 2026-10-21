@@ -170,6 +170,15 @@ class TestSlskdClientGetDownloadStatus:
         status = client.get_download_status("user1", "\\Music\\Song.flac")
         assert status is None
 
+    def test_status_404_is_removed(self, client):
+        err = Exception("404")
+        err.response = MagicMock(status_code=404)
+        client.client.transfers.get_downloads = MagicMock(side_effect=err)
+        status = client.get_download_status("user1", "\\Music\\Song.flac")
+        assert status is not None
+        assert status.state == "Removed from slskd"
+        assert status.is_failed is True
+
     def test_status_includes_transfer_id(self, client):
         client.client.transfers.get_downloads = MagicMock(
             return_value={
@@ -354,6 +363,16 @@ class TestSlskdClientWaitForDownload:
         result = await client.wait_for_download("u", "f.flac", timeout_secs=10)
         assert result is not None
         assert result.is_failed
+
+    @pytest.mark.asyncio
+    async def test_wait_removed_ends_immediately(self, client):
+        """A transfer slskd no longer lists ends the wait as failed, not a timeout."""
+        removed = DownloadStatus(username="u", filename="f.flac", state="Removed from slskd")
+        client.get_download_status = MagicMock(return_value=removed)
+        result = await client.wait_for_download("u", "f.flac", timeout_secs=10)
+        assert result is not None
+        assert result.is_failed
+        assert result.state == "Removed from slskd"
 
     @pytest.mark.asyncio
     async def test_wait_timeout(self, client):

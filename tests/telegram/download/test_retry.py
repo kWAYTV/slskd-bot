@@ -93,7 +93,41 @@ class TestRetryResultIndex:
         edit_call = update.callback_query.edit_message_text
         assert "No further results" in edit_call.call_args[0][0]
 
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_retry_replaces_running_chain_for_same_search(self, mock_slskd, mock_spotify):
+        """A Retry tap cancels the download still running for that list."""
+        import asyncio
 
-# ---------------------------------------------------------------------------
-# _rank_responses tests
-# ---------------------------------------------------------------------------
+        bot = MusicBot(_make_config())
+        track = _make_track()
+        result = _make_search_result()
+        stopped = asyncio.Event()
+
+        async def linger():
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                stopped.set()
+                raise
+
+        running = asyncio.create_task(linger())
+        other = asyncio.create_task(asyncio.sleep(60))
+        await asyncio.sleep(0)
+        bot.downloads["run"] = PendingDownload(track=track, result=result, chat_id=67890, search_id="1", task=running)
+        bot.downloads["other"] = PendingDownload(
+            track=track, result=_make_search_result(1), chat_id=67890, search_id="2", task=other
+        )
+        bot.downloads["5"] = PendingDownload(track=track, result=result, chat_id=67890, result_index=0, search_id="1")
+        update = _make_callback_update(chat_id=67890, data="retry:5")
+        context = _make_context()
+
+        with patch.object(bot, "_do_download", new_callable=AsyncMock):
+            await bot.handle_callback(update, context)
+
+        assert stopped.is_set()
+        assert not other.done()
+        other.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await other
