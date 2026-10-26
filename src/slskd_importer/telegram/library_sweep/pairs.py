@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 from telegram import Bot
 from telegram.constants import ParseMode
@@ -50,10 +51,14 @@ async def send_sweep_pairs(bot: Bot, chat_id: int, reviews: list[Review], *, mar
         if review.decision is not None:
             continue
         try:
+            yours_name = os.path.basename(review.current_path)
+            stem = os.path.splitext(yours_name)[0]
+            proposal_name = f"{stem}.{review.proposal_ext}"
             with open(review.current_path, "rb") as yours:
                 await bot.send_audio(
                     chat_id=chat_id,
                     audio=yours,
+                    filename=yours_name,
                     caption=_pair_caption(review, "yours"),
                     parse_mode=ParseMode.MARKDOWN,
                 )
@@ -62,6 +67,7 @@ async def send_sweep_pairs(bot: Bot, chat_id: int, reviews: list[Review], *, mar
                 await bot.send_audio(
                     chat_id=chat_id,
                     audio=proposal,
+                    filename=proposal_name,
                     caption=_pair_caption(review, "proposal"),
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=build_sweep_review_keyboard(review.id),

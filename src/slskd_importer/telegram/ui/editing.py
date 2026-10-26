@@ -53,10 +53,16 @@ async def safe_query_edit(query, text: str, **kwargs) -> bool:
     return await _edit_text(query.edit_message_text, text, **kwargs)
 
 
-async def edit_approval_message(query, text: str):
-    """Edit the approval message — works for both audio captions and text messages."""
+async def edit_approval_message(query, text: str, **kwargs):
+    """Edit an audio caption or text message (sweep reviews, download approvals).
+
+    Extra kwargs (e.g. ``reply_markup``) are forwarded. Caption edits are tried
+    first — review pairs and approvals are audio messages.
+    """
     try:
-        await query.edit_message_caption(caption=text, parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_caption(caption=text, parse_mode=ParseMode.MARKDOWN, **kwargs)
+        return
     except Exception:
-        with contextlib.suppress(Exception):
-            await query.edit_message_text(text=text, parse_mode=ParseMode.MARKDOWN)
+        pass
+    with contextlib.suppress(Exception):
+        await query.edit_message_text(text=text, parse_mode=ParseMode.MARKDOWN, **kwargs)

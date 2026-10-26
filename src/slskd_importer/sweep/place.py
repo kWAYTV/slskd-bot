@@ -72,8 +72,9 @@ def match_owner(path: str, like: str | None, library: str | None = None) -> None
         return
     with contextlib.suppress(OSError):
         os.chmod(path, stat.S_IMODE(st.st_mode))
-    with contextlib.suppress(OSError):
-        os.chown(path, st.st_uid, st.st_gid)
+    if hasattr(os, "chown"):
+        with contextlib.suppress(OSError):
+            os.chown(path, st.st_uid, st.st_gid)
 
 
 def _make_library_dir(path: str) -> None:
@@ -111,15 +112,20 @@ def place(source: str, target: str, like: str | None, move: bool = False) -> str
 def replace_in_library(original: str, source: str, ext: str, replaced_dir: str, move: bool = False) -> tuple[str, str]:
     """Replace the library file *original* with *source* (format *ext*); returns (new path, parked original).
 
-    The new file is "<original's stem>.<ext>" next to it, written atomically
-    with the original's mode and owner. The original is parked as
+    Same format: the new file takes the original's exact path and name. Different
+    format: "<original's stem>.<ext>" next to it. Written atomically with the
+    original's mode and owner. The original is parked as
     <replaced_dir>/<its name>.sweep (a free name). When the new file cannot be
     put in place, the original goes back where it was. A *target* of another
     format that already exists is never overwritten (FileExistsError).
     """
     folder = os.path.dirname(original)
-    stem = os.path.splitext(os.path.basename(original))[0]
-    target = os.path.join(folder, f"{stem}.{ext}")
+    base, orig_dot_ext = os.path.splitext(os.path.basename(original))
+    if orig_dot_ext.lstrip(".").lower() == ext.lower():
+        # Keep the exact library filename (casing, spelling) when the format matches.
+        target = original
+    else:
+        target = os.path.join(folder, f"{base}.{ext}")
     if os.path.normpath(target) != os.path.normpath(original) and os.path.exists(target):
         raise FileExistsError(target)
     tmp = target + ".importing"
