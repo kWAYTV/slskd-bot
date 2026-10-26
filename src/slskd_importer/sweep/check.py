@@ -17,6 +17,7 @@ from slskd_importer.sweep import judge
 from slskd_importer.sweep import sound as sound_mod
 from slskd_importer.sweep.audit import Audit
 from slskd_importer.sweep.fetch import discard, fetch_gated
+from slskd_importer.sweep.identity import identity
 from slskd_importer.sweep.outcomes import (
     CD_TRIES,
     OTHER_TRIES,
@@ -58,9 +59,9 @@ class CheckMixin:
             return SongResult(OUTCOME_WAITING, "a pair for this song waits for your ear")
         if original.tier == rules.TIER_HIRES and not run.force:
             return SongResult(OUTCOME_HIRES)
-        artist, title = judge.split_stem(stem)
-        if not artist:
-            return SongResult(OUTCOME_SKIPPED, "name is not Artist - Title")
+        artist, title = identity(original, stem)
+        if not artist or not title:
+            return SongResult(OUTCOME_SKIPPED, "could not resolve artist/title from tags or filename")
 
         candidates = await resolve_match(self.spotify, self.musicbrainz, artist, title, original.length or None)
         track: TrackInfo | None = next((c.track for c in candidates if c.confident), None)

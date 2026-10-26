@@ -25,7 +25,7 @@ OUTCOME_LABELS = {
     OUTCOME_NO_MATCH: "No confident match",
     OUTCOME_HIRES: "Already hi-res",
     OUTCOME_WAITING: "Waiting for your ear",
-    OUTCOME_SKIPPED: "Skipped (not named Artist - Title)",
+    OUTCOME_SKIPPED: "Skipped (no artist/title from tags or filename)",
     OUTCOME_ERROR: "Errors",
 }
 

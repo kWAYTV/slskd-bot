@@ -146,11 +146,17 @@ def _sig(text: str) -> set[str]:
 
 
 def split_stem(stem: str) -> tuple[str, str]:
-    """("Artist", "Title") of a library name "Artist - Title"; ("", stem) without the separator."""
-    if " - " in stem:
-        artist, title = stem.split(" - ", 1)
-        return artist.strip(), title.strip()
-    return "", stem.strip()
+    """("Artist", "Title") from a library stem; prefer :func:`identity.parse_stem` heuristics."""
+    from slskd_importer.sweep.identity import parse_stem
+
+    return parse_stem(stem)
+
+
+def library_names(original: Audit, stem: str) -> tuple[str, str]:
+    """Artist/title for judging: file tags first, then stem heuristics."""
+    from slskd_importer.sweep.identity import identity
+
+    return identity(original, stem)
 
 
 SAME = "same"
@@ -168,7 +174,7 @@ def sameness(original: Audit, candidate: Audit, stem: str) -> tuple[str, str]:
     lacks. Anything in between is for the ear. Remaster years and track
     numbers are not new performers.
     """
-    artist, title = split_stem(stem)
+    artist, title = library_names(original, stem)
     hard = _hard_reject(original, candidate, stem)
     if hard:
         return REJECT, hard
@@ -183,7 +189,7 @@ def sameness(original: Audit, candidate: Audit, stem: str) -> tuple[str, str]:
 
 def _hard_reject(original: Audit, candidate: Audit, stem: str) -> str:
     """Why the copy cannot be this song at all, or "" when it may be."""
-    artist, title = split_stem(stem)
+    artist, title = library_names(original, stem)
     ct, ca, cal = candidate.title, candidate.artist, candidate.album
     orig_text = norm(" ".join([stem, original.artist, original.title, original.album]))
     if ca and artist and not (_sig(artist) & _sig(ca)):
@@ -202,7 +208,7 @@ def _hard_reject(original: Audit, candidate: Audit, stem: str) -> str:
 
 def _extras(original: Audit, candidate: Audit, stem: str) -> tuple[list[str], list[str]]:
     """(names in the copy's artist/title tags the original lacks, version words its title adds)."""
-    _, title = split_stem(stem)
+    _, title = library_names(original, stem)
     orig_text = " ".join([stem, original.artist, original.title, original.album])
     extra = _sig(candidate.artist + " " + candidate.title) - _sig(orig_text) - _NEUTRAL_EXTRA
     extra = sorted(w for w in extra if not w.isdigit())
@@ -269,7 +275,7 @@ def keep_both_suffix(stem: str, original: Audit, candidate: Audit) -> str:
     Royal Philharmonic Orchestra"); else a bracket in its title the original's
     title lacks ("(1997 Version)"); else its album; else "alternate".
     """
-    artist, title = split_stem(stem)
+    artist, title = library_names(original, stem)
     ca = candidate.artist.strip()
     if ca and artist and norm(artist) in norm(ca) and norm(artist) != norm(ca):
         start = ca.casefold().find(artist.casefold())

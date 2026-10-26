@@ -16,7 +16,7 @@
 - **Smart ranking** — prefers FLAC, then WAV, then AIFF, then the best remaining format; scored by duration, hi-res quality, source reliability, and filename relevance; live/remix noise filtered out
 - **Languages** — English (default), Spanish, Galician, German. First `/start` picks a language; `/lang` changes it later
 - **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart (`/import` with no URL continues an unfinished job)
-- **Library sweep** — walks top-level `Artist - Title.*` files, looks on Soulseek for a better lossless copy, and sends side-by-side pairs in Telegram (`Keep mine` / `Take new` / `Keep both`). Never auto-replaces. Runs on a schedule or via `/sweep`
+- **Library sweep** — walks top-level library files, resolves artist/title from tags (or filename heuristics: track prefixes, `Artist - Album - Title`, rip brackets), looks on Soulseek for a better lossless copy, and sends side-by-side pairs in Telegram (`Keep mine` / `Take new` / `Keep both`). Never auto-replaces. Runs on a schedule or via `/sweep`
 - **Live progress** — download messages update with a progress bar and queue state; `/status` shows everything in flight for the chat
 - **Library hygiene** — canonical tags on save, duplicate detection, `/undo` / `/history` ↩️ to remove saves, `/stats` for totals
 - **Large files** — files over Telegram's 50 MB limit fall back to OGG Opus previews, or upload untouched (up to 2000 MB) via a self-hosted Bot API server
@@ -83,7 +83,7 @@ uv run python -m slskd_importer run
 | `SLSKD_HOST` | Yes | — | slskd instance URL |
 | `SLSKD_API_KEY` | Yes | — | slskd API key (Settings > Security > API Keys) |
 | `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads |
-| `OUTPUT_DIR` | No | `/music` | Where renamed files are placed (flat `Artist - Title.*` for the sweep) |
+| `OUTPUT_DIR` | No | `/music` | Where renamed files are placed (flat top-level audio files for the sweep) |
 | `DATA_DIR` | No | `/data` | SQLite directory (history, imports, sweep) |
 | `MAX_CONCURRENT_DOWNLOADS` | No | `3` | Cap on simultaneous slskd transfers |
 | `APPROVAL_TTL_SECS` | No | `86400` | Discard unapproved downloads after this many seconds |
