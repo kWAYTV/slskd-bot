@@ -78,6 +78,8 @@ VERSION_WORDS = (
 )
 # Words that may appear in a copy's tags without naming a new performer.
 _NEUTRAL_EXTRA = {"version", "remaster", "remastered", "mono", "stereo", "single", "radio", "album", "original"}
+
+
 def wanted(tier: str, copy: SearchResult, original_length: float) -> bool:
     """Whether a Soulseek copy could beat a song of *tier*, judged from the search result alone.
 

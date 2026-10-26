@@ -31,6 +31,7 @@ FAKE_CUTOFF_KHZ = 16.0
 HIRES_CUTOFF_KHZ = 24.0
 STRICT_DECODE_TIMEOUT_SECS = 900
 
+
 @dataclass
 class Audit:
     """One file measured. *strict* is None for lossy files (not decoded); *cutoff* in kHz, None when unknown."""

@@ -316,6 +316,7 @@ class LibrarySweep(CheckMixin, DecideMixin):
         if not is_due(song, run, time.time()):
             return None
         return song, Audit.from_dict(song.audit)
+
     async def schedule_loop(self, now: Callable[[], datetime.datetime] | None = None) -> None:
         """Continue an interrupted sweep, then start one at every LIBRARY_SWEEP_SCHEDULE slot; purge hourly.
 

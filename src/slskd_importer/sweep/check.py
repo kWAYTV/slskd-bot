@@ -48,7 +48,6 @@ async def _no_progress(_status) -> None:
     return None
 
 
-
 class CheckMixin:
     """Song check methods mixed into LibrarySweep."""
 
@@ -68,7 +67,9 @@ class CheckMixin:
         if track is None:
             return SongResult(OUTCOME_NO_MATCH, searched=True)
         ranked, _fallback, _cancelled = await search_with_fallbacks(
-            self.slskd, self.scorer, track,
+            self.slskd,
+            self.scorer,
+            track,
             timeout_secs=self.config.search_timeout_secs,
             is_cancelled=lambda: False,
         )
@@ -88,7 +89,10 @@ class CheckMixin:
                 tries -= 1
 
                 gated = await fetch_gated(
-                    self.slskd, self.processor, copies, index,
+                    self.slskd,
+                    self.processor,
+                    copies,
+                    index,
                     timeout_secs=self.config.download_timeout_secs,
                 )
                 index = gated.index + 1
@@ -124,7 +128,9 @@ class CheckMixin:
         if os.path.exists(held.cand_path):
             await discard(self.slskd, self.processor, held.cand_path, held.result.username, held.transfer_id)
         else:
-            await asyncio.to_thread(self.slskd.cancel_transfer, held.result.username, held.result.basename, held.transfer_id)
+            await asyncio.to_thread(
+                self.slskd.cancel_transfer, held.result.username, held.result.basename, held.transfer_id
+            )
 
     async def _consider(
         self, path, stem, original: Audit, cand_path, result, transfer_id, track, run

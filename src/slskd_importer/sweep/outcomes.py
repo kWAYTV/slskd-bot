@@ -87,6 +87,7 @@ class SweepReport:
 
 
 ReportHook = Callable[[SweepReport], Awaitable[None]]
+
+
 class SweepError(Exception):
     """A decision that cannot be applied (unknown song, already decided, file gone)."""
-

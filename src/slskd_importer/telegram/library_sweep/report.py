@@ -41,9 +41,7 @@ def status_text(st: dict) -> str:
                 f"{escape_md(run['status'])} {escape_md(finished)}"
             )
         counts = run.get("counts") or {}
-        parts = [
-            f"{OUTCOME_LABELS.get(k, k).lower()} {counts[k]}" for k in SWEEP_OUTCOME_ORDER if counts.get(k)
-        ]
+        parts = [f"{OUTCOME_LABELS.get(k, k).lower()} {counts[k]}" for k in SWEEP_OUTCOME_ORDER if counts.get(k)]
         if parts:
             lines.append(", ".join(parts))
     lines.append(f"Schedule: `{escape_md(st['schedule'])}`")
@@ -62,10 +60,7 @@ def status_text(st: dict) -> str:
 def report_caption(report: SweepReport) -> str:
     run = report.run
     if report.in_progress:
-        return (
-            f"🧹 Sweep {run.id} still running "
-            f"({run.done}/{run.total}). Pairs wait until it finishes."
-        )
+        return f"🧹 Sweep {run.id} still running ({run.done}/{run.total}). Pairs wait until it finishes."
     counts = run.counts or {}
     parts = [f"{OUTCOME_LABELS.get(k, k).lower()} {counts[k]}" for k in SWEEP_OUTCOME_ORDER if counts.get(k)]
     summary = ", ".join(parts) if parts else "nothing was due"

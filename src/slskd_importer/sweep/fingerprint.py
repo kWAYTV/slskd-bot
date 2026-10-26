@@ -25,6 +25,7 @@ SAME_RECORDING_SIMILARITY = 0.85
 FAR_SIMILARITY = 0.6
 FPCALC_TIMEOUT_SECS = 120
 
+
 def fpcalc_available() -> bool:
     return shutil.which("fpcalc") is not None
 

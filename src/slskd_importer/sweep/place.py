@@ -16,6 +16,7 @@ from slskd_importer.sweep.outcomes import CD_RECHECK_SECS, PARKED_SUFFIX
 
 logger = logging.getLogger(__name__)
 
+
 def library_files(root: str) -> list[str]:
     """Audio files at the top level of *root* (hidden ones left out), by name."""
     try:
@@ -207,4 +208,3 @@ def _cover_of(path: str) -> bytes | None:
 # ---------------------------------------------------------------------------
 # The sweep
 # ---------------------------------------------------------------------------
-
