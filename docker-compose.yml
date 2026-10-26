@@ -39,6 +39,11 @@ services:
       EXCLUDE_KEYWORDS: ${EXCLUDE_KEYWORDS:-live,remix,acoustic,karaoke,instrumental,cover,demo,radio edit,tribute,remaster}
       FILENAME_TEMPLATE: ${FILENAME_TEMPLATE:-{artist} - {title}}
 
+      # Library sweep
+      LIBRARY_SWEEP_SCHEDULE: ${LIBRARY_SWEEP_SCHEDULE:-weekly:sun:04:00}
+      LIBRARY_SWEEP_PAUSE_SECS: ${LIBRARY_SWEEP_PAUSE_SECS:-20}
+      LIBRARY_SWEEP_KEEP_DAYS: ${LIBRARY_SWEEP_KEEP_DAYS:-7}
+
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 

@@ -13,6 +13,7 @@ from telegram.ext import (
     filters,
 )
 
+from slskd_importer.catalog.musicbrainz import MusicBrainzClient
 from slskd_importer.catalog.playlist import PlaylistResolver
 from slskd_importer.catalog.spotify import SpotifyResolver
 from slskd_importer.history.store import HistoryRepository
@@ -23,12 +24,16 @@ from slskd_importer.records.prefs import ChatPrefsRepository
 from slskd_importer.settings.config import Config
 from slskd_importer.soulseek.client import SlskdClient
 from slskd_importer.soulseek.scoring import ResultScorer
+from slskd_importer.sweep import LibrarySweep
 from slskd_importer.telegram.commands import basics, cancel, history, preferences, status, undo
 from slskd_importer.telegram.core import access, cleanup, routing, ttl
 from slskd_importer.telegram.core.session import ChatSession
 from slskd_importer.telegram.download import approval, delivery, retry, run, selection, transfer
 from slskd_importer.telegram.i18n import DEFAULT_LOCALE, normalize_locale
 from slskd_importer.telegram.i18n import t as translate
+from slskd_importer.telegram.library_sweep import callbacks as sweep_callbacks
+from slskd_importer.telegram.library_sweep import command as sweep_command
+from slskd_importer.telegram.library_sweep import lifecycle as sweep_lifecycle
 from slskd_importer.telegram.playlist_import import callbacks as import_callbacks
 from slskd_importer.telegram.playlist_import import command as import_command
 from slskd_importer.telegram.playlist_import import download as import_download
@@ -79,6 +84,16 @@ class MusicBot:
         self.prefs_repo = ChatPrefsRepository(self.db)
         self._locales.update(self.prefs_repo.load_all_locales())
         self.playlist_resolver = PlaylistResolver(self.spotify)
+        self.musicbrainz = MusicBrainzClient()
+        self.sweep = LibrarySweep(
+            config,
+            self.db,
+            self.spotify,
+            self.musicbrainz,
+            self.slskd,
+            self.scorer,
+            self.processor,
+        )
 
     # --- per-chat preferences -------------------------------------------------
 
@@ -177,6 +192,10 @@ class MusicBot:
     resume_stale_imports = import_resume.resume_stale_imports
     _resume_import_job = import_resume.resume_import_job
 
+    cmd_sweep = sweep_command.cmd_sweep
+    _handle_sweep_decision = sweep_callbacks.handle_sweep_decision
+    _handle_sweep_reason = sweep_callbacks.handle_sweep_reason
+
 
 def create_bot(config: Config) -> Application:
     """Create and configure the Telegram bot application."""
@@ -188,8 +207,10 @@ def create_bot(config: Config) -> Application:
         await bot.resume_stale_imports(application)
         # Application.create_task() warns in post_init — the updater isn't running yet.
         ttl.start_approval_ttl(bot, application)
+        sweep_lifecycle.start_library_sweep(bot, application)
 
     async def _post_shutdown(application: Application) -> None:
+        await sweep_lifecycle.stop_library_sweep(application)
         await ttl.stop_approval_ttl(application)
 
     builder = Application.builder().token(config.telegram_bot_token).post_init(_post_init).post_shutdown(_post_shutdown)
@@ -210,6 +231,7 @@ def create_bot(config: Config) -> Application:
     app.add_handler(CommandHandler("history", bot.cmd_history))
     app.add_handler(CommandHandler("stats", bot.cmd_stats))
     app.add_handler(CommandHandler("import", bot.cmd_import))
+    app.add_handler(CommandHandler("sweep", bot.cmd_sweep))
     app.add_handler(CommandHandler("cancel", bot.cmd_cancel))
     app.add_handler(CallbackQueryHandler(bot.handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_text))

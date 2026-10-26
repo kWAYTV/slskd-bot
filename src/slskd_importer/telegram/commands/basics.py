@@ -20,6 +20,7 @@ def _commands_for(locale: str) -> list[BotCommand]:
         BotCommand("stats", t(locale, "cmd_stats")),
         BotCommand("undo", t(locale, "cmd_undo")),
         BotCommand("import", t(locale, "cmd_import")),
+        BotCommand("sweep", t(locale, "cmd_sweep")),
         BotCommand("cancel", t(locale, "cmd_cancel")),
     ]
 

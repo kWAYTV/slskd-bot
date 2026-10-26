@@ -55,6 +55,15 @@ class Config:
 
         self.filename_template = os.getenv("FILENAME_TEMPLATE", "{artist} - {title}")
 
+        # Library sweep: always on for library ACL users (personal bot).
+        self.library_sweep_schedule = os.getenv("LIBRARY_SWEEP_SCHEDULE", "").strip()
+        from slskd_importer.sweep.schedule import parse_schedule
+
+        parse_schedule(self.library_sweep_schedule)  # typo stops boot, not the first sweep
+        self.library_sweep_pause_secs = max(0, int(os.getenv("LIBRARY_SWEEP_PAUSE_SECS") or "20"))
+        keep = (os.getenv("LIBRARY_SWEEP_KEEP_DAYS") or "7").strip().lower()
+        self.library_sweep_keep_days = None if keep == "never" else max(0, int(keep))
+
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         if log_level == "WARN":
             log_level = "WARNING"
@@ -92,6 +101,13 @@ class Config:
             logger.info("Library save restricted to %d user(s)", len(self.telegram_library_users))
         else:
             logger.info("TELEGRAM_LIBRARY_USERS is empty — all allowed users can save to the library")
+
+        logger.info(
+            "Library sweep: schedule=%r pause=%ss keep_days=%s",
+            self.library_sweep_schedule or "weekly:sun:04:00",
+            self.library_sweep_pause_secs,
+            self.library_sweep_keep_days if self.library_sweep_keep_days is not None else "never",
+        )
 
     def _get_required_env(self, key: str) -> str:
         """Get a required environment variable."""

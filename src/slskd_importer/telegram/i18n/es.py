@@ -14,6 +14,7 @@ STRINGS: dict[str, str] = {
     "cmd_stats": "Totales de biblioteca y descargas",
     "cmd_undo": "Quitar la última pista guardada",
     "cmd_import": "Importar una lista o álbum de Spotify",
+    "cmd_sweep": "Buscar mejores copias de tus canciones",
     "cmd_cancel": "Cancelar el trabajo actual",
     "cmd_lang": "Cambiar idioma",
     "status_empty": "No hay búsquedas, descargas ni importaciones activas.",
