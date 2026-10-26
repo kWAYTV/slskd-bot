@@ -14,7 +14,13 @@ from slskd_importer.catalog.musicbrainz import MusicBrainzClient
 from slskd_importer.catalog.spotify import SpotifyResolver
 from slskd_importer.library.files import FileProcessor
 from slskd_importer.records.database import Database
-from slskd_importer.records.sweep_models import RUN_DONE, RUN_INTERRUPTED, SweepRun, SweepSong
+from slskd_importer.records.sweep_models import (
+    RUN_DONE,
+    RUN_INTERRUPTED,
+    RUN_RUNNING,
+    SweepRun,
+    SweepSong,
+)
 from slskd_importer.records.sweep_repo import SweepRepository
 from slskd_importer.settings.config import Config
 from slskd_importer.soulseek.client import SlskdClient
@@ -167,12 +173,25 @@ class LibrarySweep(CheckMixin, DecideMixin):
         return None
 
     async def stop(self) -> None:
-        """Cancel the running sweep (shutdown): its row stays running, the next start continues it."""
+        """Cancel the running sweep (process shutdown): its row stays running so resume continues it."""
         task = self._task
         if task is not None and not task.done():
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+
+    async def abort(self) -> SweepRun | None:
+        """User `/sweep stop`: cancel and mark interrupted so the next `/sweep` starts fresh."""
+        run = self._run if self.running else None
+        await self.stop()
+        if run is not None and run.status == RUN_RUNNING:
+            run.status = RUN_INTERRUPTED
+            run.current = ""
+            run.finished_at = time.time()
+            self.repo.save_run(run)
+        self._run = None
+        self._task = None
+        return run
 
     # ------------------------------------------------------------------ a run
 
@@ -188,16 +207,31 @@ class LibrarySweep(CheckMixin, DecideMixin):
             if names:
                 await asyncio.to_thread(self.repo.forget_missing, set(names))
             order = self._order(names)
-            run.total, run.done = len(order), 0
+            run.total = len(order)
+            # On resume, seed position from songs already checked in this run — never reset to 0.
+            run.done = sum(
+                1
+                for name in order
+                if (song := self.repo.get_song(name)) is not None
+                and song.last_checked_at is not None
+                and song.last_checked_at >= run.started_at
+            )
             self.repo.save_run(run)
             logger.info(
-                "Library sweep %d (%s%s): %d files", run.id, run.trigger, ", forced" if run.force else "", run.total
+                "Library sweep %d (%s%s): %d files (%d already checked)",
+                run.id,
+                run.trigger,
+                ", forced" if run.force else "",
+                run.total,
+                run.done,
             )
             pause = False
-            for name in order:
+            for index, name in enumerate(order):
                 result = await self._check_logged(name, run, pause)
-                run.done += 1
+                # Never regress past the resume seed (already-checked songs return None).
+                run.done = max(run.done, index + 1)
                 if result is None:
+                    self.repo.save_run(run)
                     continue
                 pause = result.searched
                 run.counts[result.outcome] = run.counts.get(result.outcome, 0) + 1
@@ -206,9 +240,7 @@ class LibrarySweep(CheckMixin, DecideMixin):
             await asyncio.to_thread(self.purge_parked)
             await self._finish(run)
         except asyncio.CancelledError:
-            logger.info(
-                "Library sweep %d stopped at %d of %d; the next start continues it", run.id, run.done, run.total
-            )
+            logger.info("Library sweep %d stopped at %d of %d", run.id, run.done, run.total)
             raise
         except Exception:
             logger.exception("Library sweep %d failed", run.id)

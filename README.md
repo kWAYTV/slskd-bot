@@ -64,7 +64,7 @@ uv run python -m slskd_importer run
 | *(Spotify playlist/album link)* | Start the import flow (library users only) |
 | `/lang` | Change language (`/language` also works) |
 | `/import <url>` | Import a Spotify playlist or album (library users only) |
-| `/sweep` | Start a library sweep now (`/sweep force`, `/sweep status`, `/sweep reviews`) |
+| `/sweep` | Start a library sweep now (`/sweep force`, `/sweep stop`, `/sweep status`, `/sweep reviews`) |
 | `/undo` | Remove the last track saved to the library |
 | `/status` | Active searches, downloads (with progress), and imports |
 | `/history` | Recent downloads — tap ↩️ to remove one |

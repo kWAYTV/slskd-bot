@@ -1,8 +1,9 @@
-"""`/sweep` command: start, force, status, reviews."""
+"""`/sweep` command: start, force, stop, status, reviews."""
 
 from __future__ import annotations
 
 import logging
+import time
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -14,9 +15,15 @@ from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
 
+_HELP = (
+    "`/sweep` starts a sweep now, `/sweep force` checks every song, "
+    "`/sweep stop` cancels the running one, `/sweep status` shows progress, "
+    "`/sweep reviews` sends waiting pairs."
+)
+
 
 async def cmd_sweep(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """`/sweep` starts a sweep; `/sweep status`, `/sweep reviews`, `/sweep force`."""
+    """`/sweep` starts a sweep; status / reviews / force / stop."""
     if not await self._check_library_auth(update):
         return
     user_id = update.effective_user.id
@@ -40,23 +47,34 @@ async def cmd_sweep(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.bot,
             update.effective_chat.id,
             reviews,
-            mark_offered=lambda rid: sweep.repo.mark_offered(rid, __import__("time").time()),
+            mark_offered=lambda rid: sweep.repo.mark_offered(rid, time.time()),
         )
         await update.message.reply_text(f"Sent {sent} pair(s).")
         return
 
-    if arg and arg not in ("force",):
+    if arg == "stop":
+        if not sweep.running:
+            await update.message.reply_text("No sweep is running.")
+            return
+        run = await sweep.abort()
+        rid = run.id if run is not None else "?"
         await update.message.reply_text(
-            "`/sweep` starts a sweep now, `/sweep force` checks every song, "
-            "`/sweep status` shows progress, `/sweep reviews` sends waiting pairs.",
+            f"🧹 Sweep {rid} stopped. `/sweep` or `/sweep force` starts a new one.",
             parse_mode=ParseMode.MARKDOWN,
         )
         return
 
+    if arg and arg not in ("force",):
+        await update.message.reply_text(_HELP, parse_mode=ParseMode.MARKDOWN)
+        return
+
     run, why = sweep.start("telegram", force=arg == "force")
     if run is None:
+        hint = ""
+        if "already running" in why:
+            hint = "\n\nUse `/sweep stop` first, then `/sweep force`."
         await update.message.reply_text(
-            f"Not started: {escape_md(why)}.\n\n{status_text(sweep.status())}",
+            f"Not started: {escape_md(why)}.{hint}\n\n{status_text(sweep.status())}",
             parse_mode=ParseMode.MARKDOWN,
         )
         return
