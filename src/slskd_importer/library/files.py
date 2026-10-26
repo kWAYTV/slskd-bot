@@ -7,6 +7,7 @@ import re
 import shutil
 
 from slskd_importer.library.formats import AUDIO_SUFFIXES
+from slskd_importer.library.ownership import own_like_library
 from slskd_importer.library.tags import dedup_flac_tags, write_canonical_tags
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ class FileProcessor:
                 shutil.copy2(source_path, tmp_path)
                 write_canonical_tags(tmp_path, artist, title, album, year)
                 dedup_flac_tags(tmp_path)
+                own_like_library(tmp_path, self.output_dir)
                 os.replace(tmp_path, target_path)
             except BaseException:
                 with contextlib.suppress(OSError):

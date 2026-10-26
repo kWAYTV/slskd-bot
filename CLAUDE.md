@@ -41,12 +41,13 @@ The package is organized by **what the app does** (Screaming Architecture), not 
 
 ```
 src/slskd_importer/
-  catalog/           # Track identity — Spotify lookup, playlists, TrackInfo
+  catalog/           # Track identity — Spotify, MusicBrainz, playlists, TrackInfo
   soulseek/          # Find and fetch files — search lifecycle, transfers, ranking, fallbacks
-  library/           # Organize the collection — rename, tags, formats, artwork, FLAC, previews
+  library/           # Organize the collection — rename, tags, formats, ownership, lossless, previews
+  sweep/             # Library upgrade scout — audit, fingerprint, sound, judge, fetch, decide, schedule
   history/           # Download history records
   playlist_import/   # Playlist/album import jobs
-  records/           # Shared SQLite connection used by history + import
+  records/           # Shared SQLite (history, import, sweep)
   telegram/          # Conversation delivery (feature subpackages, see below)
   settings/          # Environment configuration and logging
   health/            # Process health-check endpoint
@@ -62,6 +63,7 @@ telegram/
   search/            # text entry, pasted links, Spotify pick, Soulseek search, direct search, results
   download/          # selection, run, transfer, delivery, approval, retry
   playlist_import/   # /import command, callbacks, job queue, per-track search/download, summary, resume
+  library_sweep/     # /sweep, review pairs, Keep mine reasons, schedule lifecycle
   i18n/              # per-locale string modules (en/es/gl/de) + thin catalog lookup
 ```
 

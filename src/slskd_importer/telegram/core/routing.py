@@ -49,6 +49,8 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         "approve": self._handle_approval,
         "reject": self._handle_approval,
         "hu": self._handle_history_undo,
+        "swp": self._handle_sweep_decision,
+        "swr": self._handle_sweep_reason,
     }.get(prefix)
 
     if prefix == "lock":
