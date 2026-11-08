@@ -7,6 +7,7 @@ import logging
 import os
 
 from telegram.constants import ParseMode
+from telegram.error import NetworkError, TimedOut
 
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.result import SearchResult
@@ -146,14 +147,39 @@ async def do_download(
         await abort_transfer(self, dl_id, result, transfer_id)
         await safe_edit(status_msg, self.t(chat_id, "cancelled"))
         raise
+    except (TimedOut, NetworkError) as exc:
+        # Large lossless previews often finish on Telegram's side after httpx gives up.
+        # The audio (with Save) may already be in the chat — do not call that a failed download.
+        pending = self.downloads.get(dl_id)
+        if pending is not None and pending.source_path:
+            logger.warning(
+                "chat=%s Telegram delivery timed out for %s (%s); keeping pending for approval",
+                chat_id,
+                result.basename,
+                type(exc).__name__,
+            )
+            await _report_unconfirmed_delivery(
+                self, context, status_msg, chat_id, result, result_index, dl_id, search_id
+            )
+            return
+        logger.warning("chat=%s download aborted by network error before file landed: %s", chat_id, result.basename)
+        await _report_download_exception(self, status_msg, chat_id, result, result_index, dl_id, search_id)
+        await self._set_results_pick_state(context, search_id, result_index, "failed")
     except Exception:
+        pending = self.downloads.get(dl_id)
+        if pending is not None and pending.approval_message_id:
+            # Preview already in chat; a post-send glitch must not paint "download failed".
+            logger.exception("chat=%s post-delivery error for %s; preview already sent", chat_id, result.basename)
+            await collapse_status_message(
+                context.bot,
+                chat_id,
+                pending.status_message_id,
+                fallback=self.t(chat_id, "status_preview_below"),
+            )
+            pending.status_message_id = None
+            return
         logger.exception(f"Download failed for {result.basename}")
-        await safe_edit(
-            status_msg,
-            self.t(chat_id, "download_error", file=md_code_safe(result.basename)),
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id, search_id),
-        )
+        await _report_download_exception(self, status_msg, chat_id, result, result_index, dl_id, search_id)
         await self._set_results_pick_state(context, search_id, result_index, "failed")
 
 
@@ -216,6 +242,37 @@ async def _report_download_failure(
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id, search_id),
     )
+
+
+async def _report_download_exception(
+    self, status_msg, chat_id: int, result: SearchResult, result_index: int, dl_id: str, search_id: str | None = None
+):
+    await safe_edit(
+        status_msg,
+        self.t(chat_id, "download_error", file=md_code_safe(result.basename)),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id, search_id),
+    )
+
+
+async def _report_unconfirmed_delivery(
+    self,
+    context,
+    status_msg,
+    chat_id: int,
+    result: SearchResult,
+    result_index: int,
+    dl_id: str,
+    search_id: str | None = None,
+):
+    """Soulseek got the file; Telegram may still post the preview after a client timeout."""
+    await safe_edit(
+        status_msg,
+        self.t(chat_id, "delivery_unconfirmed", file=md_code_safe(result.basename)),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=_retry_keyboard(self, chat_id, result_index, dl_id, search_id),
+    )
+    await self._set_results_pick_state(context, search_id, result_index, "awaiting")
 
 
 async def _build_quality_line(self, chat_id: int, track: TrackInfo, result: SearchResult, source_path: str) -> str:

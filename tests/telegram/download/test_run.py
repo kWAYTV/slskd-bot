@@ -189,6 +189,49 @@ class TestDoDownload:
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
+    async def test_telegram_timeout_after_file_landed_is_not_failed_download(self, mock_slskd_cls, mock_spotify):
+        """Large preview uploads often TimedOut after Telegram already accepted them."""
+        from telegram.error import TimedOut
+
+        bot = MusicBot(_make_config())
+        bot.slskd = MagicMock()
+        bot.slskd.enqueue_download = MagicMock(return_value=True)
+        completed = DownloadStatus(username="u", filename="f", state="Completed, Succeeded")
+        bot.slskd.wait_for_download = AsyncMock(return_value=completed)
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(b"\x00" * 1000)
+            source_path = f.name
+
+        try:
+            bot.processor = MagicMock()
+            bot.processor.find_downloaded_file = MagicMock(return_value=source_path)
+            bot.processor.build_filename = MagicMock(return_value="Artist - Song.wav")
+            bot._analyze_flac = AsyncMock(return_value=None)
+            bot._set_results_pick_state = AsyncMock()
+
+            status_msg = AsyncMock()
+            status_msg.edit_text = AsyncMock()
+            status_msg.message_id = 1
+
+            context = _make_context()
+            context.bot.send_audio = AsyncMock(side_effect=TimedOut("upload"))
+
+            result = _make_result(ext="wav")
+            await bot._do_download(context, 123, _make_track(), result, status_msg, search_id="s1")
+
+            # Pending kept for Save; results marked awaiting — not a Soulseek failure.
+            assert any(dl.source_path == source_path for dl in bot.downloads.values())
+            bot._set_results_pick_state.assert_awaited()
+            assert bot._set_results_pick_state.await_args.args[3] == "awaiting"
+            edited = " ".join(str(c) for c in status_msg.edit_text.call_args_list)
+            assert "took too long" in edited.lower() or "delivery_unconfirmed" in edited or "confirm" in edited.lower()
+        finally:
+            os.unlink(source_path)
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
     async def test_non_flac_skips_analysis(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
         bot.slskd = MagicMock()

@@ -118,6 +118,7 @@ STRINGS: dict[str, str] = {
     "download_failed": "Download failed ({state})\n`{file}`",
     "file_missing": "Downloaded file is missing from disk.\nCheck `DOWNLOAD_DIR`.",
     "download_error": "Download failed for `{file}`.",
+    "delivery_unconfirmed": "Telegram took too long to confirm `{file}`.\nIf the audio appeared above, save it — otherwise retry.",
     "retrying": "Retrying {chip}\n`{file}`",
     "redownloading": "Re-downloading {chip}\n`{user}`",
     "trying_next": "Next result for {chip}\n`{file}`",

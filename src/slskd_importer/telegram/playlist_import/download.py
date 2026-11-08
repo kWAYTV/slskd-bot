@@ -7,6 +7,7 @@ import logging
 import os
 
 from telegram.constants import ParseMode
+from telegram.error import NetworkError, TimedOut
 
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.playlist_import.job import TrackStatus
@@ -121,7 +122,36 @@ async def do_import_download(
     except asyncio.CancelledError:
         await abort_transfer(self, dl_id, result)
         raise
+    except (TimedOut, NetworkError) as exc:
+        pending = self.downloads.get(dl_id)
+        if pending is not None and pending.source_path:
+            # Same as manual download: Telegram often posts the audio after httpx times out.
+            logger.warning(
+                "Import Telegram delivery timed out for %s (%s); leaving track awaiting approval",
+                result.basename,
+                type(exc).__name__,
+            )
+            await safe_edit(
+                status_msg,
+                self.t(chat_id, "delivery_unconfirmed", file=md_code_safe(result.basename)),
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=build_import_track_keyboard(job_id, track_id, dl_id, locale=self.locale(chat_id)),
+            )
+            await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
+            return
+        logger.warning("Import download network error before file landed: %s", result.basename)
+        await safe_edit(
+            status_msg,
+            self.t(chat_id, "import_dl_error", file=md_code_safe(result.basename)),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")
+        await self._process_next_import_track(context, chat_id, job_id, generation)
     except Exception:
+        pending = self.downloads.get(dl_id)
+        if pending is not None and pending.approval_message_id:
+            logger.exception("Import post-delivery error for %s; preview already sent", result.basename)
+            return
         logger.exception(f"Import download failed for {result.basename}")
         await safe_edit(
             status_msg,

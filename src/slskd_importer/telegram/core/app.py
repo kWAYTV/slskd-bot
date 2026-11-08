@@ -213,7 +213,19 @@ def create_bot(config: Config) -> Application:
         await sweep_lifecycle.stop_library_sweep(application)
         await ttl.stop_approval_ttl(application)
 
-    builder = Application.builder().token(config.telegram_bot_token).post_init(_post_init).post_shutdown(_post_shutdown)
+    # Default media_write_timeout is 20s — 80+ MB WAV/FLAC previews routinely exceed that,
+    # Telegram accepts the upload, then httpx raises TimedOut and we used to show a false failure.
+    builder = (
+        Application.builder()
+        .token(config.telegram_bot_token)
+        .post_init(_post_init)
+        .post_shutdown(_post_shutdown)
+        .connect_timeout(30)
+        .read_timeout(120)
+        .write_timeout(120)
+        .media_write_timeout(600)
+        .pool_timeout(30)
+    )
     if config.telegram_api_base_url:
         # Self-hosted Bot API server: 2000 MB uploads instead of the cloud 50 MB.
         builder = (
