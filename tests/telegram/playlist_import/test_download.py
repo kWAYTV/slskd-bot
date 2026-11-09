@@ -174,6 +174,81 @@ class TestDoImportDownload:
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     @patch("slskd_importer.telegram.playlist_import.download.safe_edit", new_callable=AsyncMock, return_value=True)
+    async def test_auto_save_job_saves_without_preview_or_approval(self, mock_edit, mock_thread):
+        bot = _setup_bot()
+        chat_id = 67890
+        bot.slskd.enqueue_download = MagicMock(return_value=True)
+        status = MagicMock()
+        status.is_failed = False
+        bot.slskd.wait_for_download = AsyncMock(return_value=status)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".flac") as source:
+            source.write(b"fake audio")
+        bot.processor = MagicMock()
+        bot.processor.find_downloaded_file = MagicMock(return_value=source.name)
+        bot.processor.process_file = MagicMock(return_value="/music/Artist - Title.flac")
+        job = _make_import_job(job_id=1, chat_id=chat_id)
+        job.auto_save = 1
+        bot.import_repo.get_job_for_chat = MagicMock(return_value=job)
+        bot.import_repo.update_track_status = MagicMock()
+        bot.import_repo.complete_track = MagicMock()
+        bot._embed_spotify_artwork = AsyncMock()
+        bot._add_history = AsyncMock()
+        bot._remove_download_file = AsyncMock()
+        bot._process_next_import_track = AsyncMock()
+        result = _make_result()
+        status_msg = MagicMock(message_id=100)
+        dl_id = "dl_auto"
+        bot.downloads[dl_id] = PendingDownload(track=_make_track(), result=result, chat_id=chat_id)
+        context = _make_context()
+        await bot._do_import_download(
+            context,
+            chat_id,
+            _make_track(),
+            result,
+            status_msg,
+            generation=0,
+            job_id=1,
+            track_id=5,
+            dl_id=dl_id,
+            position=2,
+            total=9,
+        )
+        context.bot.send_audio.assert_not_called()
+        bot.processor.process_file.assert_called_once()
+        bot.import_repo.complete_track.assert_called_once_with(1, 5, TrackStatus.completed)
+        bot.import_repo.update_track_status.assert_not_called()
+        assert dl_id not in bot.downloads
+        assert "Artist - Title.flac" in mock_edit.call_args[0][1]
+        bot._process_next_import_track.assert_awaited_once()
+        os.unlink(source.name)
+
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("slskd_importer.telegram.playlist_import.download.safe_edit", new_callable=AsyncMock, return_value=True)
+    async def test_auto_save_failure_marks_track_failed_and_moves_on(self, mock_edit, mock_thread):
+        bot = _setup_bot()
+        chat_id = 67890
+        bot.slskd.enqueue_download = MagicMock(return_value=True)
+        status = MagicMock()
+        status.is_failed = False
+        bot.slskd.wait_for_download = AsyncMock(return_value=status)
+        bot.processor = MagicMock()
+        bot.processor.find_downloaded_file = MagicMock(return_value="/downloads/x.flac")
+        bot.processor.process_file = MagicMock(return_value=None)
+        job = _make_import_job(job_id=1, chat_id=chat_id)
+        job.auto_save = 1
+        bot.import_repo.get_job_for_chat = MagicMock(return_value=job)
+        bot.import_repo.complete_track = MagicMock()
+        bot._process_next_import_track = AsyncMock()
+        result = _make_result()
+        bot.downloads["dl_f"] = PendingDownload(track=_make_track(), result=result, chat_id=chat_id)
+        await bot._do_import_download(
+            _make_context(), chat_id, _make_track(), result, MagicMock(message_id=1), 0, 1, 5, "dl_f"
+        )
+        bot.import_repo.complete_track.assert_called_once_with(1, 5, TrackStatus.failed, "File processing failed")
+        bot._process_next_import_track.assert_awaited_once()
+
+    @patch("asyncio.to_thread", side_effect=_fake_to_thread)
+    @patch("slskd_importer.telegram.playlist_import.download.safe_edit", new_callable=AsyncMock, return_value=True)
     async def test_import_download_success_sends_audio(self, mock_edit, mock_thread):
         bot = _setup_bot()
         chat_id = 67890

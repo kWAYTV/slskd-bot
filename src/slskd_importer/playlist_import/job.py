@@ -33,6 +33,12 @@ class ImportJob:
     status: str
     created_at: str
     updated_at: str
+    auto_save: int = 0
+
+    @property
+    def saves_automatically(self) -> bool:
+        """Tracks are saved to the library as soon as they land, without a Save tap."""
+        return bool(self.auto_save)
 
 
 @dataclass

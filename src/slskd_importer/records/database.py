@@ -14,7 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_VERSION = 6
+_SCHEMA_VERSION = 7
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS download_history (
@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS import_jobs (
     skipped_tracks INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'pending',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    auto_save INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS import_tracks (
@@ -216,6 +217,9 @@ class Database:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_download_history_chat ON download_history(chat_id, created_at)"
         )
+        job_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(import_jobs)")}
+        if "auto_save" not in job_cols:
+            self._conn.execute("ALTER TABLE import_jobs ADD COLUMN auto_save INTEGER NOT NULL DEFAULT 0")
         prefs_exists = self._conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='chat_prefs'"
         ).fetchone()

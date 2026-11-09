@@ -6,6 +6,7 @@ search returns nothing.
 """
 
 import re
+import string
 
 # Noise keywords that Spotify appends to track titles but Soulseek users never use.
 # Named remixes (e.g. "Butch Vig Remix") are intentionally excluded — they
@@ -120,18 +121,53 @@ def extract_latin_keywords(title: str) -> list[str]:
     return [w for w in words if w.lower() not in _NOISE_WORDS]
 
 
-def parse_query_artist_title(query: str) -> tuple[str, str]:
-    """Parse a free-text query into (artist, title) with title-casing.
+# Separators people type between artist and title: hyphen, en/em dash, pipe.
+_SEPARATOR_RE = re.compile(r"\s+[-–—|]\s+")
 
-    Tries " - " separator first. Otherwise assumes last word is title,
-    rest is artist (e.g. "david bowie helden" → "David Bowie", "Helden").
+# Bracketed noise pasted from video titles: "(Official Video)", "[HD]", "(Lyrics)".
+_QUERY_NOISE_RE = re.compile(
+    r"\s*[\(\[][^\)\]]*\b(?:official|lyrics?|visuali[sz]er|audio|video|hd|hq|4k|1080p|720p)\b[^\)\]]*[\)\]]",
+    re.IGNORECASE,
+)
+_QUERY_NOISE_TAIL_RE = re.compile(
+    r"\s+(?:official\s+(?:music\s+)?(?:video|audio)|lyric\s+video|lyrics|hd|hq|4k)\s*$",
+    re.IGNORECASE,
+)
+
+
+def clean_query(query: str) -> str:
+    """Strip pasted-title noise from a free-text query: brackets like (Official Video), outer quotes, extra spaces."""
+    text = _QUERY_NOISE_RE.sub("", query)
+    text = _QUERY_NOISE_TAIL_RE.sub("", text)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    if len(text) >= 2 and text[0] in _QUOTE_CHARS and text[-1] in _QUOTE_CHARS:
+        text = text[1:-1].strip()
+    return text or query.strip()
+
+
+def smart_case(text: str) -> str:
+    """Capitalize words only when the text is all lowercase; keep "AC/DC", "McCartney", "DJ Shadow" as typed."""
+    text = text.strip()
+    if text and text == text.lower():
+        return string.capwords(text)
+    return text
+
+
+def parse_query_artist_title(query: str) -> tuple[str, str]:
+    """Parse a free-text query into (artist, title).
+
+    An explicit separator wins: "artist - title", "artist – title", "artist | title".
+    Otherwise the last word is the title and the rest the artist
+    (e.g. "david bowie helden" → "David Bowie", "Helden"). Casing is only
+    fixed for all-lowercase input.
     """
-    if " - " in query:
-        parts = query.split(" - ", 1)
-        return parts[0].strip().title(), parts[1].strip().title()
-    words = query.strip().split()
+    query = clean_query(query)
+    parts = _SEPARATOR_RE.split(query, maxsplit=1)
+    if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+        return smart_case(parts[0]), smart_case(parts[1])
+    words = query.split()
     if len(words) >= 3:
-        return " ".join(words[:-1]).title(), words[-1].title()
+        return smart_case(" ".join(words[:-1])), smart_case(words[-1])
     if len(words) == 2:
-        return words[0].title(), words[1].title()
-    return "", query.title()
+        return smart_case(words[0]), smart_case(words[1])
+    return "", smart_case(query)

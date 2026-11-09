@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_import_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, data: str):
-    """Route import-related callbacks (ic/ix/ia/ir/is/iy/if prefixes)."""
+    """Route import-related callbacks (ic/ib/ix/ia/ir/is/iy/if prefixes)."""
     query = update.callback_query
     prefix, _sep, payload = data.partition(":")
     parts = payload.split(":")
@@ -36,6 +36,11 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
 
     if prefix == "ic":
         await _start_job(self, update, context, chat_id, job_id)
+        return
+    if prefix == "ib":
+        await asyncio.to_thread(self.import_repo.set_auto_save, job_id, True)
+        logger.info("chat=%s import job %s will save every track automatically", chat_id, job_id)
+        await _start_job(self, update, context, chat_id, job_id, auto_save=True)
         return
     if prefix == "ix":
         await _cancel_job(self, query, chat_id, job_id)
@@ -56,9 +61,9 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
         await self._handle_import_retry_failed(update, context, chat_id, job_id)
 
 
-async def _start_job(self, update, context, chat_id: int, job_id: int):
+async def _start_job(self, update, context, chat_id: int, job_id: int, auto_save: bool = False):
     query = update.callback_query
-    await safe_query_edit(query, self.t(chat_id, "import_started"))
+    await safe_query_edit(query, self.t(chat_id, "import_started_auto" if auto_save else "import_started"))
     logger.info("chat=%s started import job %s", chat_id, job_id)
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.active)
     self._active_import[chat_id] = job_id

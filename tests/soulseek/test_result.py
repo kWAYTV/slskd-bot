@@ -101,6 +101,16 @@ class TestSearchResult:
         assert "Song.flac" in s
         assert "3:00" in s
 
+    def test_quality_short(self):
+        assert SearchResult(username="u", filename="f.flac", size=1, bit_depth=16, sample_rate=44100).quality_short == (
+            "16/44.1"
+        )
+        assert SearchResult(username="u", filename="f.flac", size=1, bit_depth=24, sample_rate=96000).quality_short == (
+            "24/96"
+        )
+        assert SearchResult(username="u", filename="f.mp3", size=1, bit_rate=320).quality_short == "320k"
+        assert SearchResult(username="u", filename="f.mp3", size=1).quality_short == ""
+
     def test_quality_display_bit_depth_sample_rate_only(self):
         r = SearchResult(
             username="u",

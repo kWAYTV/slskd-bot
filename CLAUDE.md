@@ -113,11 +113,13 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Download concurrency**: `fetch_from_peer` takes `MusicBot._download_sem` (`MAX_CONCURRENT_DOWNLOADS`, default 3)
 - **Pasted links**: `catalog/links.py` detects Spotify track links/URIs in free text; tracks resolve via `SpotifyResolver.get_track`. Playlist/album links start the import flow directly (library users only)
 - **Duplicates**: `notify_if_already_owned` (in `search/soulseek.py`) sends a non-blocking "already in the library" notice after Spotify resolve; the search always continues
-- **Direct search**: the "Search Soulseek directly" button searches immediately with artist/title parsed from the query (`parse_query_artist_title`) — no follow-up prompt
+- **Direct search**: when Spotify has no match, `do_search` falls through to `do_direct_slskd_search` at once (no button); the Spotify picker keeps a "Search Soulseek" button. Artist/title come from `parse_query_artist_title` (separators `-`, `–`, `—`, `|`; `clean_query` strips `(Official Video)`-style noise; `smart_case` only capitalizes all-lowercase input)
+- **Spotify lookup**: `Artist - Title` queries try `SpotifyResolver.search_fielded` (`artist:`/`track:` filters) first, free text as fallback. `_collapse_editions` merges candidates with the same artist, title and length (±2s), keeping the earliest year
+- **Import auto-save**: `import_jobs.auto_save` (schema v7, `ImportJob.saves_automatically`) is set by the `ib:` confirm button; `do_import_download` then calls `save_to_library` directly and skips the preview and approval keyboard
 - **Undo**: `/undo` deletes the last chat save via `FileProcessor.delete_library_file` (refuses paths outside OUTPUT_DIR) and marks the history row `undone`
 - **Large files**: the send limit is `Config.telegram_file_limit`, not a constant — 50MB on the cloud Bot API, 2000MB when `TELEGRAM_API_BASE_URL` points at a self-hosted `telegram-bot-api` server (wired via `base_url`/`base_file_url`/`local_mode` in `create_bot`). Over-limit files fall back to OGG Opus / preview clips in `delivery.send_large_file`
 - **Spotify results cap**: Show 5 results per page to the user; fetch up to 50 from the API for filtering headroom
-- **Spotify artist filter**: When query contains `artist - title`, filter Spotify results by artist substring match before dedup to remove noise; fall back to unfiltered if the filter empties the list
+- **Spotify artist filter**: When the query has an `artist - title` separator, filter Spotify results by artist substring match before dedup to remove noise; fall back to unfiltered if the filter empties the list
 ## Deployment
 
 ### Release Steps

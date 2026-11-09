@@ -107,6 +107,8 @@ def _setup_bot(mock_slskd_cls, mock_spotify_cls):
     bot.slskd.wait_for_download = AsyncMock()
     bot.import_repo = MagicMock()
     bot.import_repo.get_active_job = MagicMock(return_value=None)
+    # A real job (manual approval) so flows that look the job up never see a truthy MagicMock.
+    bot.import_repo.get_job_for_chat = MagicMock(return_value=_make_import_job())
     bot.playlist_resolver = MagicMock()
     return bot
 

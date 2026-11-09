@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Import confirm card offers *Start and save everything*: tracks are saved to the library as they land, with no preview upload and no per-track Save tap (schema v7 adds `import_jobs.auto_save`; the choice survives restarts and `/import` resume)
+- `Artist - Title` queries (also `–`, `—`, `|`) resolve with Spotify `artist:`/`track:` field filters before free text
+- Pasted video titles are cleaned before lookup: `(Official Video)`, `[HD]`, `(Lyrics)`, trailing `official audio`, outer quotes
+
+### Changed
+
+- No Spotify match now searches Soulseek directly at once, showing the parsed `Artist — Title` it will save as, instead of asking for another tap
+- Spotify picker collapses the same recording across albums and reissues (same artist, title and length), so one real match goes straight to Soulseek
+- Spotify picker buttons show length and year, and drop the artist when every candidate shares it
+- Picking a version edits the picker into the search card instead of sending a second message
+- Soulseek result buttons show the format (`FLAC`, `MP3`) and a shorter quality tag (`16/44.1`)
+- Direct-search names keep typed casing (`AC/DC`, `McCartney`); only all-lowercase input is capitalized
+
 ### Removed
 
 - Auto mode (`/auto`, `AUTO_MODE`). Results always show a pick keyboard; "Auto-pick best" remains a one-click `#1`

@@ -33,6 +33,14 @@ class ImportRepository:
             row = cursor.fetchone()
             return ImportJob(**dict(row)) if row else None
 
+    def set_auto_save(self, job_id: int, auto_save: bool) -> None:
+        with self._db.locked() as conn:
+            conn.execute(
+                "UPDATE import_jobs SET auto_save = ?, updated_at = datetime('now') WHERE id = ?",
+                (int(auto_save), job_id),
+            )
+            conn.commit()
+
     def update_job_status(self, job_id: int, status: JobStatus) -> None:
         with self._db.locked() as conn:
             conn.execute(

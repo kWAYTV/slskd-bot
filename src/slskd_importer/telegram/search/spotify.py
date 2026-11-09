@@ -10,10 +10,12 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.soulseek.query import clean_query, parse_query_artist_title
 from slskd_importer.telegram.core.session import PendingSearch, split_search_callback
-from slskd_importer.telegram.search.keyboards import build_direct_search_keyboard, build_spotify_keyboard
+from slskd_importer.telegram.search.keyboards import build_spotify_keyboard
 from slskd_importer.telegram.ui.editing import safe_edit, safe_query_edit
 from slskd_importer.telegram.ui.formatting import format_spotify_results, track_md
+from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
 
@@ -39,18 +41,14 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
     search.message_id = searching_msg.message_id
 
     try:
-        tracks = await asyncio.to_thread(self.spotify.search_multiple, query, 50)
+        tracks = await _lookup_tracks(self, query)
         if self._search_cancelled(search_id):
             return
 
         logger.info("chat=%s search=%s Spotify returned %d track(s) for %r", chat_id, search_id, len(tracks), query)
         if not tracks:
-            await safe_edit(
-                searching_msg,
-                self.t(chat_id, "spotify_not_found", query=query),
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=build_direct_search_keyboard(search_id, locale=self.locale(chat_id)),
-            )
+            # No catalog match: go straight to Soulseek instead of asking for another tap.
+            await _fall_back_to_direct(self, context, chat_id, query, searching_msg, search_id)
             return
 
         unique_tracks = _filter_candidates(query, tracks)
@@ -79,13 +77,76 @@ async def do_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         await safe_edit(searching_msg, self.t(chat_id, "something_wrong"))
 
 
+async def _lookup_tracks(self, query: str) -> list[TrackInfo]:
+    """Spotify candidates: field-filtered when the query names artist and title, free text otherwise."""
+    cleaned = clean_query(query)
+    artist, title = parse_query_artist_title(query)
+    if artist and title and _has_separator(cleaned):
+        tracks = await asyncio.to_thread(self.spotify.search_fielded, artist, title, 50)
+        if tracks:
+            return tracks
+    return await asyncio.to_thread(self.spotify.search_multiple, cleaned, 50)
+
+
+def _has_separator(query: str) -> bool:
+    return any(sep in query for sep in (" - ", " – ", " — ", " | "))
+
+
+async def _fall_back_to_direct(self, context, chat_id: int, query: str, searching_msg, search_id: str) -> None:
+    """No Spotify match: tell the user what the file will be saved as and search Soulseek at once."""
+    artist, title = parse_query_artist_title(query)
+    await safe_edit(
+        searching_msg,
+        self.t(
+            chat_id,
+            "spotify_not_found_direct",
+            query=escape_md(query),
+            artist=escape_md(artist),
+            title=escape_md(title),
+        ),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    await self._do_direct_slskd_search(context, chat_id, query, searching_msg, search_id=search_id)
+
+
+# Editions of the same recording (album, compilation, reissue) differ by this much at most.
+_SAME_EDITION_SECS = 2
+
+
+def _collapse_editions(tracks: list[TrackInfo]) -> list[TrackInfo]:
+    """Keep one entry per artist+title+length, preferring the earliest release.
+
+    Spotify lists the same recording on the studio album, "Greatest Hits" and
+    three reissues; the Soulseek search ignores the album anyway, so the picker
+    only needs to show versions that actually differ (remix, live, edit).
+    """
+    kept: list[TrackInfo] = []
+    for track in tracks:
+        key = (track.artist.lower(), track.title.lower())
+        twin = next(
+            (
+                k
+                for k in kept
+                if (k.artist.lower(), k.title.lower()) == key
+                and abs(k.duration_secs - track.duration_secs) <= _SAME_EDITION_SECS
+            ),
+            None,
+        )
+        if twin is None:
+            kept.append(track)
+        elif track.year and (not twin.year or track.year < twin.year):
+            kept[kept.index(twin)] = track
+    return kept
+
+
 def _filter_candidates(query: str, tracks: list[TrackInfo]) -> list[TrackInfo]:
-    """Dedup Spotify results and prefer candidates whose artist matches the query."""
+    """Dedup Spotify results, collapse editions, and prefer candidates whose artist matches the query."""
+    query = clean_query(query)
     query_lower = query.lower()
     query_words = set(query_lower.split())
     query_artist = ""
-    if " - " in query:
-        query_artist = query.split(" - ", 1)[0].strip().lower()
+    if _has_separator(query):
+        query_artist = parse_query_artist_title(query)[0].lower()
 
     seen = set()
     artist_match_tracks = []
@@ -116,7 +177,7 @@ def _filter_candidates(query: str, tracks: list[TrackInfo]) -> list[TrackInfo]:
                 seen.add(key)
                 unique_tracks.append(t)
 
-    return unique_tracks
+    return _collapse_editions(unique_tracks)
 
 
 async def handle_spotify_page(self, update, context, chat_id: int, data: str):
@@ -179,17 +240,19 @@ async def handle_spotify_selection(self, update, context, chat_id: int, data: st
     search = self.pending.get(search_id)
     if search:
         search.track = track
+    # The picker message becomes the search card: one message per query, not two.
     await safe_query_edit(
         query,
         self.t(chat_id, "spotify_selected", track=track_md(track), duration=track.duration_display),
         parse_mode=ParseMode.MARKDOWN,
     )
-
-    searching_msg = await context.bot.send_message(
-        chat_id=chat_id,
-        text=self.t(chat_id, "searching_slskd"),
-        parse_mode=ParseMode.MARKDOWN,
-    )
+    searching_msg = query.message
+    if searching_msg is None or getattr(searching_msg, "message_id", None) is None:
+        searching_msg = await context.bot.send_message(
+            chat_id=chat_id,
+            text=self.t(chat_id, "searching_slskd"),
+            parse_mode=ParseMode.MARKDOWN,
+        )
     if search:
         search.message_id = searching_msg.message_id
     task = context.application.create_task(

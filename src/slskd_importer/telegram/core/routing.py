@@ -34,6 +34,7 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
     handler = {
         "direct": self._handle_direct_search,
         "ic": self._handle_import_callback,
+        "ib": self._handle_import_callback,
         "ix": self._handle_import_callback,
         "ia": self._handle_import_callback,
         "ir": self._handle_import_callback,

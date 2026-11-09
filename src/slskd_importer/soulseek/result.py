@@ -60,6 +60,15 @@ class SearchResult:
             parts.append(f"{self.bit_rate}kbps")
         return ", ".join(parts) if parts else (self.extension.upper() or "?")
 
+    @property
+    def quality_short(self) -> str:
+        """Compact quality for buttons: '16/44.1', '24/96', '320k', or ''."""
+        if self.bit_depth and self.sample_rate:
+            return f"{self.bit_depth}/{self.sample_rate / 1000:g}"
+        if self.bit_rate:
+            return f"{self.bit_rate}k"
+        return ""
+
     def __str__(self) -> str:
         return f"{self.basename} ({self.duration_display}, {self.quality_display}, {self.size_mb:.1f}MB)"
 

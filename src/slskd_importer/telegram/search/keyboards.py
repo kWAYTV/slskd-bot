@@ -23,9 +23,14 @@ def build_results_keyboard(
     buttons = []
     for i, result in enumerate(page_results):
         absolute_idx = start + i
-        label = (
-            f"#{absolute_idx + 1}  {result.duration_display}  ·  {result.quality_display}  ·  {result.size_mb:.0f} MB"
-        )
+        parts = [
+            f"#{absolute_idx + 1}",
+            result.extension.upper() or "?",
+            result.duration_display,
+            result.quality_short,
+            f"{result.size_mb:.0f} MB",
+        ]
+        label = "  ·  ".join(p for p in parts if p)
         buttons.append([InlineKeyboardButton(label, callback_data=f"dl:{search_id}:{absolute_idx}")])
 
     nav_row = []
@@ -45,6 +50,22 @@ def build_results_keyboard(
     return InlineKeyboardMarkup(buttons)
 
 
+_BUTTON_MAX = 64
+_SEP = "  ·  "
+
+
+def _pick_label(number: int, name: str, tail: str) -> str:
+    """``#n  Name  ·  tail`` within Telegram's button limit; the name is what gets shortened."""
+    prefix = f"#{number}  "
+    if not tail:
+        label = prefix + name
+        return label if len(label) <= _BUTTON_MAX else label[: _BUTTON_MAX - 1] + "…"
+    budget = _BUTTON_MAX - len(prefix) - len(_SEP) - len(tail)
+    if len(name) > budget:
+        name = name[: max(budget - 1, 8)].rstrip() + "…"
+    return f"{prefix}{name}{_SEP}{tail}"
+
+
 def build_spotify_keyboard(
     tracks: list[TrackInfo],
     page: int = 0,
@@ -58,13 +79,20 @@ def build_spotify_keyboard(
     end = min(start + page_size, len(tracks))
     page_tracks = tracks[start:end]
 
+    # One artist across the whole list: drop it from every button so title, length and year fit.
+    same_artist = len({t.artist.lower() for t in tracks}) == 1
     buttons = []
     for i, item in enumerate(page_tracks):
         absolute_idx = start + i
-        label = f"#{absolute_idx + 1}  {item.artist} — {item.title}"
-        if len(label) > 64:
-            label = label[:61] + "..."
-        buttons.append([InlineKeyboardButton(label, callback_data=f"sp:{search_id}:{absolute_idx}")])
+        name = item.title if same_artist else f"{item.artist} — {item.title}"
+        tail = "  ·  ".join(p for p in (item.duration_display, item.year) if p)
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    _pick_label(absolute_idx + 1, name, tail), callback_data=f"sp:{search_id}:{absolute_idx}"
+                )
+            ]
+        )
 
     nav_row = []
     if page > 0:
@@ -93,8 +121,3 @@ def build_results_status_keyboard(
     if show_cancel:
         rows.append([InlineKeyboardButton(t(locale, "btn_cancel"), callback_data=f"dl:{search_id}:cancel")])
     return InlineKeyboardMarkup(rows)
-
-
-def build_direct_search_keyboard(search_id: str, *, locale: str = DEFAULT_LOCALE) -> InlineKeyboardMarkup:
-    """Button to search Soulseek directly without Spotify resolution."""
-    return InlineKeyboardMarkup([[InlineKeyboardButton(t(locale, "btn_direct"), callback_data=f"direct:{search_id}")]])
