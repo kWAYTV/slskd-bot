@@ -151,6 +151,7 @@ class MusicBot:
     cmd_history = history.cmd_history
     cmd_stats = status.cmd_stats
     cmd_cancel = cancel.cmd_cancel
+    _handle_cancel_all = cancel.handle_cancel_all
     _handle_history_undo = undo.handle_history_undo
     cmd_import = import_command.cmd_import
 

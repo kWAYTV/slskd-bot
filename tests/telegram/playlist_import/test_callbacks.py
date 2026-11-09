@@ -36,6 +36,10 @@ class TestHandleImportCallback:
         bot.import_repo.update_job_status.assert_called_once_with(1, JobStatus.active)
         assert bot._active_import[chat_id] == 1
         context.application.create_task.assert_called_once()
+        # Progress message is pinned for the life of the import.
+        context.bot.pin_chat_message.assert_awaited_once_with(
+            chat_id=chat_id, message_id=999, disable_notification=True
+        )
 
     @patch("asyncio.to_thread", side_effect=_fake_to_thread)
     @patch(
@@ -48,11 +52,13 @@ class TestHandleImportCallback:
         bot.import_repo.get_job_for_chat = MagicMock(return_value=job)
         bot.import_repo.update_job_status = MagicMock()
         bot._active_import[chat_id] = 1
+        bot._import_status_msg[chat_id] = MagicMock(message_id=999)
         update = _make_update(chat_id=chat_id)
         context = _make_context()
         await bot._handle_import_callback(update, context, chat_id, "ix:1")
         bot.import_repo.update_job_status.assert_called_once_with(1, JobStatus.cancelled)
         assert chat_id not in bot._active_import
+        context.bot.unpin_chat_message.assert_awaited_once_with(chat_id=chat_id, message_id=999)
         mock_qedit.assert_awaited()
         assert "cancelled" in mock_qedit.call_args[0][1]
 

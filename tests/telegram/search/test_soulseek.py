@@ -62,6 +62,32 @@ class TestDoSlskdSearch:
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
+    async def test_no_results_reacts_on_query_message(self, mock_slskd_cls, mock_spotify):
+        from telegram import ReactionTypeEmoji
+
+        from slskd_importer.telegram.core.session import PendingSearch
+
+        bot = MusicBot(_make_config())
+        bot.slskd = AsyncMock()
+        bot.slskd.search = AsyncMock(return_value=[])
+        bot.scorer = MagicMock()
+        bot.scorer.score_results = MagicMock(return_value=[])
+        bot._chat_generation[123] = 0
+        bot.pending["s"] = PendingSearch(query="q", chat_id=123, search_id="s", query_message_id=55)
+
+        msg = AsyncMock()
+        msg.edit_text = AsyncMock()
+        msg.message_id = 1
+        context = _make_context()
+        await bot._do_slskd_search(context, 123, _make_track(), msg, 0, search_id="s")
+        context.bot.set_message_reaction.assert_awaited_with(
+            chat_id=123, message_id=55, reaction=[ReactionTypeEmoji("🤷")]
+        )
+        assert "s" not in bot.pending
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
     async def test_finds_flac_results(self, mock_slskd_cls, mock_spotify):
         bot = MusicBot(_make_config())
         bot.slskd = AsyncMock()

@@ -7,6 +7,7 @@ import contextlib
 import logging
 import os
 
+from slskd_importer.telegram.ui.feedback import REACTION_SAVED, react
 from slskd_importer.telegram.ui.formatting import track_chip
 from slskd_importer.telegram.ui.markdown import escape_md
 
@@ -81,6 +82,7 @@ async def _approve_download(self, query, context, chat_id: int, dl_id: str, pend
     await self._edit_approval_message(query, self.t(chat_id, "saved", name=target_name))
     logger.info("chat=%s approved and saved: %s", chat_id, target_name)
     await self._set_results_pick_state(context, pending_dl.search_id, pending_dl.result_index, "saved")
+    await react(context.bot, chat_id, pending_dl.query_message_id, REACTION_SAVED)
     await self._dismiss_other_downloads(context, chat_id, search_id=pending_dl.search_id)
 
 

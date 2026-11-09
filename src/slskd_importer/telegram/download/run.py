@@ -25,6 +25,7 @@ from slskd_importer.telegram.download.transfer import (
     remember_approval_message,
 )
 from slskd_importer.telegram.ui.editing import safe_edit
+from slskd_importer.telegram.ui.feedback import show_uploading
 from slskd_importer.telegram.ui.formatting import format_flac_verdict, format_result_reasons, progress_bar, track_chip
 from slskd_importer.telegram.ui.markdown import md_code_safe
 from slskd_importer.telegram.ui.reply import collapse_status_message
@@ -63,6 +64,7 @@ async def do_download(
         search_id=search_id,
         task=asyncio.current_task(),
         origin_message_id=origin_id,
+        query_message_id=search.query_message_id if search else None,
     )
     self.downloads[dl_id] = pending_dl
     logger.info(
@@ -119,6 +121,7 @@ async def do_download(
             self.t(chat_id, "downloaded_sending", chip=chip, file=md_code_safe(result.basename), quality=quality_line),
             parse_mode=ParseMode.MARKDOWN,
         )
+        await show_uploading(context.bot, chat_id)
 
         delivered = await _deliver_preview(
             self,

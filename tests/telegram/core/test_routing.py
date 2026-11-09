@@ -160,6 +160,45 @@ class TestMusicBotCallbackHandler:
         context = _make_context()
         await bot.handle_callback(update, context)
         context.bot.send_message.assert_not_called()
+        # Silent tap: no toast text.
+        update.callback_query.answer.assert_awaited_once_with(text=None)
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_tap_shows_localized_toast(self, mock_slskd, mock_spotify):
+        bot = MusicBot(_make_config())
+        bot._locales[67890] = "es"
+        bot.pending["1"] = PendingSearch(
+            query="test", track=_make_track(), results=[_make_search_result()], chat_id=67890, search_id="1"
+        )
+        bot._do_download = AsyncMock()
+        update = _make_callback_update(data="dl:1:0")
+        context = _make_context()
+        context.application.create_task = MagicMock(return_value=MagicMock())
+        await bot.handle_callback(update, context)
+        update.callback_query.answer.assert_awaited_once_with(text="Descargando…")
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_unauthorized_tap_gets_no_toast(self, mock_slskd, mock_spotify):
+        config = _make_config()
+        config.telegram_allowed_users = {11111}
+        bot = MusicBot(config)
+        update = _make_callback_update(user_id=99999, data="dl:1:0")
+        await bot.handle_callback(update, _make_context())
+        update.callback_query.answer.assert_awaited_once_with(text=None)
+
+    def test_toast_keys(self):
+        from slskd_importer.telegram.core.routing import toast_key
+
+        assert toast_key("dl:1:0") == "toast_downloading"
+        assert toast_key("dl:1:cancel") == "toast_cancelled"
+        assert toast_key("sp:1:cancel") == "toast_cancelled"
+        assert toast_key("approve:9") == "toast_saving"
+        assert toast_key("dl_page:1:2") is None
+        assert toast_key("lang:es") is None
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -243,6 +282,31 @@ class TestMusicBotCallbackHandler:
         await bot.handle_callback(update, context)
         assert "1" not in bot.downloads
         assert bot.history_repo.count() == 1
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_approve_reacts_thumbs_up_on_query_message(self, mock_slskd, mock_spotify):
+        from telegram import ReactionTypeEmoji
+
+        bot = MusicBot(_make_config())
+        bot.processor = MagicMock()
+        bot.processor.process_file = MagicMock(return_value="/music/Artist - Song.flac")
+        bot._embed_spotify_artwork = AsyncMock()
+        bot._dismiss_other_downloads = AsyncMock()
+        bot.downloads["1"] = PendingDownload(
+            track=_make_track(),
+            result=_make_search_result(),
+            chat_id=67890,
+            source_path="/downloads/song.flac",
+            query_message_id=42,
+        )
+        update = _make_callback_update(data="approve:1")
+        context = _make_context()
+        await bot.handle_callback(update, context)
+        context.bot.set_message_reaction.assert_awaited_once_with(
+            chat_id=67890, message_id=42, reaction=[ReactionTypeEmoji("👍")]
+        )
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")

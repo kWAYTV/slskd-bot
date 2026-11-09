@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from slskd_importer.playlist_import.job import JobStatus
 from slskd_importer.telegram.playlist_import.keyboards import build_import_summary_keyboard
+from slskd_importer.telegram.ui.feedback import unpin
 from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,8 @@ async def send_import_summary(self, context, chat_id: int, job_id: int):
     )
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.completed)
     self._active_import.pop(chat_id, None)
-    self._import_status_msg.pop(chat_id, None)
+    status_msg = self._import_status_msg.pop(chat_id, None)
+    await unpin(context.bot, chat_id, getattr(status_msg, "message_id", None))
 
     lines = [
         self.t(chat_id, "import_complete") + "\n",

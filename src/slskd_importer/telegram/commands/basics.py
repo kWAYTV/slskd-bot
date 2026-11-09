@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+
 from telegram import BotCommand, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from slskd_importer.telegram.commands.keyboards import build_language_keyboard
 from slskd_importer.telegram.i18n import DEFAULT_LOCALE, LOCALES, normalize_locale, t
+
+logger = logging.getLogger(__name__)
 
 
 def _commands_for(locale: str) -> list[BotCommand]:
@@ -26,11 +30,24 @@ def _commands_for(locale: str) -> list[BotCommand]:
 
 
 async def register_bot_commands(application) -> None:
+    """Command menu plus the description Telegram shows in an empty chat, per locale."""
     await application.bot.set_my_commands(_commands_for(DEFAULT_LOCALE))
     for locale in LOCALES:
         if locale == DEFAULT_LOCALE:
             continue
         await application.bot.set_my_commands(_commands_for(locale), language_code=locale)
+    await register_bot_descriptions(application)
+
+
+async def register_bot_descriptions(application) -> None:
+    """What a new user reads before /start ("What can this bot do?") and in the profile."""
+    for locale in LOCALES:
+        code = None if locale == DEFAULT_LOCALE else locale
+        try:
+            await application.bot.set_my_description(t(locale, "bot_description"), language_code=code)
+            await application.bot.set_my_short_description(t(locale, "bot_short_description"), language_code=code)
+        except Exception:
+            logger.warning("Could not set the bot description for %s", locale, exc_info=True)
 
 
 async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

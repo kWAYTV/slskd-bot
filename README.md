@@ -17,7 +17,7 @@
 - **Languages** — English (default), Spanish, Galician, German. First `/start` picks a language; `/lang` changes it later
 - **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart (`/import` with no URL continues an unfinished job). *Start and save everything* saves each track as it lands, with no per-track preview or Save tap
 - **Library sweep** — walks top-level library files, resolves artist/title from tags (or filename heuristics: track prefixes, `Artist - Album - Title`, rip brackets), looks on Soulseek for a better lossless copy, and sends side-by-side pairs in Telegram (`Keep mine` / `Take new` / `Keep both`). Never auto-replaces. Runs on a schedule or via `/sweep`
-- **Live progress** — download messages update with a progress bar and queue state; `/status` shows everything in flight for the chat
+- **Live progress** — download messages update with a progress bar and queue state; `/status` shows everything in flight for the chat with a *Cancel all* button. Every tap gets a toast, your query message is reacted 👀 / 🤷 / 👍 as the search progresses, and a running import stays pinned
 - **Library hygiene** — canonical tags on save, duplicate detection, `/undo` / `/history` ↩️ to remove saves, `/stats` for totals
 - **Large files** — files over Telegram's 50 MB limit fall back to OGG Opus previews, or upload untouched (up to 2000 MB) via a self-hosted Bot API server
 - **Access control** — bot usage restricted to allowed user IDs; library writes (save, `/import`, `/sweep`) optionally restricted further via `TELEGRAM_LIBRARY_USERS`

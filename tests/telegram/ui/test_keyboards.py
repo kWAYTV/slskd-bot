@@ -59,8 +59,23 @@ class TestBuildResultsKeyboard:
         results = [_make_result(i) for i in range(3)]
         kb = build_results_keyboard(results, search_id="1")
         rows = kb.inline_keyboard
-        # 3 result rows + action row
-        assert len(rows) == 4
+        # one number row (3 picks) + action row
+        assert len(rows) == 2
+        assert [btn.text for btn in rows[0]] == ["#1", "#2", "#3"]
+        assert [btn.callback_data for btn in rows[0]] == ["dl:1:0", "dl:1:1", "dl:1:2"]
+
+    def test_numbers_wrap_five_per_row(self):
+        results = [_make_result(i) for i in range(8)]
+        kb = build_results_keyboard(results, page=0, page_size=10, search_id="1")
+        rows = kb.inline_keyboard
+        assert [btn.text for btn in rows[0]] == ["#1", "#2", "#3", "#4", "#5"]
+        assert [btn.text for btn in rows[1]] == ["#6", "#7", "#8"]
+
+    def test_second_page_numbers_continue(self):
+        results = [_make_result(i) for i in range(7)]
+        kb = build_results_keyboard(results, page=1, page_size=5, search_id="1")
+        assert [btn.text for btn in kb.inline_keyboard[0]] == ["#6", "#7"]
+        assert kb.inline_keyboard[0][0].callback_data == "dl:1:5"
 
     def test_pagination_first_page(self):
         results = [_make_result(i) for i in range(15)]
@@ -86,19 +101,6 @@ class TestBuildResultsKeyboard:
         nav_row = rows[-2]
         assert any("Prev" in btn.text for btn in nav_row)
         assert any("Next" in btn.text for btn in nav_row)
-
-    def test_button_shows_format_and_short_quality(self):
-        kb = build_results_keyboard([_make_result()], search_id="1")
-        label = kb.inline_keyboard[0][0].text
-        assert label.startswith("#1  ·  FLAC  ·  3:00  ·  16/44.1  ·  ")
-        assert "bit" not in label and "kHz" not in label
-
-    def test_button_without_quality_skips_slot(self):
-        bare = SearchResult(username="u", filename="\\Music\\x.mp3", size=5_000_000, length=180)
-        kb = build_results_keyboard([bare], search_id="1")
-        label = kb.inline_keyboard[0][0].text
-        assert "MP3" in label
-        assert "  ·    ·  " not in label
 
     def test_action_row_has_auto_and_cancel(self):
         results = [_make_result()]
@@ -212,6 +214,15 @@ class TestBuildImportFailureKeyboard:
         assert "iy:7:3:dl9" in callbacks
         assert "is:7:3" in callbacks
         assert "ir:7:3" in callbacks
+
+
+class TestBuildStatusKeyboard:
+    def test_cancel_all_button(self):
+        from slskd_importer.telegram.commands.keyboards import build_status_keyboard
+
+        kb = build_status_keyboard()
+        assert kb.inline_keyboard[0][0].callback_data == "cancel_all"
+        assert kb.inline_keyboard[0][0].text == "Cancel all"
 
 
 class TestBuildHistoryKeyboard:

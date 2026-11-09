@@ -12,6 +12,7 @@ from slskd_importer.soulseek.errors import SlskdUnavailableError
 from slskd_importer.soulseek.fallbacks import search_with_fallbacks as soulseek_search_with_fallbacks
 from slskd_importer.telegram.search.results import present_search_results
 from slskd_importer.telegram.ui.editing import safe_edit
+from slskd_importer.telegram.ui.feedback import REACTION_NOTHING, react, show_typing
 from slskd_importer.telegram.ui.formatting import track_md
 from slskd_importer.telegram.ui.markdown import escape_md
 
@@ -100,6 +101,8 @@ async def do_slskd_search(
             parse_mode=ParseMode.MARKDOWN,
         )
 
+        await show_typing(context.bot, chat_id)
+
         async def on_tier(kind: str):
             messages = {
                 "title-only": self.t(chat_id, "searching_title_only", track=header),
@@ -107,6 +110,7 @@ async def do_slskd_search(
                 "artist-keywords": self.t(chat_id, "searching_artist_kw", track=header),
             }
             await safe_edit(searching_msg, messages[kind], parse_mode=ParseMode.MARKDOWN)
+            await show_typing(context.bot, chat_id)
 
         ranked, is_fallback, stale = await search_with_fallbacks(
             self, track, chat_id, generation, on_tier=on_tier, search_id=search_id
@@ -125,12 +129,13 @@ async def do_slskd_search(
             track.title,
         )
         if not ranked:
-            self._session.drop_search(search_id)
+            dropped = self._session.drop_search(search_id)
             await safe_edit(
                 searching_msg,
                 self.t(chat_id, "no_soulseek", track=header, duration=track.duration_display),
                 parse_mode=ParseMode.MARKDOWN,
             )
+            await react(context.bot, chat_id, dropped.query_message_id if dropped else None, REACTION_NOTHING)
             return
 
         await present_search_results(

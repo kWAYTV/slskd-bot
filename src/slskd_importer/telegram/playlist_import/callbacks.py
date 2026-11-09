@@ -12,6 +12,7 @@ from telegram.ext import ContextTypes
 from slskd_importer.playlist_import.job import JobStatus, TrackStatus
 from slskd_importer.telegram.download.approval import save_to_library
 from slskd_importer.telegram.ui.editing import safe_query_edit
+from slskd_importer.telegram.ui.feedback import pin, unpin
 from slskd_importer.telegram.ui.markdown import md_code_safe
 from slskd_importer.telegram.ui.reply import reply_kwargs
 
@@ -43,7 +44,7 @@ async def handle_import_callback(self, update: Update, context: ContextTypes.DEF
         await _start_job(self, update, context, chat_id, job_id, auto_save=True)
         return
     if prefix == "ix":
-        await _cancel_job(self, query, chat_id, job_id)
+        await _cancel_job(self, query, context, chat_id, job_id)
         return
     if prefix == "ia":
         await self._handle_import_approve(update, context, chat_id, job_id, int(parts[1]), parts[2])
@@ -71,6 +72,8 @@ async def _start_job(self, update, context, chat_id: int, job_id: int, auto_save
         chat_id=chat_id, text=self.t(chat_id, "import_starting"), parse_mode="Markdown"
     )
     self._import_status_msg[chat_id] = progress_msg
+    # Pinned for the life of the import, so progress is one tap away in a long chat.
+    await pin(context.bot, chat_id, getattr(progress_msg, "message_id", None))
     generation = self._chat_generation.get(chat_id, 0)
     task = context.application.create_task(
         self._process_next_import_track(context, chat_id, job_id, generation),
@@ -79,9 +82,11 @@ async def _start_job(self, update, context, chat_id: int, job_id: int, auto_save
     self._track_task(chat_id, task)
 
 
-async def _cancel_job(self, query, chat_id: int, job_id: int):
+async def _cancel_job(self, query, context, chat_id: int, job_id: int):
     await asyncio.to_thread(self.import_repo.update_job_status, job_id, JobStatus.cancelled)
     self._active_import.pop(chat_id, None)
+    status_msg = self._import_status_msg.pop(chat_id, None)
+    await unpin(context.bot, chat_id, getattr(status_msg, "message_id", None))
     logger.info("chat=%s cancelled import job %s via keyboard", chat_id, job_id)
     await safe_query_edit(query, self.t(chat_id, "import_cancelled"))
 

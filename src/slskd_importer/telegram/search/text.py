@@ -12,6 +12,7 @@ from slskd_importer.catalog.playlist import PlaylistResolver
 from slskd_importer.telegram.core.session import PendingSearch
 from slskd_importer.telegram.playlist_import.command import start_import_from_url
 from slskd_importer.telegram.search.links import search_from_spotify_link
+from slskd_importer.telegram.ui.feedback import REACTION_SEARCHING, react, show_typing
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +32,23 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     chat_id = update.effective_chat.id
+    query_message_id = getattr(update.message, "message_id", None)
 
     if PlaylistResolver.is_spotify_url(query):
         if not await self._check_library_auth(update):
             return
         logger.info("chat=%s pasted playlist/album link", chat_id)
+        await show_typing(context.bot, chat_id)
         task = context.application.create_task(
             start_import_from_url(self, update, context, chat_id, query.split()[0]),
             update=update,
         )
         self._track_task(chat_id, task)
         return
+
+    # The user's message carries the status from here on: 👀 searching, 👍 saved, 🤷 nothing.
+    await react(context.bot, chat_id, query_message_id, REACTION_SEARCHING)
+    await show_typing(context.bot, chat_id)
 
     spotify_track_id = extract_spotify_track_id(query)
     if spotify_track_id:
@@ -52,6 +59,7 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=chat_id,
             search_id=search_id,
             user_id=update.effective_user.id,
+            query_message_id=query_message_id,
         )
         task = context.application.create_task(
             search_from_spotify_link(self, update, context, chat_id, spotify_track_id, search_id),
@@ -66,6 +74,7 @@ async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=chat_id,
         search_id=search_id,
         user_id=update.effective_user.id,
+        query_message_id=query_message_id,
     )
     logger.info("chat=%s user=%s search=%s query=%r", chat_id, update.effective_user.id, search_id, query)
     task = context.application.create_task(

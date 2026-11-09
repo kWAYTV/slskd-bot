@@ -15,6 +15,7 @@ from slskd_importer.soulseek.scoring import rank_responses
 from slskd_importer.telegram.core.session import split_search_callback
 from slskd_importer.telegram.search.results import present_search_results
 from slskd_importer.telegram.ui.editing import safe_edit, safe_query_edit
+from slskd_importer.telegram.ui.feedback import REACTION_NOTHING, react
 from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
@@ -109,13 +110,13 @@ async def do_direct_slskd_search(
             return
 
         if not ranked:
-            if search_id:
-                self._session.drop_search(search_id)
+            dropped = self._session.drop_search(search_id) if search_id else None
             await safe_edit(
                 searching_msg,
                 self.t(chat_id, "direct_no_results", query=query),
                 parse_mode=ParseMode.MARKDOWN,
             )
+            await react(context.bot, chat_id, dropped.query_message_id if dropped else None, REACTION_NOTHING)
             return
 
         if search_id is None:

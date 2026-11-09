@@ -17,17 +17,49 @@ from slskd_importer.telegram.ui.formatting import welcome_text
 logger = logging.getLogger(__name__)
 
 
+# Toast shown on the tap itself, before the handler edits anything.
+_TOASTS = {
+    "dl": "toast_downloading",
+    "approve": "toast_saving",
+    "reject": "toast_discarded",
+    "next": "toast_next",
+    "retry": "toast_retrying",
+    "sp": "toast_searching",
+    "direct": "toast_searching",
+    "hu": "toast_removing",
+    "ic": "toast_import_started",
+    "ib": "toast_import_started",
+    "ix": "toast_cancelled",
+    "is": "toast_skipped",
+    "ir": "toast_discarded",
+    "ia": "toast_saving",
+    "iy": "toast_retrying",
+    "if": "toast_retrying",
+    "cancel_all": "toast_cancelled",
+}
+
+
+def toast_key(data: str) -> str | None:
+    """The i18n key of the toast for a callback, or None for silent taps (paging, locks)."""
+    prefix, _, rest = data.partition(":")
+    if prefix in ("dl", "sp") and rest.endswith(":cancel"):
+        return "toast_cancelled"
+    return _TOASTS.get(prefix)
+
+
 async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle inline keyboard button presses."""
     query = update.callback_query
-    with contextlib.suppress(BadRequest):
-        await query.answer()
-
-    if not self._is_authorized(query.from_user.id):
-        return
-
     chat_id = update.effective_chat.id
     data = query.data
+    authorized = self._is_authorized(query.from_user.id)
+    key = toast_key(data) if authorized else None
+    with contextlib.suppress(BadRequest):
+        await query.answer(text=self.t(chat_id, key) if key else None)
+
+    if not authorized:
+        return
+
     logger.debug("Callback chat=%s user=%s data=%s", chat_id, query.from_user.id, data)
 
     prefix = data.split(":", 1)[0]
@@ -52,6 +84,7 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         "hu": self._handle_history_undo,
         "swp": self._handle_sweep_decision,
         "swr": self._handle_sweep_reason,
+        "cancel_all": self._handle_cancel_all,
     }.get(prefix)
 
     if prefix == "lock":
