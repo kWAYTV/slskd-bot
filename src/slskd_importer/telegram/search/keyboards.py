@@ -6,6 +6,8 @@ from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.i18n import DEFAULT_LOCALE, t
 
+NUMBERS_PER_ROW = 5
+
 
 def build_results_keyboard(
     results: list[SearchResult],
@@ -15,23 +17,18 @@ def build_results_keyboard(
     search_id: str,
     locale: str = DEFAULT_LOCALE,
 ) -> InlineKeyboardMarkup:
-    """Build an inline keyboard with search results for the user to pick from."""
+    """Build an inline keyboard with search results for the user to pick from.
+
+    The card text already lists format, length, quality and size per ``#n``,
+    so the picks are a compact row of numbers (five per row) under it.
+    """
     start = page * page_size
     end = min(start + page_size, len(results))
-    page_results = results[start:end]
 
     buttons = []
-    for i, result in enumerate(page_results):
-        absolute_idx = start + i
-        parts = [
-            f"#{absolute_idx + 1}",
-            result.extension.upper() or "?",
-            result.duration_display,
-            result.quality_short,
-            f"{result.size_mb:.0f} MB",
-        ]
-        label = "  ·  ".join(p for p in parts if p)
-        buttons.append([InlineKeyboardButton(label, callback_data=f"dl:{search_id}:{absolute_idx}")])
+    numbers = [InlineKeyboardButton(f"#{idx + 1}", callback_data=f"dl:{search_id}:{idx}") for idx in range(start, end)]
+    for row_start in range(0, len(numbers), NUMBERS_PER_ROW):
+        buttons.append(numbers[row_start : row_start + NUMBERS_PER_ROW])
 
     nav_row = []
     if page > 0:

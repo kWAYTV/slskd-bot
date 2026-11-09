@@ -44,6 +44,8 @@ class PendingSearch:
     created_at: float = field(default_factory=time.time)
     picked_index: int | None = None
     pick_state: str = ""
+    # The user's own message that started this search (for reactions).
+    query_message_id: int | None = None
 
 
 @dataclass
@@ -65,6 +67,7 @@ class PendingDownload:
     search_id: str | None = None
     task: asyncio.Task | None = None
     origin_message_id: int | None = None
+    query_message_id: int | None = None
 
 
 class ChatSession:

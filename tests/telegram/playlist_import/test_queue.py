@@ -19,6 +19,7 @@ class TestProcessNextImportTrack:
         bot = _setup_bot()
         chat_id = 67890
         bot._active_import[chat_id] = 1
+        bot._import_status_msg[chat_id] = MagicMock(message_id=999)
         bot.import_repo.get_next_pending_track = MagicMock(return_value=None)
         bot.import_repo.get_job_progress = MagicMock(return_value=(7, 2, 1, 10))
         bot.import_repo.update_job_status = MagicMock()
@@ -26,6 +27,8 @@ class TestProcessNextImportTrack:
         await bot._process_next_import_track(context, chat_id, 1, generation=0)
         bot.import_repo.update_job_status.assert_called_once_with(1, JobStatus.completed)
         assert chat_id not in bot._active_import
+        assert chat_id not in bot._import_status_msg
+        context.bot.unpin_chat_message.assert_awaited_once_with(chat_id=chat_id, message_id=999)
         context.bot.send_message.assert_awaited_once()
         msg_text = context.bot.send_message.call_args[1]["text"]
         assert "Import complete" in msg_text

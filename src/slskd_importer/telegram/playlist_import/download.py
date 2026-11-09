@@ -18,6 +18,7 @@ from slskd_importer.telegram.download.delivery import send_audio_or_document
 from slskd_importer.telegram.download.transfer import abort_transfer, fetch_from_peer, make_progress_callback
 from slskd_importer.telegram.playlist_import.keyboards import build_import_failure_keyboard, build_import_track_keyboard
 from slskd_importer.telegram.ui.editing import safe_edit
+from slskd_importer.telegram.ui.feedback import show_uploading
 from slskd_importer.telegram.ui.formatting import progress_bar
 from slskd_importer.telegram.ui.markdown import escape_md, md_code_safe
 
@@ -277,6 +278,7 @@ async def _deliver_import_preview(
         title=track.title,
         quality=quality_line,
     )
+    await show_uploading(context.bot, chat_id)
     await send_audio_or_document(
         context,
         chat_id,

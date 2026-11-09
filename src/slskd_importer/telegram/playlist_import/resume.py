@@ -8,6 +8,7 @@ import logging
 from telegram.constants import ParseMode
 
 from slskd_importer.playlist_import.job import JobStatus
+from slskd_importer.telegram.ui.feedback import pin
 from slskd_importer.telegram.ui.markdown import escape_md
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ async def resume_import_job(self, context, chat_id: int, notify: bool = False, j
                 parse_mode=ParseMode.MARKDOWN,
             )
             self._import_status_msg[chat_id] = progress_msg
+            await pin(context.bot, chat_id, getattr(progress_msg, "message_id", None))
         except Exception:
             logger.warning("Could not notify chat %s about import resume", chat_id)
 

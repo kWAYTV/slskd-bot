@@ -8,6 +8,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from slskd_importer.telegram.commands.keyboards import build_status_keyboard
 from slskd_importer.telegram.ui.markdown import code_span, escape_md
 
 
@@ -24,7 +25,11 @@ async def cmd_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(self.t(chat_id, "status_empty"))
         return
 
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=build_status_keyboard(locale=self.locale(chat_id)),
+    )
 
 
 async def cmd_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

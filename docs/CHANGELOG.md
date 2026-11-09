@@ -13,13 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Artist - Title` queries (also `–`, `—`, `|`) resolve with Spotify `artist:`/`track:` field filters before free text
 - Pasted video titles are cleaned before lookup: `(Official Video)`, `[HD]`, `(Lyrics)`, trailing `official audio`, outer quotes
 
+- Feedback through Telegram itself instead of extra messages: every button tap shows a toast ("Downloading…", "Saved", "Discarded"); your query message is reacted 👀 while searching, 🤷 when nothing turns up and 👍 once saved; "typing…" and "sending file…" chat actions during lookups and uploads
+- The import progress message is pinned while the import runs and unpinned when it ends or is cancelled
+- `/status` has a *Cancel all* button
+- Bot description and short description (shown in the empty chat before `/start`) are set per locale on startup
+
 ### Changed
 
+- Welcome text leads with what to send (two example queries, link types) and what the reactions mean, then the commands
+- Soulseek result picks are a compact row of `#1 … #5` buttons under the list (the text already shows format, length, quality and size)
 - No Spotify match now searches Soulseek directly at once, showing the parsed `Artist — Title` it will save as, instead of asking for another tap
 - Spotify picker collapses the same recording across albums and reissues (same artist, title and length), so one real match goes straight to Soulseek
 - Spotify picker buttons show length and year, and drop the artist when every candidate shares it
 - Picking a version edits the picker into the search card instead of sending a second message
-- Soulseek result buttons show the format (`FLAC`, `MP3`) and a shorter quality tag (`16/44.1`)
 - Direct-search names keep typed casing (`AC/DC`, `McCartney`); only all-lowercase input is capitalized
 
 ### Removed

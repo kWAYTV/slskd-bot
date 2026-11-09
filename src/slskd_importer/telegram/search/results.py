@@ -143,6 +143,7 @@ async def present_search_results(
         user_id=existing.user_id if existing else None,
         search_id=search_id,
         chat_id=chat_id,
+        query_message_id=existing.query_message_id if existing else None,
     )
 
     results_text = format_search_results(

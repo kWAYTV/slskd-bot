@@ -43,6 +43,27 @@ class TestMusicBotHandleText:
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
+    async def test_query_message_gets_searching_reaction_and_typing(self, mock_slskd, mock_spotify):
+        from telegram import ReactionTypeEmoji
+        from telegram.constants import ChatAction
+
+        bot = MusicBot(_make_config())
+        bot._do_search = AsyncMock()
+        update = _make_update(text="Artist Song")
+        update.message.message_id = 321
+        context = _make_context()
+        await bot.handle_text(update, context)
+        await asyncio.sleep(0)
+        context.bot.set_message_reaction.assert_awaited_once_with(
+            chat_id=67890, message_id=321, reaction=[ReactionTypeEmoji("👀")]
+        )
+        context.bot.send_chat_action.assert_awaited_once_with(chat_id=67890, action=ChatAction.TYPING)
+        search_id = bot._do_search.await_args.args[3]
+        assert bot.pending[search_id].query_message_id == 321
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
     async def test_unauthorized_text(self, mock_slskd, mock_spotify):
         config = _make_config()
         config.telegram_allowed_users = {11111}
