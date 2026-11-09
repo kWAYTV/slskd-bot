@@ -15,13 +15,14 @@ def build_import_summary_keyboard(
 
 
 def build_import_confirm_keyboard(job_id: int, *, locale: str = DEFAULT_LOCALE) -> InlineKeyboardMarkup:
-    """Confirm/cancel keyboard for playlist import."""
+    """Confirm/cancel keyboard for playlist import, with a save-everything shortcut."""
     return InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton(t(locale, "btn_start_import"), callback_data=f"ic:{job_id}"),
                 InlineKeyboardButton(t(locale, "btn_cancel"), callback_data=f"ix:{job_id}"),
-            ]
+            ],
+            [InlineKeyboardButton(t(locale, "btn_start_import_auto"), callback_data=f"ib:{job_id}")],
         ]
     )
 

@@ -12,10 +12,10 @@
 
 ## Features
 
-- **Search by text or link** — free-text queries resolve via catalog metadata (Spotify today); pasted Spotify track links resolve directly, and playlist/album links start an import
+- **Search by text or link** — free-text queries resolve via catalog metadata (Spotify today); `Artist - Title` (also `–`, `—`, `|`) uses precise field filters, pasted video titles like `(Official Video)` are cleaned up, and a query Spotify does not know goes straight to Soulseek. Pasted Spotify track links resolve directly, and playlist/album links start an import
 - **Smart ranking** — prefers FLAC, then WAV, then AIFF, then the best remaining format; scored by duration, hi-res quality, source reliability, and filename relevance; live/remix noise filtered out
 - **Languages** — English (default), Spanish, Galician, German. First `/start` picks a language; `/lang` changes it later
-- **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart (`/import` with no URL continues an unfinished job)
+- **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart (`/import` with no URL continues an unfinished job). *Start and save everything* saves each track as it lands, with no per-track preview or Save tap
 - **Library sweep** — walks top-level library files, resolves artist/title from tags (or filename heuristics: track prefixes, `Artist - Album - Title`, rip brackets), looks on Soulseek for a better lossless copy, and sends side-by-side pairs in Telegram (`Keep mine` / `Take new` / `Keep both`). Never auto-replaces. Runs on a schedule or via `/sweep`
 - **Live progress** — download messages update with a progress bar and queue state; `/status` shows everything in flight for the chat
 - **Library hygiene** — canonical tags on save, duplicate detection, `/undo` / `/history` ↩️ to remove saves, `/stats` for totals

@@ -87,6 +87,19 @@ class TestBuildResultsKeyboard:
         assert any("Prev" in btn.text for btn in nav_row)
         assert any("Next" in btn.text for btn in nav_row)
 
+    def test_button_shows_format_and_short_quality(self):
+        kb = build_results_keyboard([_make_result()], search_id="1")
+        label = kb.inline_keyboard[0][0].text
+        assert label.startswith("#1  ·  FLAC  ·  3:00  ·  16/44.1  ·  ")
+        assert "bit" not in label and "kHz" not in label
+
+    def test_button_without_quality_skips_slot(self):
+        bare = SearchResult(username="u", filename="\\Music\\x.mp3", size=5_000_000, length=180)
+        kb = build_results_keyboard([bare], search_id="1")
+        label = kb.inline_keyboard[0][0].text
+        assert "MP3" in label
+        assert "  ·    ·  " not in label
+
     def test_action_row_has_auto_and_cancel(self):
         results = [_make_result()]
         kb = build_results_keyboard(results, search_id="1")
@@ -166,6 +179,29 @@ class TestBuildSpotifyKeyboard:
         kb = build_spotify_keyboard([track], search_id="1")
         label = kb.inline_keyboard[0][0].text
         assert len(label) <= 64
+        # Length and year survive truncation; they are what tells versions apart.
+        assert label.endswith("3:00  ·  2024")
+
+    def test_single_artist_drops_name_from_buttons(self):
+        tracks = [_make_track(0), _make_track(1)]
+        tracks[1].artist = "Artist0"
+        kb = build_spotify_keyboard(tracks, search_id="1")
+        labels = [row[0].text for row in kb.inline_keyboard[:2]]
+        assert labels[0] == "#1  Title0  ·  3:00  ·  2024"
+        assert "Artist0" not in labels[1]
+
+    def test_mixed_artists_keep_name(self):
+        kb = build_spotify_keyboard([_make_track(0), _make_track(1)], search_id="1")
+        assert kb.inline_keyboard[0][0].text == "#1  Artist0 — Title0  ·  3:00  ·  2024"
+
+
+class TestBuildImportConfirmKeyboard:
+    def test_offers_manual_and_auto_save_start(self):
+        from slskd_importer.telegram.playlist_import.keyboards import build_import_confirm_keyboard
+
+        kb = build_import_confirm_keyboard(7)
+        callbacks = [btn.callback_data for row in kb.inline_keyboard for btn in row]
+        assert callbacks == ["ic:7", "ix:7", "ib:7"]
 
 
 class TestBuildImportFailureKeyboard:

@@ -97,19 +97,37 @@ class SpotifyResolver:
         try:
             results = self.sp.search(q=query, type="track", limit=limit)
             tracks = results.get("tracks", {}).get("items", [])
-
-            return [
-                TrackInfo(
-                    artist=t["artists"][0]["name"],
-                    title=t["name"],
-                    album=t["album"]["name"],
-                    duration_ms=t["duration_ms"],
-                    spotify_url=t["external_urls"].get("spotify", ""),
-                    year=t["album"].get("release_date", "")[:4],
-                )
-                for t in tracks
-            ]
+            return [_track_from_item(t) for t in tracks]
 
         except Exception:
             logger.exception(f"Spotify multi-search failed for: {query}")
             return []
+
+    def search_fielded(self, artist: str, title: str, limit: int = 5) -> list[TrackInfo]:
+        """Search with Spotify field filters (``artist:`` / ``track:``) for a precise artist/title pair.
+
+        Returns an empty list when nothing matches so callers can fall back to free text.
+        """
+        artist = artist.strip().replace('"', "")
+        title = title.strip().replace('"', "")
+        if not artist or not title:
+            return []
+        query = f"artist:{artist} track:{title}"
+        try:
+            results = self.sp.search(q=query, type="track", limit=limit)
+            tracks = results.get("tracks", {}).get("items", [])
+            return [_track_from_item(t) for t in tracks]
+        except Exception:
+            logger.exception(f"Spotify fielded search failed for: {query}")
+            return []
+
+
+def _track_from_item(t: dict) -> TrackInfo:
+    return TrackInfo(
+        artist=t["artists"][0]["name"],
+        title=t["name"],
+        album=t["album"]["name"],
+        duration_ms=t["duration_ms"],
+        spotify_url=t["external_urls"].get("spotify", ""),
+        year=t["album"].get("release_date", "")[:4],
+    )

@@ -13,6 +13,7 @@ from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.playlist_import.job import TrackStatus
 from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.core.session import PendingDownload
+from slskd_importer.telegram.download.approval import save_to_library
 from slskd_importer.telegram.download.delivery import send_audio_or_document
 from slskd_importer.telegram.download.transfer import abort_transfer, fetch_from_peer, make_progress_callback
 from slskd_importer.telegram.playlist_import.keyboards import build_import_failure_keyboard, build_import_track_keyboard
@@ -102,6 +103,23 @@ async def do_import_download(
 
         pending_dl.source_path = source_path
 
+        job = await asyncio.to_thread(self.import_repo.get_job_for_chat, job_id, chat_id)
+        if job is not None and job.saves_automatically:
+            await _auto_save_import_track(
+                self,
+                context,
+                chat_id,
+                pending_dl,
+                status_msg,
+                generation,
+                job_id,
+                track_id,
+                dl_id,
+                position=position,
+                total=total,
+            )
+            return
+
         await asyncio.to_thread(self.import_repo.update_track_status, track_id, TrackStatus.awaiting_approval)
 
         await _deliver_import_preview(
@@ -160,6 +178,59 @@ async def do_import_download(
         )
         await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "Download error")
         await self._process_next_import_track(context, chat_id, job_id, generation)
+
+
+async def _auto_save_import_track(
+    self,
+    context,
+    chat_id: int,
+    pending_dl: PendingDownload,
+    status_msg,
+    generation: int,
+    job_id: int,
+    track_id: int,
+    dl_id: str,
+    position: int = 0,
+    total: int = 0,
+):
+    """Save-everything imports: place the file in the library at once, no preview, no Save tap."""
+    track, result = pending_dl.track, pending_dl.result
+    self.downloads.pop(dl_id, None)
+    target_name = await save_to_library(self, pending_dl, chat_id)
+    if not target_name:
+        logger.warning("chat=%s import job %s auto-save failed for %s", chat_id, job_id, result.basename)
+        await safe_edit(
+            status_msg,
+            self.t(
+                chat_id,
+                "import_save_failed",
+                position=position or "?",
+                total=total or "?",
+                artist=escape_md(track.artist),
+                title=escape_md(track.title),
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        await asyncio.to_thread(
+            self.import_repo.complete_track, job_id, track_id, TrackStatus.failed, "File processing failed"
+        )
+    else:
+        logger.info("chat=%s import job %s auto-saved track %s as %s", chat_id, job_id, track_id, target_name)
+        await safe_edit(
+            status_msg,
+            self.t(
+                chat_id,
+                "import_saved",
+                position=position or "?",
+                total=total or "?",
+                artist=escape_md(track.artist),
+                title=escape_md(track.title),
+                name=md_code_safe(target_name),
+            ),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        await asyncio.to_thread(self.import_repo.complete_track, job_id, track_id, TrackStatus.completed)
+    await self._process_next_import_track(context, chat_id, job_id, generation)
 
 
 async def _deliver_import_preview(

@@ -125,6 +125,45 @@ class TestSpotifyResolver:
         assert result.year == ""
 
 
+class TestSearchFielded:
+    @pytest.fixture
+    def resolver(self):
+        with (
+            patch("slskd_importer.catalog.spotify.SpotifyClientCredentials"),
+            patch("slskd_importer.catalog.spotify.spotipy.Spotify") as mock_sp,
+        ):
+            r = SpotifyResolver("test-id", "test-secret")
+            r.sp = mock_sp.return_value
+            return r
+
+    def test_uses_field_filters(self, resolver):
+        resolver.sp.search.return_value = {
+            "tracks": {
+                "items": [
+                    {
+                        "artists": [{"name": "Nancy Sinatra"}],
+                        "name": "Bang Bang",
+                        "album": {"name": "Album", "release_date": "1966-01-01"},
+                        "duration_ms": 162000,
+                        "external_urls": {"spotify": "u"},
+                    }
+                ]
+            }
+        }
+        tracks = resolver.search_fielded('Nancy "Sinatra"', "Bang Bang", limit=10)
+        assert len(tracks) == 1
+        assert resolver.sp.search.call_args.kwargs["q"] == "artist:Nancy Sinatra track:Bang Bang"
+        assert resolver.sp.search.call_args.kwargs["limit"] == 10
+
+    def test_empty_parts_skip_the_call(self, resolver):
+        assert resolver.search_fielded("", "Bang Bang") == []
+        resolver.sp.search.assert_not_called()
+
+    def test_exception_returns_empty(self, resolver):
+        resolver.sp.search.side_effect = Exception("boom")
+        assert resolver.search_fielded("A", "B") == []
+
+
 class TestGetTrack:
     @pytest.fixture
     def resolver(self):

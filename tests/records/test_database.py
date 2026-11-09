@@ -27,13 +27,13 @@ class TestDatabaseNormalCreation:
         db.close()
 
     def test_database_schema_version(self, tmp_path):
-        """Verify user_version is set to 6."""
+        """Verify user_version is set to 7."""
         db_path = str(tmp_path / "version.db")
         db = Database(db_path)
 
         cursor = db.connection.execute("PRAGMA user_version")
         version = cursor.fetchone()[0]
-        assert version == 6
+        assert version == 7
         cols = {row[1] for row in db.connection.execute("PRAGMA table_info(chat_prefs)")}
         assert "locale" in cols
         db.close()
@@ -74,7 +74,7 @@ class TestDatabaseCorruptRecovery:
 
             db = Database(db_path)
             cursor = db.connection.execute("PRAGMA user_version")
-            assert cursor.fetchone()[0] == 6
+            assert cursor.fetchone()[0] == 7
             db.close()
 
 
@@ -136,8 +136,10 @@ class TestDatabaseMigration:
         cols = {row[1] for row in db.connection.execute("PRAGMA table_info(download_history)")}
         assert "chat_id" in cols
         assert "spotify_url" in cols
+        job_cols = {row[1] for row in db.connection.execute("PRAGMA table_info(import_jobs)")}
+        assert "auto_save" in job_cols
         version = db.connection.execute("PRAGMA user_version").fetchone()[0]
-        assert version == 6
+        assert version == 7
         tables = {row[0] for row in db.connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "chat_prefs" in tables
         prefs_cols = {row[1] for row in db.connection.execute("PRAGMA table_info(chat_prefs)")}

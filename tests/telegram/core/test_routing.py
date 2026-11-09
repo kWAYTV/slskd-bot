@@ -58,6 +58,24 @@ class TestMusicBotCallbackHandler:
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
+    async def test_spotify_select_reuses_picker_message(self, mock_slskd, mock_spotify):
+        """Picking a version edits the picker into the search card; no second message is sent."""
+        bot = MusicBot(_make_config())
+        bot._spotify_candidates["1"] = [_make_track(), _make_track()]
+        bot.pending["1"] = PendingSearch(query="test", chat_id=67890, search_id="1", message_id=5)
+        update = _make_callback_update(data="sp:1:0")
+        update.callback_query.message = MagicMock(message_id=5)
+        context = _make_context()
+        bot._do_slskd_search = AsyncMock()
+        await bot.handle_callback(update, context)
+        await asyncio.sleep(0)
+        context.bot.send_message.assert_not_called()
+        assert bot._do_slskd_search.await_args.args[3] is update.callback_query.message
+        assert bot.pending["1"].message_id == 5
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
     async def test_spotify_select_invalid_index(self, mock_slskd, mock_spotify):
         bot = MusicBot(_make_config())
         bot._spotify_candidates["1"] = [_make_track()]
@@ -318,6 +336,24 @@ class TestImportCallbackRouting:
         await bot.handle_callback(update, context)
         edit_text = update.callback_query.edit_message_text
         assert "cancelled" in edit_text.call_args[0][0].lower()
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_import_auto_save_prefix_flags_job_and_starts(self, mock_slskd, mock_spotify):
+        """ib: marks the job save-everything and starts it."""
+        bot = MusicBot(_make_config())
+        job_id = bot.import_repo.create_job(67890, "https://spotify.com/playlist/x", "Test", 5)
+        update = _make_callback_update(chat_id=67890, data=f"ib:{job_id}")
+        context = _make_context()
+        context.application.create_task = MagicMock(return_value=MagicMock())
+        with patch.object(bot, "_process_next_import_track", new_callable=AsyncMock):
+            await bot.handle_callback(update, context)
+        job = bot.import_repo.get_job_for_chat(job_id, 67890)
+        assert job.saves_automatically is True
+        assert job.status == "active"
+        assert bot._active_import[67890] == job_id
+        assert "saved" in update.callback_query.edit_message_text.call_args[0][0].lower()
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")

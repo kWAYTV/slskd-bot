@@ -53,6 +53,18 @@ class TestCreateJob:
         assert job.status == "pending"
 
 
+class TestAutoSave:
+    def test_defaults_off_and_can_be_turned_on(self, repo):
+        job_id = repo.create_job(chat_id=1, spotify_url="url", name="PL", total_tracks=3)
+        assert repo.get_job_for_chat(job_id, 1).saves_automatically is False
+        repo.set_auto_save(job_id, True)
+        job = repo.get_job_for_chat(job_id, 1)
+        assert job.auto_save == 1
+        assert job.saves_automatically is True
+        # Survives the resume path too.
+        assert repo.list_resumable_jobs()[0].saves_automatically is True
+
+
 class TestAddTracks:
     def test_adds_tracks_and_verifies_count(self, repo):
         job_id = repo.create_job(chat_id=1, spotify_url="url", name="PL", total_tracks=3)
