@@ -17,7 +17,9 @@ from slskd_importer.telegram.ui.formatting import format_search_results, track_c
 
 logger = logging.getLogger(__name__)
 
-_CANCELABLE_STATES = frozenset({"downloading", "failed"})
+# Locked while work is in flight or a Save is pending — failed unlocks so another # can be tapped.
+_LOCKED_STATES = frozenset({"downloading", "awaiting", "saved"})
+_CANCELABLE_STATES = frozenset({"downloading"})
 
 
 def render_results_card(self, pending: PendingSearch) -> tuple[str, InlineKeyboardMarkup]:
@@ -42,7 +44,8 @@ def render_results_card(self, pending: PendingSearch) -> tuple[str, InlineKeyboa
         pick_state=pending.pick_state,
         status_line=status_line,
     )
-    if pending.picked_index is not None and pending.pick_state:
+    locked = pending.picked_index is not None and pending.pick_state in _LOCKED_STATES
+    if locked:
         label = f"#{pending.picked_index + 1}"
         markup = build_results_status_keyboard(
             label=self.t(pending.chat_id, f"btn_status_{pending.pick_state}", label=label),
@@ -51,6 +54,7 @@ def render_results_card(self, pending: PendingSearch) -> tuple[str, InlineKeyboa
             locale=locale,
         )
     else:
+        # failed / idle: keep the ❌ mark in the list but restore pick buttons.
         markup = build_results_keyboard(
             pending.results,
             page=pending.page,

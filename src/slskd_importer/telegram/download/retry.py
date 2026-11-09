@@ -114,10 +114,13 @@ async def handle_next_result(self, update, context: ContextTypes.DEFAULT_TYPE, c
         self.downloads[dl_id] = pending_dl
         return
 
-    next_idx = pending_dl.result_index + 1
-    if next_idx >= len(pending.results):
+    n = len(pending.results)
+    if n <= 1:
         await safe_query_edit(query, self.t(chat_id, "no_more_results"))
         return
+
+    # Wrap so failing on #2 of 2 still offers #1 (not only "worse" results below).
+    next_idx = (pending_dl.result_index + 1) % n
 
     if pending_dl.source_path:
         await self._cleanup_download_artifacts(pending_dl)

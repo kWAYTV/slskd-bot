@@ -88,7 +88,8 @@ def _parse_result_index(action: str) -> int | None:
 
 
 def has_next_result(self, chat_id: int, current_index: int, search_id: str | None = None) -> bool:
+    """True when another result exists to try (wraps past the last index to earlier ones)."""
     pending = self.pending.get(search_id) if search_id else None
     if pending is None:
         pending = self._import_pending.get(chat_id)
-    return pending is not None and current_index + 1 < len(pending.results)
+    return pending is not None and len(pending.results) > 1

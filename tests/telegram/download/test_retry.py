@@ -79,7 +79,7 @@ class TestRetryResultIndex:
     @patch("slskd_importer.telegram.core.app.SlskdClient")
     @pytest.mark.asyncio
     async def test_next_result_exhausted(self, mock_slskd, mock_spotify):
-        """Next-result on last result should show 'no more results'."""
+        """Next-result with a single result should show 'no more results'."""
         bot = MusicBot(_make_config())
         track = _make_track()
         results = [_make_search_result(0)]
@@ -92,6 +92,28 @@ class TestRetryResultIndex:
         await bot.handle_callback(update, context)
         edit_call = update.callback_query.edit_message_text
         assert "No further results" in edit_call.call_args[0][0]
+
+    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
+    @patch("slskd_importer.telegram.core.app.SlskdClient")
+    @pytest.mark.asyncio
+    async def test_next_result_wraps_to_earlier(self, mock_slskd, mock_spotify):
+        """Failing on the last pick still offers earlier results via Next."""
+        bot = MusicBot(_make_config())
+        track = _make_track()
+        results = [_make_search_result(i) for i in range(2)]
+        bot.pending["1"] = PendingSearch(query="test", track=track, results=results, chat_id=67890, search_id="1")
+        bot.downloads["2"] = PendingDownload(
+            track=track, result=results[1], chat_id=67890, result_index=1, search_id="1"
+        )
+        update = _make_callback_update(chat_id=67890, data="next:2")
+        context = _make_context()
+
+        with patch.object(bot, "_do_download", new_callable=AsyncMock) as mock_dl:
+            await bot.handle_callback(update, context)
+            mock_dl.assert_called_once()
+            call_args = mock_dl.call_args[0]
+            assert call_args[3] == results[0]
+            assert call_args[-1] == 0
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
