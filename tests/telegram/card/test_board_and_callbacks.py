@@ -152,7 +152,8 @@ async def test_get_replaces_a_saved_track(bot):
     bot.runner.pipeline.finder._found[item.id] = Copies([make_result(0)])
     with patch.object(bot.shelf, "remove", MagicMock(return_value=True)) as remove:
         await press(bot, actions.GET, batch, item.id, 0)
-    remove.assert_called_once_with("old.flac", 3)
+    remove.assert_not_called()  # the old file stays until the new copy has landed
+    assert bot.runner.pipeline.replaces[item.id] == ("old.flac", 3)
 
 
 async def test_get_ignores_a_stale_index(bot):
@@ -216,3 +217,11 @@ async def test_deliver_copy_sends_to_the_batch_chat(bot, tmp_path):
 
 def test_view_defaults():
     assert View() == View(board.SUMMARY, 0, 0)
+
+
+async def test_skip_leaves_a_track_waiting_for_review(bot):
+    batch, items = queue(bot)
+    bot.queue_store.update_item(items[0].id, status=ItemStatus.review, detail="MP3 · 320k · 13 MB")
+    await press(bot, actions.SKIP, batch, items[0].id)
+    assert bot.queue_store.get_item(items[0].id).status == ItemStatus.cancelled
+    assert "Cancelled." in drawn_text(bot)

@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 # Copies fetched per item before giving up.
 MAX_TRIES = 3
+# A lossless verdict is stored on the item as ``verdict:<KIND>:<cutoff kHz>`` so a front end can word it.
+VERDICT_PREFIX = "verdict:"
 
 Report = Callable[[Progress], None]
 # Hands a fetched file to the requester (batch, item, track, copy, path, quality); True when it reached them.
@@ -64,6 +66,8 @@ class ItemPipeline:
         self.deliver: DeliverHook | None = None
         # A copy the requester picked by hand for an item: fetched as is, never second-guessed.
         self.picks: dict[int, SearchResult] = {}
+        # The saved file (name, history id) a picked copy replaces; removed once the new copy is ready to place.
+        self.replaces: dict[int, tuple[str, int | None]] = {}
         # (peer, remote path) -> (lock, items waiting on or holding it)
         self._copy_locks: dict[tuple[str, str], tuple[asyncio.Lock, int]] = {}
 
@@ -80,6 +84,7 @@ class ItemPipeline:
             report(Progress(phases.IDENTIFYING))
         track = await self.identified(item)
         pick = self.picks.pop(item.id, None)
+        replaces = self.replaces.pop(item.id, None)
 
         if pick is None and batch.to_library and not item.forced:
             owned = await asyncio.to_thread(self.shelf.owned_as, track)
@@ -97,13 +102,13 @@ class ItemPipeline:
                 return
             if found.lossy:
                 best = found.ranked[0]
-                await self._finish(item, ItemStatus.review, detail=f"no lossless copy; best is {describe_copy(best)}")
+                await self._finish(item, ItemStatus.review, detail=describe_copy(best))
                 return
             copies = found.ranked[:MAX_TRIES]
 
         notes: list[str] = []
         for result in copies:
-            note = await self._try_copy(batch, item, track, result, report, trusted=pick is not None)
+            note = await self._try_copy(batch, item, track, result, report, trusted=pick is not None, replaces=replaces)
             if note is None:
                 return
             logger.info("Queue item %d: %s from %s: %s", item.id, result.basename, result.username, note)
@@ -111,7 +116,15 @@ class ItemPipeline:
         await self._finish(item, ItemStatus.failed, detail="; ".join(notes)[:300])
 
     async def _try_copy(
-        self, batch: Batch, item: Item, track: TrackInfo, result: SearchResult, report: Report, *, trusted: bool
+        self,
+        batch: Batch,
+        item: Item,
+        track: TrackInfo,
+        result: SearchResult,
+        report: Report,
+        *,
+        trusted: bool,
+        replaces: tuple[str, int | None] | None = None,
     ) -> str | None:
         """Fetch one copy and finish the item with it. Returns why it was not used, or None on success."""
 
@@ -132,7 +145,9 @@ class ItemPipeline:
                 if not landed.ok:
                     return landed.error
                 try:
-                    return await self._use_copy(batch, item, track, result, landed, report, trusted=trusted)
+                    return await self._use_copy(
+                        batch, item, track, result, landed, report, trusted=trusted, replaces=replaces
+                    )
                 except BaseException:
                     await discard(self._slskd, self._processor, result, landed.path, landed.transfer_id)
                     raise
@@ -153,6 +168,7 @@ class ItemPipeline:
         report: Report,
         *,
         trusted: bool,
+        replaces: tuple[str, int | None] | None = None,
     ) -> str | None:
         verdict = None
         if result.extension in CHECKABLE_EXTENSIONS:
@@ -163,9 +179,12 @@ class ItemPipeline:
             return f"fake lossless (cutoff {verdict.cutoff_khz:.1f} kHz)"
 
         quality = describe_copy(result)
-        detail = verdict.display if verdict else ""
+        detail = f"{VERDICT_PREFIX}{verdict.verdict}:{verdict.cutoff_khz:.1f}" if verdict else ""
         if batch.to_library:
             report(Progress(phases.SAVING))
+            if replaces is not None:
+                # Only now, with the new copy fetched and checked, does the old one go.
+                await asyncio.to_thread(self.shelf.remove, *replaces)
             placed = await self.shelf.place(track, result, landed.path, batch.chat_id)
             await discard(self._slskd, self._processor, result, landed.path, landed.transfer_id)
             if placed is None:

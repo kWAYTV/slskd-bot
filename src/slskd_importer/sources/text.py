@@ -9,17 +9,16 @@ from __future__ import annotations
 
 import re
 
-from slskd_importer.sources.titles import has_separator, is_unidentified, strip_numbering
+from slskd_importer.sources.titles import has_separator, is_unidentified, strip_label_tag, strip_numbering
 from slskd_importer.sources.tracklist import Entry
 
 _BULLET = re.compile(r"^\s*[-•*·▪]\s+")
-_TRAILING_LABEL = re.compile(r"\s*\[[^\]]+\]\s*$")
 
 
 def clean_line(line: str) -> str:
     """One tracklist line without bullet, numbering, timestamp or trailing ``[Label]``."""
     text = strip_numbering(_BULLET.sub("", line, count=1))
-    text = _TRAILING_LABEL.sub("", text)
+    text = strip_label_tag(text)
     return re.sub(r"\s{2,}", " ", text).strip()
 
 

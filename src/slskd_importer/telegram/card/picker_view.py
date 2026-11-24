@@ -10,13 +10,13 @@ from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card
 from slskd_importer.telegram.card.status import Translate
-from slskd_importer.telegram.ui.markdown import code_span, escape_md
+from slskd_importer.telegram.ui.markdown import bold, code_span
 
 
 def render_picker(t: Translate, batch: Batch, item: Item, copies: Copies | None, page: int, page_size: int) -> Card:
     """*copies* None means the search is still running."""
     back = [InlineKeyboardButton(t("btn_back"), callback_data=actions.encode(actions.ITEM, batch.id, item.id))]
-    head = f"*{escape_md(item.label)}*"
+    head = bold(item.label)
     if copies is None:
         return f"{head}\n{t('picker_searching')}", InlineKeyboardMarkup([back])
     if not copies.ranked:

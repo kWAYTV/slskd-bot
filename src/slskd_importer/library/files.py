@@ -35,7 +35,7 @@ class FileProcessor:
         """Return library files whose stem matches the configured filename template."""
         if not os.path.isdir(self.output_dir):
             return []
-        stem = self._sanitize_filename(self.filename_template.format(artist=artist, title=title)).lower()
+        stem = self._stem(artist, title).lower()
         matches = []
         for filename in os.listdir(self.output_dir):
             name, ext = os.path.splitext(filename)
@@ -47,9 +47,12 @@ class FileProcessor:
 
     def build_filename(self, artist: str, title: str, extension: str = "flac") -> str:
         """Build the target filename from artist and title."""
-        name = self.filename_template.format(artist=artist, title=title)
-        name = self._sanitize_filename(name)
-        return f"{name}.{extension}"
+        return f"{self._stem(artist, title)}.{extension}"
+
+    def _stem(self, artist: str, title: str) -> str:
+        """The file name without extension. A track with no known artist is named by its title alone."""
+        name = self.filename_template.format(artist=artist, title=title) if artist.strip() else title
+        return self._sanitize_filename(name)
 
     def find_downloaded_file(self, username: str, remote_filename: str) -> str | None:
         """Find a downloaded file on disk based on the slskd download structure."""

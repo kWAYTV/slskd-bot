@@ -12,6 +12,12 @@ def escape_md(text: str) -> str:
     return text
 
 
+def bold(text: str) -> str:
+    """*text* in bold. Legacy Markdown ignores backslash escapes inside an entity, so the
+    characters that would break it are dropped instead of escaped."""
+    return f"*{text.replace('*', '').replace('`', '').replace('_', ' ').strip() or '?'}*"
+
+
 def md_code_safe(text: str) -> str:
     """Neutralize backticks in values interpolated into Markdown code spans."""
     return text.replace("`", "ʼ")

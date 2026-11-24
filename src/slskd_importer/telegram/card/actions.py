@@ -17,6 +17,7 @@ UNDO = "u"  # remove a saved track from the library
 SEND = "f"  # send the saved file to the chat
 AGAIN = "a"  # fetch again, skipping the owned check
 RETRY = "t"  # run one track through the queue again
+SKIP = "k"  # leave a track that waits for a decision
 
 
 @dataclass(frozen=True)

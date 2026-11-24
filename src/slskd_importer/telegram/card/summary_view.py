@@ -12,7 +12,7 @@ from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card
 from slskd_importer.telegram.card.status import ATTENTION, Translate, item_icon, phase_text
 from slskd_importer.telegram.ui.formatting import clip, progress_bar
-from slskd_importer.telegram.ui.markdown import escape_md
+from slskd_importer.telegram.ui.markdown import bold, escape_md
 
 ATTENTION_BUTTONS = 5
 
@@ -22,7 +22,8 @@ def render_summary(t: Translate, batch: Batch, items: list[Item], progress: dict
     total = len(items)
     settled = total - sum(counts[status] for status in OPEN_STATUSES)
 
-    lines = [f"*{escape_md(batch.name)}*  ·  {t(f'kind_{batch.kind}')}"]
+    # A typed list is named "12 tracks" already; only real sources get their kind spelled out.
+    lines = [bold(batch.name) if batch.kind == "list" else f"{bold(batch.name)}  ·  {t(f'kind_{batch.kind}')}"]
     if batch.status == BatchStatus.active:
         lines.append(f"{progress_bar(settled / total * 100 if total else 100)}  {settled} / {total}")
     else:

@@ -77,7 +77,7 @@ def test_delivered_item_has_no_library_buttons(store):
     ("status", "words", "buttons"),
     [
         (ItemStatus.owned, "Already in your library", ["Download anyway"]),
-        (ItemStatus.review, "No lossless copy found", ["Choose a copy"]),
+        (ItemStatus.review, "No lossless copy. Best there is:", ["Choose a copy", "Skip"]),
         (ItemStatus.no_match, "Nothing found on Soulseek", ["Search again"]),
         (ItemStatus.failed, "Could not get it", ["Retry", "Choose a copy"]),
         (ItemStatus.removed, "Removed from the library", ["Download again"]),
@@ -113,7 +113,7 @@ def test_summary_counts_progress_and_attention(store):
     store.update_item(items[4].id, status=ItemStatus.working)
     items = store.items(batch.id)
     text, markup = render_summary(t, batch, items, {items[4].id: Progress(DOWNLOADING, 50.0)})
-    assert "*Test batch*  ·  List" in text
+    assert text.startswith("*Test batch*\n")
     assert "4 / 6" in text
     assert (
         "✅ 1 saved" in text
@@ -177,3 +177,21 @@ def test_actions_round_trip():
     assert len(actions.encode(actions.PICKER, 10**9, 10**9, 99)) <= 64
     assert actions.decode("lang:es") is None
     assert actions.decode("q:g:x:1:2") is None
+
+
+def test_names_with_markdown_characters_stay_bold_without_backslashes(store):
+    from slskd_importer.catalog.track import TrackInfo
+
+    batch = make_batch(store, [Entry(track=TrackInfo("Isaiah", "Shake It Down [ISH_EP 04] *", "", 0, "", ""))])
+    text, _ = render_item(t, batch, store.items(batch.id)[0], None, alone=True)
+    assert "*Isaiah — Shake It Down [ISH EP 04]*" in text and "\\" not in text
+
+
+def test_saved_item_words_the_lossless_verdict(store):
+    batch, item = one_item(
+        store, status=ItemStatus.done, saved_name="x.flac", quality="FLAC", detail="verdict:WARNING:19.5"
+    )
+    text, _ = render_item(t, batch, item, None, alone=True)
+    assert "⚠️ Possible transcode · cutoff 19.5 kHz" in text
+    es, _ = render_item(partial(translate, "es"), batch, item, None, alone=True)
+    assert "Posible transcodificación" in es

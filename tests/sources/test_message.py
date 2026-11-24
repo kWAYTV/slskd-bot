@@ -126,3 +126,11 @@ def test_is_spotify_url():
     assert is_spotify_url("https://open.spotify.com/track/abc")
     assert is_spotify_url("https://open.spotify.com/playlist/abc")
     assert not is_spotify_url("https://www.youtube.com/watch?v=abc")
+
+
+def test_label_tags_go_but_version_tags_stay():
+    from slskd_importer.sources.titles import strip_label_tag
+
+    assert strip_label_tag("Isaiah - Ain't Nobody Shake It Down [ISH EP 04]") == "Isaiah - Ain't Nobody Shake It Down"
+    assert strip_label_tag("A - B [Extended Mix]") == "A - B [Extended Mix]"
+    assert strip_label_tag("A - B") == "A - B"
