@@ -8,7 +8,6 @@ import pytest
 from slskd_importer.sources import tracklist_pages
 from slskd_importer.sources.tracklist import SourceError
 from slskd_importer.sources.tracklist_pages import (
-    BLOCKED,
     BLOCKED_1001,
     NO_TRACKS,
     UNREADABLE,
@@ -19,7 +18,6 @@ from slskd_importer.sources.tracklist_pages import (
 URL_1001 = (
     "https://www.1001tracklists.com/tracklist/140z3slt/timmy-trumpet-one-world-radio-full-moon-083-2026-11-24.html"
 )
-URL_MIXESDB = "https://www.mixesdb.com/w/2026-10-24_-_Miss_Monique_-_Essential_Mix"
 
 
 def _recording(name: str) -> str:
@@ -52,30 +50,12 @@ CHALLENGE_1001 = """<html><head>
 
 CLOUDFLARE_CHALLENGE = "<html><head><title>Just a moment...</title></head><body>Checking your browser</body></html>"
 
-PAGE_MIXESDB = """<html><head>
-<title>2026-10-24 - Miss Monique - Essential Mix | DJ sets tracklists on MixesDB</title></head><body>
-<ul><li class="toclevel-1"><a href="#Tracklist"><span class="toctext">Tracklist</span></a></li></ul>
-<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>
-<div class="mw-heading mw-heading2"><h2 id="Tracklist">Tracklist</h2></div>
-<ol><li>[000] intro</li>
-<li>[002] Sideral - Miracle [Habitat]</li>
-<li>[006] <i>Gravitate 02 - A2 [Gravitate]</i></li>
-<li>[0??] DJ Split - Nun Stop</li>
-<li>[042] Tom Staar &amp; Trace - East Soul (Kryder Remix) [Spinnin']</li>
-<li>[051] ?</li>
-<li>[055] ? - ? [Axiom]</li></ol>
-<!-- Render ID 94f68a84 -->
-<ol><li>Not - A Track</li></ol>
-</body></html>"""
-
 
 def _resolve(page: str, url: str = URL_1001):
     return resolve_tracklist_page(url, fetch=lambda _url: page)
 
 
-@pytest.mark.parametrize(
-    "url", [URL_1001, URL_MIXESDB, "1001tracklists.com/tracklist/2uz9wx21/gorillaz.html", f"  {URL_1001} "]
-)
+@pytest.mark.parametrize("url", [URL_1001, "1001tracklists.com/tracklist/2uz9wx21/gorillaz.html", f"  {URL_1001} "])
 def test_is_tracklist_page_url_accepts_tracklist_pages(url: str) -> None:
     assert is_tracklist_page_url(url)
 
@@ -85,7 +65,10 @@ def test_is_tracklist_page_url_accepts_tracklist_pages(url: str) -> None:
     [
         "https://www.1001tracklists.com/",
         "https://www.1001tracklists.com/dj/timmytrumpet/index.html",
-        "https://www.mixesdb.com/w/Category:Essential_Mix",
+        "https://www.mixesdb.com/w/2026-10-24_-_Miss_Monique_-_Essential_Mix",
+        "https://evil1001tracklists.com/tracklist/140z3slt/x.html",
+        "https://1001tracklists.com.evil.example/tracklist/140z3slt/x.html",
+        "https://example.com/?next=https://www.1001tracklists.com/tracklist/140z3slt/x.html",
         "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
         "https://example.com/tracklist/1001tracklists.com",
@@ -109,19 +92,6 @@ def test_1001tracklists_reads_music_recording_names() -> None:
     ]
 
 
-def test_mixesdb_reads_the_tracklist_section() -> None:
-    tracklist = _resolve(PAGE_MIXESDB, URL_MIXESDB)
-
-    assert tracklist.kind == "mix"
-    assert tracklist.name == "2026-10-24 - Miss Monique - Essential Mix"
-    assert [entry.query for entry in tracklist.entries] == [
-        "Sideral - Miracle",
-        "Gravitate 02 - A2",
-        "DJ Split - Nun Stop",
-        "Tom Staar & Trace - East Soul (Kryder Remix)",
-    ]
-
-
 @pytest.mark.parametrize("page", [CHALLENGE_1001, CLOUDFLARE_CHALLENGE])
 def test_1001tracklists_challenge_page_is_reported_as_blocked(page: str) -> None:
     with pytest.raises(SourceError) as excinfo:
@@ -130,20 +100,11 @@ def test_1001tracklists_challenge_page_is_reported_as_blocked(page: str) -> None
     assert str(excinfo.value) == BLOCKED_1001
 
 
-def test_mixesdb_challenge_page_is_reported_as_blocked() -> None:
-    with pytest.raises(SourceError) as excinfo:
-        _resolve(CLOUDFLARE_CHALLENGE, URL_MIXESDB)
-
-    assert str(excinfo.value) == BLOCKED
-
-
 @pytest.mark.parametrize(
     ("page", "url"),
     [
         ("<html><head><title>Empty set</title></head><body></body></html>", URL_1001),
         (f"<html><body>{_recording('ID - ID')}</body></html>", URL_1001),
-        ('<html><body><h2 id="Tracklist">Tracklist</h2><ol><li>?</li></ol></body></html>', URL_MIXESDB),
-        ("<html><body><ol><li>Artist - Outside The Section</li></ol></body></html>", URL_MIXESDB),
     ],
 )
 def test_page_without_identified_tracks_is_a_source_error(page: str, url: str) -> None:
@@ -185,9 +146,8 @@ def test_default_fetch_sends_a_browser_user_agent(monkeypatch: pytest.MonkeyPatc
     [
         (403, URL_1001, BLOCKED_1001),
         (429, URL_1001, BLOCKED_1001),
-        (403, URL_MIXESDB, BLOCKED),
         (404, URL_1001, UNREADABLE),
-        (500, URL_MIXESDB, UNREADABLE),
+        (500, URL_1001, UNREADABLE),
     ],
 )
 def test_default_fetch_maps_http_errors(monkeypatch: pytest.MonkeyPatch, status: int, url: str, message: str) -> None:
