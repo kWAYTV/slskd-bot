@@ -1,8 +1,4 @@
-"""DJ tracklist sites: 1001Tracklists and MixID (schema.org microdata), MixesDB (MediaWiki ordered lists).
-
-MixID sits behind a Cloudflare challenge that refuses non-browser clients, so a
-MixID link usually ends in its "paste it as text" message.
-"""
+"""DJ tracklist sites: 1001Tracklists (schema.org microdata) and MixesDB (MediaWiki ordered lists)."""
 
 from __future__ import annotations
 
@@ -17,7 +13,6 @@ from slskd_importer.sources.tracklist import SourceError, Tracklist
 Fetch = Callable[[str], str]
 
 BLOCKED_1001 = "1001Tracklists blocked the request. Copy the tracklist and paste it as text instead."
-BLOCKED_MIXID = "MixID blocked the request. Copy the tracklist and paste it as text instead."
 BLOCKED = "That site blocked the request. Copy the tracklist and paste it as text instead."
 UNREADABLE = "Could not read that link (private or removed?)."
 NO_TRACKS = "No tracklist found on that page. Paste the track names as text instead."
@@ -30,7 +25,7 @@ _BLOCKED_STATUS = frozenset({403, 429, 503})
 _CHALLENGE_MARKERS = ("just a moment...", "turnstile-container", "you will be forwarded to the requested page")
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
-_TITLE_SUFFIX_RE = re.compile(r"\s*\|\s*(?:DJ sets tracklists on )?(?:MixesDB|1001Tracklists|MixID).*$", re.IGNORECASE)
+_TITLE_SUFFIX_RE = re.compile(r"\s*\|\s*(?:DJ sets tracklists on )?(?:MixesDB|1001Tracklists).*$", re.IGNORECASE)
 # 1001Tracklists: <div itemprop="tracks" itemtype="http://schema.org/MusicRecording"><meta itemprop="name" content="…">
 _RECORDING_RE = re.compile(
     r'itemtype="https?://schema\.org/MusicRecording"[^>]*>\s*<meta\s+itemprop="name"\s+content="([^"]*)"',
@@ -51,14 +46,8 @@ def _is_1001(url: str) -> bool:
     return _host(url).endswith("1001tracklists.com") and "/tracklist/" in url
 
 
-def _is_mixid(url: str) -> bool:
-    return _host(url).endswith("mixid.fm") and "/mixes/" in url
-
-
 def _blocked_message(url: str) -> str:
-    if _is_1001(url):
-        return BLOCKED_1001
-    return BLOCKED_MIXID if _is_mixid(url) else BLOCKED
+    return BLOCKED_1001 if _is_1001(url) else BLOCKED
 
 
 def _is_mixesdb(url: str) -> bool:
@@ -67,9 +56,9 @@ def _is_mixesdb(url: str) -> bool:
 
 
 def is_tracklist_page_url(url: str) -> bool:
-    """True for a 1001Tracklists tracklist page, a MixID mix page or a MixesDB mix page. No network."""
+    """True for a 1001Tracklists tracklist page or a MixesDB mix page. No network."""
     url = url.strip()
-    return _is_1001(url) or _is_mixid(url) or _is_mixesdb(url)
+    return _is_1001(url) or _is_mixesdb(url)
 
 
 def _fetch(url: str) -> str:

@@ -209,28 +209,3 @@ def test_default_fetch_maps_network_errors(monkeypatch: pytest.MonkeyPatch) -> N
         tracklist_pages.resolve_tracklist_page(URL_1001)
 
     assert str(excinfo.value) == UNREADABLE
-
-
-MIXID_URL = "https://www.mixid.fm/mixes/anne-xtrude-x-rso-berlin-04-10-2026"
-
-
-def test_mixid_links_are_recognised() -> None:
-    assert is_tracklist_page_url(MIXID_URL)
-    assert not is_tracklist_page_url("https://www.mixid.fm/")
-
-
-def test_mixid_challenge_page_says_to_paste_the_tracklist() -> None:
-    from slskd_importer.sources.tracklist_pages import BLOCKED_MIXID
-
-    with pytest.raises(SourceError, match=BLOCKED_MIXID):
-        resolve_tracklist_page(MIXID_URL, fetch=lambda url: "<title>Just a moment...</title>")
-
-
-def test_mixid_microdata_is_read_when_the_page_is_served() -> None:
-    page = (
-        "<title>Anne Xtrude x RSO Berlin | MixID</title>"
-        '<div itemtype="https://schema.org/MusicRecording"><meta itemprop="name" content="Artist A - Track One"></div>'
-    )
-    tracklist = resolve_tracklist_page(MIXID_URL, fetch=lambda url: page)
-    assert tracklist.name == "Anne Xtrude x RSO Berlin"
-    assert [entry.query for entry in tracklist.entries] == ["Artist A - Track One"]
