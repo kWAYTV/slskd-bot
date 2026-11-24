@@ -225,3 +225,14 @@ async def test_skip_leaves_a_track_waiting_for_review(bot):
     await press(bot, actions.SKIP, batch, items[0].id)
     assert bot.queue_store.get_item(items[0].id).status == ItemStatus.cancelled
     assert "Cancelled." in drawn_text(bot)
+
+
+async def test_skip_clears_unfound_and_failed_tracks_from_the_summary(bot):
+    batch, items = queue(bot, 3)
+    bot.queue_store.update_item(items[0].id, status=ItemStatus.no_match)
+    bot.queue_store.update_item(items[1].id, status=ItemStatus.failed)
+    bot.queue_store.update_item(items[2].id, status=ItemStatus.done)
+    await press(bot, actions.SKIP, batch, items[0].id)
+    await press(bot, actions.SKIP, batch, items[1].id)
+    await press(bot, actions.SKIP, batch, items[2].id)  # a saved track is not skippable
+    assert bot.queue_store.counts(batch.id) == {"cancelled": 2, "done": 1}
