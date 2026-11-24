@@ -74,7 +74,7 @@ async def retry(self, query, batch: Batch, item: Item, _number: int) -> None:
 
 async def skip(self, query, batch: Batch, item: Item, _number: int) -> None:
     """Leave a track that needs attention (lossy only, not found, failed); it can be fetched again later."""
-    if item.status in ATTENTION:
+    if item.status in (*ATTENTION, ItemStatus.no_match):
         self.cards.leave(batch.id)
         await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.cancelled)
 

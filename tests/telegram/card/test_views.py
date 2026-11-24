@@ -197,12 +197,12 @@ def test_saved_item_words_the_lossless_verdict(store):
     assert "Posible transcodificación" in es
 
 
-def test_picker_marks_copies_that_do_not_name_the_song(store):
-    from slskd_importer.soulseek.result import SearchResult
-
-    batch, item = one_item(store)
-    other = SearchResult(username="u", filename="\\Music\\Cher - Bang Bang.flac", size=1, length=162)
-    text, _ = render_picker(t, batch, item, Copies([make_result(0), other]), 0, 5)
-    first, second = text.split("*#2*")
-    assert "❓" not in first.split("*#1*")[1]
-    assert second.lstrip().startswith("🔴 ❓") and "❓ = the file name does not mention this song" in second
+def test_tracks_nothing_was_found_for_are_counted_but_ask_for_nothing(store):
+    batch, items = many(store, 3)
+    store.update_item(items[0].id, status=ItemStatus.no_match)
+    store.update_item(items[1].id, status=ItemStatus.choose)
+    store.update_item(items[2].id, status=ItemStatus.done)
+    store.close_if_finished(batch.id)
+    text, markup = render_summary(t, store.get_batch(batch.id), store.items(batch.id), {})
+    assert "❌ 1 not downloaded" in text
+    assert labels(markup) == ["👉  Nancy Sinatra — Song 1", "All tracks", "Retry 1"]

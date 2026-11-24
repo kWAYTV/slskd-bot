@@ -6,6 +6,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 
 from slskd_importer.catalog.track import TrackInfo
+from slskd_importer.queue.confidence import sure_copies
 from slskd_importer.settings.config import Config
 from slskd_importer.soulseek.client import SlskdClient
 from slskd_importer.soulseek.fallbacks import search_with_fallbacks
@@ -35,7 +36,12 @@ class CopyFinder:
         return self._found.get(item_id)
 
     async def find(self, item_id: int, track: TrackInfo) -> Copies:
-        """Search Soulseek with the four-tier fallbacks and remember the best copies for *item_id*."""
+        """Search Soulseek with the four-tier fallbacks and remember the best copies for *item_id*.
+
+        Only copies whose path names the song are kept: the looser fallback
+        queries also return other artists' songs with the same title, and those
+        are not worth showing, let alone fetching.
+        """
         ranked, lossy, _cancelled = await search_with_fallbacks(
             self._slskd,
             self._scorer,
@@ -43,7 +49,7 @@ class CopyFinder:
             timeout_secs=self._config.search_timeout_secs,
             is_cancelled=lambda: False,
         )
-        copies = Copies(ranked[:REMEMBERED_COPIES], lossy)
+        copies = Copies(sure_copies(track, ranked)[:REMEMBERED_COPIES], lossy)
         self._found[item_id] = copies
         self._found.move_to_end(item_id)
         while len(self._found) > REMEMBERED_ITEMS:
