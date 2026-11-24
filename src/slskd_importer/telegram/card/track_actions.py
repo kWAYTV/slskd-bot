@@ -10,7 +10,6 @@ import logging
 
 from slskd_importer.queue.batch import Batch, Item, ItemStatus
 from slskd_importer.telegram.card import actions, board
-from slskd_importer.telegram.card.board import View
 from slskd_importer.telegram.card.status import ATTENTION
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 async def open_picker(self, query, batch: Batch, item: Item, page: int) -> None:
     """Show the copies found for a track, searching first when none are remembered."""
-    self.cards.show(batch.id, View(board.PICKER, item_id=item.id, page=page))
+    self.cards.focus(batch.id, board.PICKER, item.id, page)
     finder = self.runner.pipeline.finder
     if finder.remembered(item.id) is not None:
         return
@@ -28,7 +27,7 @@ async def open_picker(self, query, batch: Batch, item: Item, page: int) -> None:
         await finder.find(item.id, track)
     except Exception:
         logger.exception("Picker search failed for item %d", item.id)
-        self.cards.show(batch.id, View(board.ITEM, item_id=item.id))
+        self.cards.focus(batch.id, board.ITEM, item.id)
 
 
 async def get_copy(self, query, batch: Batch, item: Item, index: int) -> None:
@@ -42,7 +41,7 @@ async def get_copy(self, query, batch: Batch, item: Item, index: int) -> None:
         # The saved file stays until the chosen copy has landed and passed its checks.
         self.runner.pipeline.replaces[item.id] = (item.saved_name, item.history_id)
     logger.info("chat=%s item %d: picked #%d %s", batch.chat_id, item.id, index + 1, copies.ranked[index].basename)
-    self.cards.show(batch.id, View(board.ITEM, item_id=item.id))
+    self.cards.focus(batch.id, board.ITEM, item.id)
     await self.runner.requeue(item, forced=True, pick=copies.ranked[index])
 
 
@@ -73,7 +72,7 @@ async def retry(self, query, batch: Batch, item: Item, _number: int) -> None:
 
 async def skip(self, query, batch: Batch, item: Item, _number: int) -> None:
     """Leave a track that needs attention (lossy only, not found, failed); it can be fetched again later."""
-    if item.status in ATTENTION:
+    if item.status in (*ATTENTION, ItemStatus.choose):
         await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.cancelled)
 
 

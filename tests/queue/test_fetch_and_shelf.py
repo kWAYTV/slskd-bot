@@ -137,3 +137,35 @@ def test_owned_anywhere_in_the_collection(tmp_path):
 def test_record_delivery(shelf):
     library, _ = shelf
     assert library.record(make_track(), make_result(), "delivered", 67890) > 0
+
+
+def queued_forever(calls: int = 50):
+    async def wait(username, filename, timeout_secs=600, progress_callback=None):
+        for _ in range(calls):
+            await progress_callback(DownloadStatus(username, filename, "Queued, Remotely", transfer_id="t9"))
+            await asyncio.sleep(0.01)
+        return DownloadStatus(username, filename, "Completed, Succeeded", transfer_id="t9")
+
+    return wait
+
+
+async def test_fetch_gives_up_on_a_copy_stuck_in_the_peer_queue():
+    from slskd_importer.queue.fetch import QUEUED_TOO_LONG
+
+    slskd = MagicMock()
+    slskd.enqueue_download.return_value = True
+    slskd.wait_for_download = queued_forever()
+    landed = await fetch(slskd, MagicMock(), make_result(), 5, queue_patience_secs=0.03)
+    assert landed.error == QUEUED_TOO_LONG
+    slskd.cancel_transfer.assert_called_once()
+    assert slskd.cancel_transfer.call_args.args[2] == "t9"
+
+
+async def test_fetch_without_patience_waits_out_the_peer_queue():
+    slskd = MagicMock()
+    slskd.enqueue_download.return_value = True
+    slskd.wait_for_download = queued_forever(calls=5)
+    processor = MagicMock()
+    processor.find_downloaded_file.return_value = "/downloads/x.flac"
+    landed = await fetch(slskd, processor, make_result(), 5, queue_patience_secs=None)
+    assert landed.ok

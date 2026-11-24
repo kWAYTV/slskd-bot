@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -17,6 +18,7 @@ ProgressHook = Callable[[DownloadStatus], Awaitable[None]]
 # incomplete/, so the first disk lookup can miss it.
 LOCATE_RETRY_SECS = 10.0
 LOCATE_RETRY_STEP_SECS = 0.5
+QUEUED_TOO_LONG = "stuck in the peer's queue"
 
 
 @dataclass
@@ -38,23 +40,50 @@ async def fetch(
     result: SearchResult,
     timeout_secs: int,
     on_progress: ProgressHook | None = None,
+    queue_patience_secs: float | None = None,
 ) -> Landed:
-    """Enqueue on slskd, wait for the transfer, find the file. A cancelled or failed transfer is removed from slskd."""
+    """Enqueue on slskd, wait for the transfer, find the file. A cancelled or failed transfer is removed from slskd.
+
+    *queue_patience_secs*: give up on a copy that sits this long in the peer's
+    upload queue without starting (None waits the whole timeout).
+    """
     if not await asyncio.to_thread(slskd.enqueue_download, result):
         return Landed(error="peer offline or refused")
 
     transfer_id: str | None = None
+    queued_since: float | None = None
+    out_of_patience = asyncio.Event()
 
     async def track(status: DownloadStatus) -> None:
-        nonlocal transfer_id
+        nonlocal transfer_id, queued_since
         transfer_id = status.transfer_id or transfer_id
+        if not status.is_queued:
+            queued_since = None
+        else:
+            queued_since = queued_since or time.monotonic()
+            if queue_patience_secs is not None and time.monotonic() - queued_since >= queue_patience_secs:
+                out_of_patience.set()
         if on_progress is not None:
             await on_progress(status)
 
+    transfer = asyncio.ensure_future(
+        slskd.wait_for_download(result.username, result.filename, timeout_secs=timeout_secs, progress_callback=track)
+    )
+    patience = asyncio.ensure_future(out_of_patience.wait())
     try:
-        status = await slskd.wait_for_download(
-            result.username, result.filename, timeout_secs=timeout_secs, progress_callback=track
-        )
+        await asyncio.wait({transfer, patience}, return_when=asyncio.FIRST_COMPLETED)
+    except BaseException:
+        transfer.cancel()
+        await _stop_transfer(slskd, result, transfer_id)
+        raise
+    finally:
+        patience.cancel()
+    if not transfer.done():
+        transfer.cancel()
+        await _stop_transfer(slskd, result, transfer_id)
+        return Landed(error=QUEUED_TOO_LONG)
+    try:
+        status = transfer.result()
     except BaseException:
         await _stop_transfer(slskd, result, transfer_id)
         raise

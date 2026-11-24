@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 # Copies fetched per item before giving up.
 MAX_TRIES = 3
+# An automatically chosen copy that sits this long in its peer's upload queue is dropped for the next
+# one, so a busy peer cannot hold a queue slot for the whole download timeout.
+QUEUE_PATIENCE_SECS = 90
 # A lossless verdict is stored on the item as ``verdict:<KIND>:<cutoff kHz>`` so a front end can word it.
 VERDICT_PREFIX = "verdict:"
 
@@ -100,6 +103,9 @@ class ItemPipeline:
             if not found.ranked:
                 await self._finish(item, ItemStatus.no_match)
                 return
+            if batch.asks_which_copy:
+                await self._finish(item, ItemStatus.choose)
+                return
             if found.lossy:
                 best = found.ranked[0]
                 await self._finish(item, ItemStatus.review, detail=describe_copy(best))
@@ -140,7 +146,13 @@ class ItemPipeline:
             async with lock:
                 report(Progress(phases.DOWNLOADING, 0.0))
                 landed = await fetch(
-                    self._slskd, self._processor, result, self._config.download_timeout_secs, on_progress
+                    self._slskd,
+                    self._processor,
+                    result,
+                    self._config.download_timeout_secs,
+                    on_progress,
+                    # A copy picked by hand is worth waiting for; an automatic one has alternatives.
+                    queue_patience_secs=None if trusted else QUEUE_PATIENCE_SECS,
                 )
                 if not landed.ok:
                     return landed.error

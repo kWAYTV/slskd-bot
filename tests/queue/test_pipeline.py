@@ -192,7 +192,7 @@ async def test_two_items_wanting_the_same_remote_file_take_turns(store):
     pipeline.deliver = AsyncMock(return_value=True)
     in_flight = peak = 0
 
-    async def slow_fetch(*args):
+    async def slow_fetch(*args, **kwargs):
         nonlocal in_flight, peak
         in_flight += 1
         peak = max(peak, in_flight)
@@ -237,3 +237,27 @@ async def test_replaced_file_is_removed_only_once_the_new_copy_is_ready(store):
         done = await run(pipeline, store, batch)
     assert done.status == ItemStatus.done
     pipeline.shelf.remove.assert_called_once_with("old.flac", 3)
+
+
+async def test_a_song_asked_for_on_its_own_waits_for_a_pick(store):
+    pipeline = make_pipeline(store)
+    batch = store.create_batch(67890, 12345, "Bang Bang", "track", [Entry(track=make_track())], message_id=900)
+    with patch(f"{PIPELINE}.fetch", landed()) as fetch:
+        item = await run(pipeline, store, batch)
+    assert item.status == ItemStatus.choose
+    fetch.assert_not_called()
+
+
+async def test_only_hand_picked_copies_wait_out_a_peer_queue(store):
+    pipeline = make_pipeline(store)
+    with (
+        patch(f"{PIPELINE}.fetch", landed()) as fetch,
+        patch(f"{PIPELINE}.discard", AsyncMock()),
+        patch(f"{PIPELINE}.analyze_lossless", verdict()),
+    ):
+        await run(pipeline, store, make_batch(store))
+        assert fetch.await_args.kwargs["queue_patience_secs"] == 90
+        batch = make_batch(store)
+        pipeline.picks[store.items(batch.id)[0].id] = make_result(1)
+        await run(pipeline, store, batch)
+        assert fetch.await_args.kwargs["queue_patience_secs"] is None

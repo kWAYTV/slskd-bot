@@ -31,7 +31,8 @@ def render_list(t: Translate, batch: Batch, items: list[Item], progress: dict[in
         [
             InlineKeyboardButton(
                 clip(f"{item_icon(item, progress.get(item.id))}  {item.label}"),
-                callback_data=actions.encode(actions.ITEM, batch.id, item.id),
+                # The page rides along (1-based) so Back returns to this page of the list.
+                callback_data=actions.encode(actions.ITEM, batch.id, item.id, page + 1),
             )
         ]
         for item in shown

@@ -14,6 +14,7 @@ from telegram.error import RetryAfter
 
 from slskd_importer.queue.batch import Batch, BatchStatus, Item, ItemStatus
 from slskd_importer.queue.runner import QueueRunner
+from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card, render_item
 from slskd_importer.telegram.card.list_view import render_list
 from slskd_importer.telegram.card.picker_view import render_picker
@@ -35,9 +36,13 @@ PICKER = "picker"
 
 @dataclass(frozen=True)
 class View:
+    """What a card shows. *back* / *back_page*: where a track was opened from (summary, or a list page)."""
+
     kind: str = SUMMARY
     item_id: int = 0
     page: int = 0
+    back: str = SUMMARY
+    back_page: int = 0
 
 
 class CardBoard:
@@ -55,6 +60,11 @@ class CardBoard:
 
     def show(self, batch_id: int, view: View) -> None:
         self._views[batch_id] = view
+
+    def focus(self, batch_id: int, kind: str, item_id: int, page: int = 0) -> None:
+        """Show a track's item or picker view, remembering where the track was opened from."""
+        current = self._views.get(batch_id, View())
+        self._views[batch_id] = View(kind, item_id, page, current.back, current.back_page)
 
     def request(self, batch_id: int) -> None:
         """Redraw the batch's card soon. Calls while a redraw is cooling down collapse into one."""
@@ -114,9 +124,19 @@ class CardBoard:
             copies = self._runner.pipeline.finder.remembered(item.id)
             return render_picker(t, batch, item, copies, view.page, self._page_size)
         if len(items) == 1:
-            return render_item(t, batch, items[0], progress.get(items[0].id), alone=True)
+            only = items[0]
+            copies = self._runner.pipeline.finder.remembered(only.id)
+            if only.status == ItemStatus.choose and view.kind != ITEM and copies is not None:
+                # A song asked for on its own opens straight on its copies.
+                return render_picker(t, batch, only, copies, view.page, self._page_size)
+            return render_item(t, batch, only, progress.get(only.id), alone=True)
         if view.kind == ITEM and item is not None:
-            return render_item(t, batch, item, progress.get(item.id), alone=False)
+            back = (
+                actions.encode(actions.LIST, batch.id, 0, view.back_page)
+                if view.back == LIST
+                else actions.encode(actions.SUMMARY, batch.id)
+            )
+            return render_item(t, batch, item, progress.get(item.id), alone=False, back=back)
         if view.kind == LIST:
             return render_list(t, batch, items, progress, view.page)
         return render_summary(t, batch, items, progress)
@@ -129,4 +149,6 @@ class CardBoard:
             return
         self._reacted.add(batch.id)
         got = any(item.status in (ItemStatus.done, ItemStatus.owned) for item in items)
+        if not got and any(item.status in (ItemStatus.choose, ItemStatus.review) for item in items):
+            return  # still waiting for the requester: the request keeps its 👀
         await react(self.telegram, batch.chat_id, batch.query_message_id, REACTION_SAVED if got else REACTION_NOTHING)

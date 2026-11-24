@@ -10,8 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed — queue-first rework
 
 - Every message is now a **batch in a download queue** with **one card** that updates in place. Send one song, twenty lines or a playlist link; several batches run side by side. The queue is persisted (schema v8: `queue_batches`, `queue_items`) and resumes after a restart
-- **No confirmation step.** The best lossless copy is fetched, spectrum-checked and saved. A fake FLAC is discarded and the next copy tried (three per track). Tracks with only lossy copies wait under *Choose a copy* instead of being saved silently
+- A song sent on its own shows the copies found and waits for a pick; lists, playlists and tracklists run without asking
+- **No confirmation step for lists.** The best lossless copy is fetched, spectrum-checked and saved. A fake FLAC is discarded and the next copy tried (three per track). Tracks with only lossy copies wait under *Choose a copy* instead of being saved silently
 - Each track on a card can be opened: *Other copies*, *Undo*, *Send file*, *Retry*, *Download anyway* for songs already owned
+- A copy stuck in a peer's upload queue for 90 seconds is dropped for the next copy instead of holding a queue slot for ten minutes (a copy you picked by hand still waits)
 - The queue is fair across batches and limited to `MAX_CONCURRENT_DOWNLOADS` tracks at a time
 - People without library access (`TELEGRAM_LIBRARY_USERS`) get every file sent to their chat; nothing of theirs is placed in the library
 - `/status` lists the chat's batches; `/cancel` stops them all
