@@ -3,19 +3,15 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from slskd_importer.playlist_import.job import JobStatus
 from slskd_importer.telegram.core.app import MusicBot
-from slskd_importer.telegram.core.session import PendingDownload, PendingSearch
 from tests.telegram.helpers import (
     _make_callback_update,
     _make_config,
     _make_context,
-    _make_search_result,
-    _make_track,
     _make_update,
 )
 
@@ -58,10 +54,10 @@ class TestMusicBotCommands:
         context = _make_context()
         await bot.cmd_start(update, context)
         text = update.message.reply_text.call_args[0][0]
-        assert "Send me a song" in text
+        assert "Send me songs" in text
         assert "`Nancy Sinatra - Bang Bang`" in text
         assert "/lang" in text
-        assert "/import" in text
+        assert "/status" in text
         assert "/quality" not in text
         assert "/import resume" not in text
         assert "/auto" not in text
@@ -91,7 +87,7 @@ class TestMusicBotCommands:
         await bot.handle_callback(update, context)
         assert bot.locale(67890) == "es"
         text = update.callback_query.edit_message_text.call_args[0][0]
-        assert "Envíame una canción" in text
+        assert "Envíame canciones" in text
         assert bot.prefs_repo.get_locale(67890) == "es"
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
@@ -118,97 +114,6 @@ class TestMusicBotCommands:
         text = update.message.reply_text.call_args[0][0]
         assert "Download stats" in text
         assert "Total: 0" in text
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cmd_status_empty(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        update.message.reply_text.assert_called_once_with("No active searches, downloads, or imports.")
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cmd_status_with_pending(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.pending["1"] = PendingSearch(query="test", track=_make_track(), chat_id=67890, search_id="1")
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        call_args = update.message.reply_text.call_args
-        assert "Nancy Sinatra" in call_args[0][0]
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cmd_status_pending_without_track(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.pending["1"] = PendingSearch(query="artist_with*md", track=None, chat_id=67890, search_id="1")
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        call_args = update.message.reply_text.call_args
-        assert "artist_with*md" in call_args[0][0]
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cmd_status_ignores_other_chats(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.pending["1"] = PendingSearch(query="secret", track=_make_track(), chat_id=11111, search_id="1")
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        update.message.reply_text.assert_called_once_with("No active searches, downloads, or imports.")
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cmd_status_with_downloads(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.downloads["1"] = PendingDownload(
-            track=_make_track(),
-            result=_make_search_result(),
-            chat_id=67890,
-        )
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        call_args = update.message.reply_text.call_args
-        assert "Active downloads" in call_args[0][0]
-        markup = call_args.kwargs["reply_markup"]
-        assert markup.inline_keyboard[0][0].callback_data == "cancel_all"
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cancel_all_button_stops_work(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.pending["1"] = PendingSearch(query="test", chat_id=67890, search_id="1", message_id=10)
-        update = _make_callback_update(data="cancel_all")
-        context = _make_context()
-        await bot.handle_callback(update, context)
-        assert "1" not in bot.pending
-        update.callback_query.edit_message_text.assert_awaited_with("Cancelled.")
-        update.callback_query.answer.assert_awaited_once_with(text="Cancelled")
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_cancel_import_unpins_status_message(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        job_id = bot.import_repo.create_job(67890, "https://spotify.com/playlist/x", "P", 3)
-        bot.import_repo.update_job_status(job_id, JobStatus.active)
-        bot._active_import[67890] = job_id
-        bot._import_status_msg[67890] = MagicMock(message_id=77)
-        update = _make_update(text="/cancel")
-        context = _make_context()
-        await bot.cmd_cancel(update, context)
-        context.bot.unpin_chat_message.assert_awaited_once_with(chat_id=67890, message_id=77)
-        assert bot.import_repo.get_active_job(67890) is None
 
     @patch("slskd_importer.telegram.core.app.SpotifyResolver")
     @patch("slskd_importer.telegram.core.app.SlskdClient")
@@ -259,91 +164,6 @@ class TestMusicBotCommands:
         markup = call_args.kwargs["reply_markup"]
         callbacks = [btn.callback_data for row in markup.inline_keyboard for btn in row]
         assert any(cb.startswith("hu:") for cb in callbacks)
-
-
-class TestCmdStatusDetails:
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_status_shows_download_progress(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.downloads["1"] = PendingDownload(
-            track=_make_track(),
-            result=_make_search_result(),
-            chat_id=67890,
-            progress_percent=42.0,
-        )
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        text = update.message.reply_text.call_args[0][0]
-        assert "42%" in text
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_status_shows_queued_at_peer(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.downloads["1"] = PendingDownload(
-            track=_make_track(),
-            result=_make_search_result(),
-            chat_id=67890,
-            transfer_state="Queued, Remotely",
-        )
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        text = update.message.reply_text.call_args[0][0]
-        assert "queued at peer" in text
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_status_shows_awaiting_approval(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.downloads["1"] = PendingDownload(
-            track=_make_track(),
-            result=_make_search_result(),
-            chat_id=67890,
-            source_path="/tmp/somefile.flac",
-            progress_percent=100.0,
-        )
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        text = update.message.reply_text.call_args[0][0]
-        assert "awaiting approval" in text
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_status_shows_active_import(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        job_id = bot.import_repo.create_job(67890, "https://spotify.com/playlist/x", "My Playlist", 10)
-        bot.import_repo.update_job_status(job_id, JobStatus.active)
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        text = update.message.reply_text.call_args[0][0]
-        assert "Active import" in text
-        assert "My Playlist" in text
-        assert "0/10" in text
-
-    @patch("slskd_importer.telegram.core.app.SpotifyResolver")
-    @patch("slskd_importer.telegram.core.app.SlskdClient")
-    @pytest.mark.asyncio
-    async def test_status_ignores_other_chat_imports(self, mock_slskd, mock_spotify):
-        bot = MusicBot(_make_config())
-        bot.import_repo.create_job(11111, "https://spotify.com/playlist/x", "Other", 3)
-        update = _make_update()
-        context = _make_context()
-        await bot.cmd_status(update, context)
-        update.message.reply_text.assert_called_once_with("No active searches, downloads, or imports.")
-
-
-# ---------------------------------------------------------------------------
-# _remove_download_file (read-only DOWNLOAD_DIR fallback)
-# ---------------------------------------------------------------------------
 
 
 class TestUndoCommand:

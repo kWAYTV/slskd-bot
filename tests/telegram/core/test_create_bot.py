@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from slskd_importer.telegram.core.app import create_bot
-from tests.telegram.download.helpers import _make_config
+from tests.telegram.helpers import _make_config
 
 # Every fluent ApplicationBuilder call create_bot chains before build().
 _CHAINED = (
@@ -17,6 +17,7 @@ _CHAINED = (
     "write_timeout",
     "media_write_timeout",
     "pool_timeout",
+    "concurrent_updates",
     "base_url",
     "base_file_url",
     "local_mode",
@@ -42,7 +43,7 @@ class TestCreateBot:
             app = create_bot(config)
             assert app is mock_app
             mock_app.add_handler.assert_called()
-            # command handlers (/start+/help and /lang+/language share) + sweep + callback + text
+            # nine command handlers (aliases share one) + callback + text
             assert mock_app.add_handler.call_count == 11
             mock_builder.base_url.assert_not_called()
             mock_builder.post_shutdown.assert_called_once()

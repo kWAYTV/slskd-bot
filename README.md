@@ -6,21 +6,22 @@
   <a href="https://github.com/kWAYTV/slskd-bot/pkgs/container/slskd-bot"><img src="https://img.shields.io/badge/ghcr.io-kwaytv%2Fslskd--bot-blue?logo=github" alt="GHCR"/></a>
 </p>
 
-<p align="center"><strong>Telegram bot that finds music on Soulseek. Send a song name or Spotify link, get a scored list of matches from <a href="https://github.com/slskd/slskd">slskd</a> (FLAC, WAV, AIFF, then the best available), and save the pick to your library as <code>Artist - Title</code>. Optionally sweeps the library for better copies and asks before replacing anything.</strong></p>
+<p align="center"><strong>Telegram bot that gets music from Soulseek. Send song names, links or a whole tracklist; a download queue finds the best copy on <a href="https://github.com/slskd/slskd">slskd</a> (FLAC, WAV, AIFF first), checks it, and files it in your library as <code>Artist - Title</code>. One live card per message, nothing to confirm.</strong></p>
 
 > This is a fork of [GeiserX/telegram-slskd-local-bot](https://github.com/GeiserX/telegram-slskd-local-bot), heavily reworked since. Credit for the original idea and foundation goes upstream.
 
 ## Features
 
-- **Search by text or link** — free-text queries resolve via catalog metadata (Spotify today); `Artist - Title` (also `–`, `—`, `|`) uses precise field filters, pasted video titles like `(Official Video)` are cleaned up, and a query Spotify does not know goes straight to Soulseek. Pasted Spotify track links resolve directly, and playlist/album links start an import
-- **Smart ranking** — prefers FLAC, then WAV, then AIFF, then the best remaining format; scored by duration, hi-res quality, source reliability, and filename relevance; live/remix noise filtered out
+- **Send anything, as much as you like** — one song per line, or links: Spotify (track, album, playlist), YouTube and YouTube Music (video, playlist, album, and the chapters of a DJ mix), SoundCloud, Bandcamp, 1001Tracklists, MixID and MixesDB pages. A tracklist copied from anywhere works too: numbering, timestamps and `[Label]` tags are stripped
+- **One card per message** — every message becomes a batch with a single message that updates in place: progress, counts, what is downloading. Several batches run side by side without mixing. Your own message is reacted 👀 while it works, 👍 when something arrived, 🤷 when nothing did
+- **Nothing to confirm** — the queue picks the best lossless copy, downloads it, runs a spectrum check, skips fake FLACs for the next copy, and saves. Only exceptions wait for you: no lossless copy exists (*Choose a copy*), nothing found, every copy failed
+- **Every track stays in reach** — tap a track on its card to choose another copy, undo the save, get the file sent to the chat, or retry
+- **Fair queue** — a fixed number of tracks at a time (`MAX_CONCURRENT_DOWNLOADS`), shared fairly: one song never waits behind a 300-track playlist. The queue survives restarts
+- **Friends without touching your library** — people in `TELEGRAM_ALLOWED_USERS` but not in `TELEGRAM_LIBRARY_USERS` get their files sent to the chat (up to 2000 MB with a self-hosted Bot API server); nothing of theirs is ever saved to the library
+- **Smart ranking** — FLAC, then WAV, then AIFF; scored by duration, hi-res quality, source reliability and filename; live/remix noise filtered out unless you asked for it
+- **Library sweep** — walks the library (subfolders included; `LIBRARY_SWEEP_DIR` can point at your whole collection), looks on Soulseek for a better lossless copy of each song, and sends side-by-side pairs (`Keep mine` / `Take new` / `Keep both`). Never auto-replaces. Runs on a schedule or via `/sweep`
+- **Library hygiene** — canonical tags and artwork on save, songs you already own are skipped, `/undo` and `/history` ↩️ remove saves, `/stats` for totals
 - **Languages** — English (default), Spanish, Galician, German. First `/start` picks a language; `/lang` changes it later
-- **Playlist/album import** — `/import <url>` walks a whole Spotify playlist or album, skips tracks already in the library, and resumes after restart (`/import` with no URL continues an unfinished job). *Start and save everything* saves each track as it lands, with no per-track preview or Save tap
-- **Library sweep** — walks top-level library files, resolves artist/title from tags (or filename heuristics: track prefixes, `Artist - Album - Title`, rip brackets), looks on Soulseek for a better lossless copy, and sends side-by-side pairs in Telegram (`Keep mine` / `Take new` / `Keep both`). Never auto-replaces. Runs on a schedule or via `/sweep`
-- **Live progress** — download messages update with a progress bar and queue state; `/status` shows everything in flight for the chat with a *Cancel all* button. Every tap gets a toast, your query message is reacted 👀 / 🤷 / 👍 as the search progresses, and a running import stays pinned
-- **Library hygiene** — canonical tags on save, duplicate detection, `/undo` / `/history` ↩️ to remove saves, `/stats` for totals
-- **Large files** — files over Telegram's 50 MB limit fall back to OGG Opus previews, or upload untouched (up to 2000 MB) via a self-hosted Bot API server
-- **Access control** — bot usage restricted to allowed user IDs; library writes (save, `/import`, `/sweep`) optionally restricted further via `TELEGRAM_LIBRARY_USERS`
 - **Docker-ready** — image published to `ghcr.io/kwaytv/slskd-bot` on every push to `main`
 
 ## Quick Start
@@ -46,6 +47,8 @@ services:
 
 > With `/downloads` mounted read-only the bot cleans up originals through slskd's remote file management API — enable it with `SLSKD_REMOTE_FILE_MANAGEMENT=true` on the slskd side, or mount the volume read-write.
 
+> Keep slskd's downloads folder **outside** the library folder. Files land there before they are checked; a media server or a sync tool watching the library would pick up unfinished and rejected downloads.
+
 ### Local development
 
 ```bash
@@ -59,17 +62,25 @@ uv run python -m slskd_importer run
 
 | Command | Description |
 |---------|-------------|
-| *(any text)* | Search for a song and show download options |
-| *(Spotify track link)* | Resolve the link and search for it |
-| *(Spotify playlist/album link)* | Start the import flow (library users only) |
-| `/lang` | Change language (`/language` also works) |
-| `/import <url>` | Import a Spotify playlist or album (library users only) |
-| `/sweep` | Start a library sweep now (`/sweep force`, `/sweep stop`, `/sweep status`, `/sweep reviews`) |
-| `/undo` | Remove the last track saved to the library |
-| `/status` | Active searches, downloads (with progress), and imports |
+| *(any text)* | Queue the songs named, one per line |
+| *(any link)* | Queue what the link holds: a track, an album, a playlist, a mix tracklist |
+| `/status` | What this chat has in the queue, with *Cancel all* |
 | `/history` | Recent downloads — tap ↩️ to remove one |
+| `/undo` | Remove the last track saved to the library |
 | `/stats` | Download totals and library size for this chat |
-| `/cancel` | Cancel the current search, download, or import |
+| `/sweep` | Start a library sweep now (`/sweep force`, `/sweep stop`, `/sweep status`, `/sweep reviews`) |
+| `/lang` | Change language (`/language` also works) |
+| `/cancel` | Stop everything this chat has in the queue |
+
+`/get <text or link>` and `/import <link>` do the same as sending the text on its own.
+
+### Source notes
+
+- SoundCloud and Bandcamp are read track by track, so a long set takes a while to appear (about half a minute for 40 tracks).
+- YouTube playlists give a title and a channel name, not a clean artist; label and compilation channels can produce wrong guesses. The catalog lookup fixes most of them.
+- MixID sits behind a browser check that refuses bots, so a MixID link normally answers "paste it as text". Copy the tracklist from the page and send it; that works.
+- 1001Tracklists may block automated requests. The bot then says so; copy the tracklist and paste it.
+- Source error messages are in English in every language.
 
 ## Configuration
 
@@ -77,22 +88,22 @@ uv run python -m slskd_importer run
 |----------|----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | — | Bot token from @BotFather |
 | `TELEGRAM_ALLOWED_USERS` | Yes | — | Comma-separated user IDs allowed to use the bot (empty denies everyone) |
-| `TELEGRAM_LIBRARY_USERS` | No | — | User IDs allowed to save to the library, run `/import`, and get `/sweep` (empty = all allowed users) |
+| `TELEGRAM_LIBRARY_USERS` | No | — | User IDs whose downloads are saved to the library and who get `/sweep` and `/undo`. Other allowed users get files sent to their chat (empty = all allowed users save) |
 | `TELEGRAM_API_BASE_URL` | No | — | Self-hosted [telegram-bot-api](https://github.com/tdlib/telegram-bot-api) URL; raises the upload limit to 2000 MB |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app credentials |
 | `SLSKD_HOST` | Yes | — | slskd instance URL |
 | `SLSKD_API_KEY` | Yes | — | slskd API key (Settings > Security > API Keys) |
-| `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads |
-| `OUTPUT_DIR` | No | `/music` | Where renamed files are placed (flat top-level audio files for the sweep) |
-| `DATA_DIR` | No | `/data` | SQLite directory (history, imports, sweep) |
-| `MAX_CONCURRENT_DOWNLOADS` | No | `3` | Cap on simultaneous slskd transfers |
-| `APPROVAL_TTL_SECS` | No | `86400` | Discard unapproved downloads after this many seconds |
-| `MAX_RESULTS` | No | `5` | Search results shown per query |
+| `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads (keep it outside the library) |
+| `OUTPUT_DIR` | No | `/music` | Where renamed files are placed |
+| `DATA_DIR` | No | `/data` | SQLite directory (queue, history, sweep) |
+| `MAX_CONCURRENT_DOWNLOADS` | No | `3` | Tracks the queue works on at the same time |
+| `MAX_RESULTS` | No | `5` | Copies shown per page when choosing one by hand |
 | `DURATION_TOLERANCE_SECS` | No | `5` | Duration match tolerance |
 | `SEARCH_TIMEOUT_SECS` | No | `30` | slskd search timeout |
 | `DOWNLOAD_TIMEOUT_SECS` | No | `600` | Download completion timeout |
 | `EXCLUDE_KEYWORDS` | No | `live,remix,...` | Keywords filtered from results |
 | `FILENAME_TEMPLATE` | No | `{artist} - {title}` | Output filename template |
+| `LIBRARY_SWEEP_DIR` | No | `OUTPUT_DIR` | Folder the sweep walks, subfolders included; hidden folders are skipped |
 | `LIBRARY_SWEEP_SCHEDULE` | No | `weekly:sun:04:00` | When the sweep starts on its own (`weekly:<mon..sun>:HH:MM`, `daily:HH:MM`, or `off`) |
 | `LIBRARY_SWEEP_PAUSE_SECS` | No | `20` | Pause between songs that searched Soulseek |
 | `LIBRARY_SWEEP_KEEP_DAYS` | No | `7` | Days a replaced original stays in `.sweep-replaced/` (`0` = purge at once, `never` = keep) |

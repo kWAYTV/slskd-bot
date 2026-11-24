@@ -22,6 +22,15 @@ _JUNK_BRACKET = re.compile(
 )
 
 
+def leaf(stem: str) -> str:
+    """The file-name part of a stem.
+
+    A stem is a song's path under the sweep root without its extension, so it may
+    carry folders; only the last part names the song.
+    """
+    return stem.replace("\\", "/").rsplit("/", 1)[-1]
+
+
 def strip_junk(text: str) -> str:
     """Drop rip/format brackets and tidy whitespace."""
     text = _JUNK_BRACKET.sub("", text or "")
@@ -39,7 +48,7 @@ def parse_stem(stem: str) -> tuple[str, str]:
 
     Returns ``("", stem)`` when no confident artist/title split exists.
     """
-    raw = (stem or "").strip()
+    raw = leaf(stem or "").strip()
     if not raw:
         return "", ""
 

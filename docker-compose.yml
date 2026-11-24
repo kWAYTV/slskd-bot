@@ -31,7 +31,6 @@ services:
 
       # Download Behavior
       MAX_CONCURRENT_DOWNLOADS: ${MAX_CONCURRENT_DOWNLOADS:-3}
-      APPROVAL_TTL_SECS: ${APPROVAL_TTL_SECS:-86400}
       MAX_RESULTS: ${MAX_RESULTS:-5}
       DURATION_TOLERANCE_SECS: ${DURATION_TOLERANCE_SECS:-5}
       SEARCH_TIMEOUT_SECS: ${SEARCH_TIMEOUT_SECS:-30}
@@ -40,6 +39,7 @@ services:
       FILENAME_TEMPLATE: ${FILENAME_TEMPLATE:-{artist} - {title}}
 
       # Library sweep
+      LIBRARY_SWEEP_DIR: ${LIBRARY_SWEEP_DIR:-}
       LIBRARY_SWEEP_SCHEDULE: ${LIBRARY_SWEEP_SCHEDULE:-weekly:sun:04:00}
       LIBRARY_SWEEP_PAUSE_SECS: ${LIBRARY_SWEEP_PAUSE_SECS:-20}
       LIBRARY_SWEEP_KEEP_DAYS: ${LIBRARY_SWEEP_KEEP_DAYS:-7}
@@ -58,7 +58,7 @@ services:
       # This is where renamed FLAC files are placed
       - ${MUSIC_OUTPUT_PATH:-./music}:/music
 
-      # Persistent data (SQLite database for history + imports)
+      # Persistent data (SQLite database for the queue, history and sweep)
       - ${DATA_PATH:-./data}:/data
 
     # Security hardening

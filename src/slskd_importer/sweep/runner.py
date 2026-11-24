@@ -104,7 +104,7 @@ class LibrarySweep(CheckMixin, DecideMixin):
 
     @property
     def root(self) -> str:
-        return self.config.output_dir
+        return self.config.library_sweep_dir
 
     @property
     def replaced_dir(self) -> str:

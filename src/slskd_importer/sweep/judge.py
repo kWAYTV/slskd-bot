@@ -19,6 +19,7 @@ from slskd_importer.sweep.audit import (
     Audit,
 )
 from slskd_importer.sweep.fingerprint import SAME_RECORDING_SIMILARITY
+from slskd_importer.sweep.identity import leaf
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +192,7 @@ def _hard_reject(original: Audit, candidate: Audit, stem: str) -> str:
     """Why the copy cannot be this song at all, or "" when it may be."""
     artist, title = library_names(original, stem)
     ct, ca, cal = candidate.title, candidate.artist, candidate.album
-    orig_text = norm(" ".join([stem, original.artist, original.title, original.album]))
+    orig_text = norm(" ".join([leaf(stem), original.artist, original.title, original.album]))
     if ca and artist and not (_sig(artist) & _sig(ca)):
         return f"artist tag '{ca}'"
     cand_text = norm(" ".join([ca, ct, cal]))
@@ -209,7 +210,7 @@ def _hard_reject(original: Audit, candidate: Audit, stem: str) -> str:
 def _extras(original: Audit, candidate: Audit, stem: str) -> tuple[list[str], list[str]]:
     """(names in the copy's artist/title tags the original lacks, version words its title adds)."""
     _, title = library_names(original, stem)
-    orig_text = " ".join([stem, original.artist, original.title, original.album])
+    orig_text = " ".join([leaf(stem), original.artist, original.title, original.album])
     extra = _sig(candidate.artist + " " + candidate.title) - _sig(orig_text) - _NEUTRAL_EXTRA
     extra = sorted(w for w in extra if not w.isdigit())
     added = [w for w in VERSION_WORDS if w in norm(candidate.title).split() and w not in norm(title).split()]

@@ -14,7 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_VERSION = 7
+_SCHEMA_VERSION = 8
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS download_history (
@@ -33,36 +33,41 @@ CREATE TABLE IF NOT EXISTS download_history (
     spotify_url TEXT DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS import_jobs (
+CREATE TABLE IF NOT EXISTS queue_batches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id INTEGER NOT NULL,
-    spotify_url TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
     name TEXT NOT NULL,
-    total_tracks INTEGER NOT NULL,
-    completed_tracks INTEGER NOT NULL DEFAULT 0,
-    failed_tracks INTEGER NOT NULL DEFAULT 0,
-    skipped_tracks INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'pending',
+    kind TEXT NOT NULL DEFAULT 'track',
+    source_url TEXT NOT NULL DEFAULT '',
+    destination TEXT NOT NULL DEFAULT 'library',
+    status TEXT NOT NULL DEFAULT 'active',
+    message_id INTEGER,
+    query_message_id INTEGER,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    auto_save INTEGER NOT NULL DEFAULT 0
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS import_tracks (
+CREATE TABLE IF NOT EXISTS queue_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id INTEGER NOT NULL REFERENCES import_jobs(id) ON DELETE CASCADE,
+    batch_id INTEGER NOT NULL REFERENCES queue_batches(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
-    artist TEXT NOT NULL,
-    title TEXT NOT NULL,
-    album TEXT DEFAULT '',
-    duration_ms INTEGER DEFAULT 0,
-    spotify_url TEXT DEFAULT '',
-    year TEXT DEFAULT '',
+    query TEXT NOT NULL DEFAULT '',
+    artist TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL DEFAULT '',
+    album TEXT NOT NULL DEFAULT '',
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    spotify_url TEXT NOT NULL DEFAULT '',
+    year TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'pending',
-    error_message TEXT DEFAULT '',
+    detail TEXT NOT NULL DEFAULT '',
+    saved_name TEXT NOT NULL DEFAULT '',
+    quality TEXT NOT NULL DEFAULT '',
+    history_id INTEGER,
+    forced INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(job_id, position)
+    UNIQUE(batch_id, position)
 );
 
 CREATE TABLE IF NOT EXISTS chat_prefs (
@@ -138,8 +143,9 @@ CREATE TABLE IF NOT EXISTS sweep_replacements (
     purged_at REAL
 );
 
-CREATE INDEX IF NOT EXISTS idx_import_tracks_job_status ON import_tracks(job_id, status);
-CREATE INDEX IF NOT EXISTS idx_import_jobs_status ON import_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_queue_items_batch_status ON queue_items(batch_id, status);
+CREATE INDEX IF NOT EXISTS idx_queue_items_status ON queue_items(status);
+CREATE INDEX IF NOT EXISTS idx_queue_batches_status ON queue_batches(status, chat_id);
 CREATE INDEX IF NOT EXISTS idx_download_history_created ON download_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_download_history_chat ON download_history(chat_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sweep_reviews_pending ON sweep_reviews(decision, stem);
@@ -217,9 +223,8 @@ class Database:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_download_history_chat ON download_history(chat_id, created_at)"
         )
-        job_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(import_jobs)")}
-        if "auto_save" not in job_cols:
-            self._conn.execute("ALTER TABLE import_jobs ADD COLUMN auto_save INTEGER NOT NULL DEFAULT 0")
+        # v8 replaced playlist imports with the download queue. The old import_jobs /
+        # import_tracks tables are left in place, unused, so a rollback still finds them.
         prefs_exists = self._conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='chat_prefs'"
         ).fetchone()

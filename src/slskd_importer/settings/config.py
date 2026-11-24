@@ -45,7 +45,6 @@ class Config:
         self.search_timeout_secs = int(os.getenv("SEARCH_TIMEOUT_SECS", "30"))
         self.download_timeout_secs = int(os.getenv("DOWNLOAD_TIMEOUT_SECS", "600"))
         self.max_concurrent_downloads = max(1, int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3")))
-        self.approval_ttl_secs = max(60, int(os.getenv("APPROVAL_TTL_SECS", "86400")))
 
         exclude_kw = os.getenv(
             "EXCLUDE_KEYWORDS",
@@ -56,7 +55,10 @@ class Config:
         self.filename_template = os.getenv("FILENAME_TEMPLATE", "{artist} - {title}")
 
         # Library sweep: always on for library ACL users (personal bot).
+        # The sweep walks this whole tree; by default only where the bot saves.
+        self.library_sweep_dir = os.getenv("LIBRARY_SWEEP_DIR", "").strip() or self.output_dir
         self.library_sweep_schedule = os.getenv("LIBRARY_SWEEP_SCHEDULE", "").strip()
+        # Imported here: the sweep package imports Config.
         from slskd_importer.sweep.schedule import parse_schedule
 
         parse_schedule(self.library_sweep_schedule)  # typo stops boot, not the first sweep
@@ -77,7 +79,7 @@ class Config:
         logger.info(
             "Config: download_dir=%s output_dir=%s data_dir=%s "
             "max_results=%s search_timeout=%ss download_timeout=%ss duration_tol=%ss "
-            "file_limit=%sMB concurrent=%s approval_ttl=%ss",
+            "file_limit=%sMB concurrent=%s",
             self.download_dir,
             self.output_dir,
             self.data_dir,
@@ -87,7 +89,6 @@ class Config:
             self.duration_tolerance_secs,
             limit_mb,
             self.max_concurrent_downloads,
-            self.approval_ttl_secs,
         )
         if self.telegram_api_base_url:
             logger.info("Local Bot API server at %s (file limit %sMB)", self.telegram_api_base_url, limit_mb)
@@ -103,7 +104,8 @@ class Config:
             logger.info("TELEGRAM_LIBRARY_USERS is empty — all allowed users can save to the library")
 
         logger.info(
-            "Library sweep: schedule=%r pause=%ss keep_days=%s",
+            "Library sweep: dir=%s schedule=%r pause=%ss keep_days=%s",
+            self.library_sweep_dir,
             self.library_sweep_schedule or "weekly:sun:04:00",
             self.library_sweep_pause_secs,
             self.library_sweep_keep_days if self.library_sweep_keep_days is not None else "never",

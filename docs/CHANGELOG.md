@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — queue-first rework
+
+- Every message is now a **batch in a download queue** with **one card** that updates in place. Send one song, twenty lines or a playlist link; several batches run side by side. The queue is persisted (schema v8: `queue_batches`, `queue_items`) and resumes after a restart
+- **No confirmation step.** The best lossless copy is fetched, spectrum-checked and saved. A fake FLAC is discarded and the next copy tried (three per track). Tracks with only lossy copies wait under *Choose a copy* instead of being saved silently
+- Each track on a card can be opened: *Other copies*, *Undo*, *Send file*, *Retry*, *Download anyway* for songs already owned
+- The queue is fair across batches and limited to `MAX_CONCURRENT_DOWNLOADS` tracks at a time
+- People without library access (`TELEGRAM_LIBRARY_USERS`) get every file sent to their chat; nothing of theirs is placed in the library
+- `/status` lists the chat's batches; `/cancel` stops them all
+
+### Added
+
+- Sources beyond Spotify: YouTube / YouTube Music (videos, playlists, albums, DJ-mix chapters), SoundCloud, Bandcamp (via `yt-dlp`), 1001Tracklists and MixesDB pages, and pasted tracklists (numbering, timestamps and `[Label]` tags stripped). Non-Spotify entries are matched against the catalog when processed
+- `/get` (alias `/import`) for people who prefer a command
+- `LIBRARY_SWEEP_DIR`: the sweep now walks a whole folder tree (default `OUTPUT_DIR`), so it can cover songs the bot did not save. A better copy replaces the song in its own folder. Changing the folder makes the next sweep measure every file again
+
+### Removed
+
+- The Spotify version picker, the per-download preview with Save/Discard approval, `APPROVAL_TTL_SECS`, and the separate playlist-import flow (`import_jobs` / `import_tracks` stay in the database, unused; unfinished imports are not carried over)
+
+### Fixed
+
+- A transfer slskd reports as `Completed, Errored` is treated as failed, not as a finished download whose file is missing (library sweep)
+- The library sweep cancels a timed-out transfer by its full remote path, so slskd no longer keeps it
+- History rows store the real saved file name (including a ` (1)` suffix), so undo removes the right file
+
+## [Unreleased, before the queue rework]
+
 ### Added
 
 - Import confirm card offers *Start and save everything*: tracks are saved to the library as they land, with no preview upload and no per-track Save tap (schema v7 adds `import_jobs.auto_save`; the choice survives restarts and `/import` resume)

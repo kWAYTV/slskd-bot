@@ -1123,7 +1123,7 @@ wheels = [
 
 [[package]]
 name = "telegram-slskd-local-bot"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
@@ -1132,6 +1132,7 @@ dependencies = [
     { name = "python-telegram-bot" },
     { name = "slskd-api" },
     { name = "spotipy" },
+    { name = "yt-dlp" },
 ]
 
 [package.optional-dependencies]
@@ -1166,6 +1167,7 @@ requires-dist = [
     { name = "slskd-api", specifier = ">=0.2.4" },
     { name = "soundfile", marker = "extra == 'analysis'", specifier = ">=0.13.1" },
     { name = "spotipy", specifier = ">=2.26.0" },
+    { name = "yt-dlp", specifier = ">=2026.11.23" },
 ]
 provides-extras = ["analysis", "dev"]
 
@@ -1254,4 +1256,13 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/2d/dc/a6eb1ddfa7f1e390fa599b078453c97edb3f6f846b34fb4eac3e8ea16401/virtualenv-21.7.4.tar.gz", hash = "sha256:c9d960c95fa458171e58222a5ccab7465298e4b6559977865e627c4719f1e825", size = 5345511, upload-time = "2026-08-10T22:54:33.316Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/40/4c/eb2f52aeeaf30dbd073d315a251a63ae2b8263171ec4428c135140cb0802/virtualenv-21.7.4-py3-none-any.whl", hash = "sha256:376ec93cd6aab3044fa395d7db226db38043b7b5748948044b2a87168525e843", size = 5324444, upload-time = "2026-08-10T22:54:31.515Z" },
+]
+
+[[package]]
+name = "yt-dlp"
+version = "2026.11.23"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/5a/1b6b13c8bf553841e7deaf204105dc63d4765aca9143def73a130da228c1/yt_dlp-2026.11.23.tar.gz", hash = "sha256:1db83772a8de7855a2dab551a94d7f617c88629dfdf506531c06b369b47f88a4", size = 3051332, upload-time = "2026-11-23T23:50:02.694Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/30/1e/f4bf64ca733135e609696c6df77a6c22c6d4909b6e293e4563ae51ea335c/yt_dlp-2026.11.23-py3-none-any.whl", hash = "sha256:e9188e0c559905f7ee05acc1ba0b6fb3f310e7565bf6dea5f62b5300e0775e35", size = 3186416, upload-time = "2026-11-23T23:50:00.052Z" },
 ]
