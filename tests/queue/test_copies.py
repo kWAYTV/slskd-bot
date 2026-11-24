@@ -3,7 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from slskd_importer.queue.copies import REMEMBERED_ITEMS, CopyFinder
+from slskd_importer.queue.copies import CACHED_ITEMS as REMEMBERED_ITEMS
+from slskd_importer.queue.copies import CopyFinder
 from slskd_importer.soulseek.result import SearchResult
 from tests.queue.helpers import make_result, make_track
 
@@ -36,3 +37,19 @@ async def test_lossy_flag_is_kept_and_old_items_are_forgotten():
             found = await copies.find(item_id, make_track())
     assert found.lossy is True
     assert copies.remembered(0) is None and copies.remembered(REMEMBERED_ITEMS + 1) is not None
+
+
+async def test_copies_survive_a_restart(tmp_path):
+    from tests.queue.helpers import make_batch, make_store
+
+    store = make_store(tmp_path)
+    item = store.items(make_batch(store).id)[0]
+    first = CopyFinder(SimpleNamespace(search_timeout_secs=5), MagicMock(), MagicMock(), store)
+    with patch(SEARCH, AsyncMock(return_value=([make_result(0), make_result(1, "mp3")], True, False))):
+        await first.find(item.id, make_track())
+
+    after_restart = CopyFinder(SimpleNamespace(search_timeout_secs=5), MagicMock(), MagicMock(), store)
+    remembered = after_restart.remembered(item.id)
+    assert remembered.lossy is True
+    assert remembered.ranked == [make_result(0), make_result(1, "mp3")]
+    assert after_restart.remembered(item.id + 99) is None

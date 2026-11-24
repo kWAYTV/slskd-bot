@@ -14,7 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_VERSION = 9
+_SCHEMA_VERSION = 10
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS download_history (
@@ -69,6 +69,13 @@ CREATE TABLE IF NOT EXISTS queue_items (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(batch_id, position)
+);
+
+CREATE TABLE IF NOT EXISTS queue_copies (
+    item_id INTEGER PRIMARY KEY REFERENCES queue_items(id) ON DELETE CASCADE,
+    lossy INTEGER NOT NULL DEFAULT 0,
+    copies TEXT NOT NULL DEFAULT '[]',
+    found_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS chat_prefs (

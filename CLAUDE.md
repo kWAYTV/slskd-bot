@@ -105,7 +105,7 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Async wrapping**: All synchronous `slskd-api` calls must be wrapped with `asyncio.to_thread()` to avoid blocking the Telegram bot event loop
 - **Timeouts**: Hard timeout via `asyncio.wait_for()` around the entire search+poll loop; `searches.stop()` actively cancels the server-side search on timeout
 - **Cleanup**: Stale slskd searches are deleted only when their IDs are not in `_active_search_ids` (serialized with search start)
-- **Queue search**: every queue item uses the four-tier fallbacks (`queue.copies.CopyFinder` → `search_with_fallbacks`) and remembers the top copies so the picker needs no second search
+- **Queue search**: every queue item uses the four-tier fallbacks (`queue.copies.CopyFinder` → `search_with_fallbacks`) and remembers the top copies in the database (`queue_copies`, cached in memory) so the picker needs no second search, even after a restart
 - **Failed transfers**: slskd reports failures as `Completed, Errored`; check `DownloadStatus.is_failed`, never `not is_complete`
 
 ## Telegram UX Patterns

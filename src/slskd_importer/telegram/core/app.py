@@ -76,7 +76,7 @@ class MusicBot:
             slskd=self.slskd,
             processor=self.processor,
             store=self.queue_store,
-            finder=CopyFinder(config, self.slskd, self.scorer),
+            finder=CopyFinder(config, self.slskd, self.scorer, self.queue_store),
             shelf=self.shelf,
         )
         pipeline.deliver = self._deliver_copy

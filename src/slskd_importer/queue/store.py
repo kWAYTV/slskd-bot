@@ -205,6 +205,23 @@ class QueueRepository:
             conn.commit()
             return cursor.rowcount
 
+    def save_copies(self, item_id: int, lossy: bool, copies: str) -> None:
+        """Remember the copies found for an item (JSON, see queue.pick), replacing an earlier search."""
+        with self._db.locked() as conn:
+            conn.execute(
+                "INSERT INTO queue_copies (item_id, lossy, copies) VALUES (?, ?, ?) "
+                "ON CONFLICT(item_id) DO UPDATE SET lossy = excluded.lossy, copies = excluded.copies, "
+                "found_at = datetime('now')",
+                (item_id, int(lossy), copies),
+            )
+            conn.commit()
+
+    def load_copies(self, item_id: int) -> tuple[bool, str] | None:
+        """(no lossless copy was found, the copies as JSON) for an item, or None when it was never searched."""
+        with self._db.locked() as conn:
+            row = conn.execute("SELECT lossy, copies FROM queue_copies WHERE item_id = ?", (item_id,)).fetchone()
+            return (bool(row["lossy"]), row["copies"]) if row else None
+
     def reset_working(self) -> int:
         """After a restart: items that were in flight go back to pending. Returns how many."""
         with self._db.locked() as conn:
