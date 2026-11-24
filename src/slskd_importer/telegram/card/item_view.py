@@ -6,11 +6,12 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from slskd_importer.queue import progress as phases
 from slskd_importer.queue.batch import Batch, Item, ItemStatus
+from slskd_importer.queue.pipeline import VERDICT_PREFIX
 from slskd_importer.queue.progress import Progress
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.status import Translate, item_icon
 from slskd_importer.telegram.ui.formatting import progress_bar
-from slskd_importer.telegram.ui.markdown import code_span, escape_md
+from slskd_importer.telegram.ui.markdown import bold, code_span, escape_md
 
 Card = tuple[str, InlineKeyboardMarkup | None]
 
@@ -18,7 +19,7 @@ Card = tuple[str, InlineKeyboardMarkup | None]
 def render_item(t: Translate, batch: Batch, item: Item, progress: Progress | None, *, alone: bool) -> Card:
     """*alone*: the batch is this one track, so the card offers Cancel instead of Back."""
     track = item.track
-    head = f"{item_icon(item, progress)}  *{escape_md(item.label)}*"
+    head = f"{item_icon(item, progress)}  {bold(item.label)}"
     if track is not None and track.duration_ms:
         head += f"  ·  {track.duration_display}"
     lines = [head, *_body(t, batch, item, progress)]
@@ -33,13 +34,22 @@ def _body(t: Translate, batch: Batch, item: Item, progress: Progress | None) -> 
         return _working(t, progress)
     if status == ItemStatus.done:
         first = t("item_saved", name=code_span(item.saved_name)) if batch.to_library else t("item_sent")
-        return [first, *(escape_md(line) for line in (item.quality, item.detail) if line)]
+        return [first, *(line for line in (escape_md(item.quality), _detail(t, item.detail)) if line)]
     if status == ItemStatus.owned:
         return [t("item_owned"), code_span(item.saved_name)]
     lines = [t(f"item_{status}")]
     if item.detail and status in (ItemStatus.review, ItemStatus.failed):
         lines.append(escape_md(item.detail))
     return lines
+
+
+def _detail(t: Translate, detail: str) -> str:
+    """A stored lossless verdict (``verdict:WARNING:19.5``) in the chat's language; other details as they are."""
+    if not detail.startswith(VERDICT_PREFIX):
+        return escape_md(detail)
+    _, _, rest = detail.partition(":")
+    kind, _, khz = rest.partition(":")
+    return t(f"verdict_{kind.lower()}", khz=khz)
 
 
 def _working(t: Translate, progress: Progress | None) -> list[str]:
@@ -66,7 +76,7 @@ def _keyboard(t: Translate, batch: Batch, item: Item, *, alone: bool) -> InlineK
     elif status == ItemStatus.owned:
         row.append(button("btn_anyway", actions.AGAIN))
     elif status == ItemStatus.review:
-        row.append(button("btn_choose", actions.PICKER))
+        row += [button("btn_choose", actions.PICKER), button("btn_skip", actions.SKIP)]
     elif status == ItemStatus.no_match:
         row.append(button("btn_search_again", actions.RETRY))
     elif status == ItemStatus.failed:

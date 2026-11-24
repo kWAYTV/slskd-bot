@@ -13,7 +13,14 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from slskd_importer.soulseek.query import clean_query
-from slskd_importer.sources.titles import MAX_ENTRIES, has_separator, looks_like_track, strip_numbering, unique_entries
+from slskd_importer.sources.titles import (
+    MAX_ENTRIES,
+    has_separator,
+    looks_like_track,
+    strip_label_tag,
+    strip_numbering,
+    unique_entries,
+)
 from slskd_importer.sources.tracklist import SourceError, Tracklist
 
 logger = logging.getLogger(__name__)
@@ -115,7 +122,7 @@ def _artist(item: dict[str, Any]) -> tuple[str, bool]:
 
 def _query(item: dict[str, Any], fallback_artist: str = "") -> str:
     """Free-text ``Artist - Title`` for one video or track, or "" for a placeholder."""
-    title = str(item.get("track") or item.get("title") or "").strip()
+    title = strip_label_tag(str(item.get("track") or item.get("title") or "").strip())
     if not title or _PLACEHOLDER_RE.match(title):
         return ""
     artist, structured = _artist(item)

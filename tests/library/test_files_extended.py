@@ -75,3 +75,11 @@ class TestCleanupDownload:
         processor = FileProcessor(str(download_dir), str(output_dir), filename_template="{title} by {artist}")
         result = processor.build_filename("Artist", "Song", "mp3")
         assert result == "Song by Artist.mp3"
+
+
+def test_track_without_artist_is_named_by_its_title(tmp_path):
+    from slskd_importer.library.files import FileProcessor
+
+    processor = FileProcessor(str(tmp_path / "downloads"), str(tmp_path / "music"))
+    assert processor.build_filename("", "Unknown Banger", "flac") == "Unknown Banger.flac"
+    assert processor.build_filename("Isaiah", "Usually", "flac") == "Isaiah - Usually.flac"

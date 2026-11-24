@@ -30,6 +30,7 @@ _CARD_TOASTS = {
     actions.GET: "toast_downloading",
     actions.UNDO: "toast_removing",
     actions.SEND: "toast_sending",
+    actions.SKIP: "toast_cancelled",
 }
 
 

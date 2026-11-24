@@ -31,14 +31,15 @@ async def open_picker(self, query, batch: Batch, item: Item, page: int) -> None:
 
 
 async def get_copy(self, query, batch: Batch, item: Item, index: int) -> None:
-    """Fetch the copy the requester chose. A track already saved is replaced by it."""
+    """Fetch the copy the requester chose. A track already saved is replaced by it once it arrives."""
     copies = self.runner.pipeline.finder.remembered(item.id)
     if copies is None or index >= len(copies.ranked) or item.status in (ItemStatus.pending, ItemStatus.working):
         return
     if batch.to_library and not self._can_save_library(query.from_user.id):
         return
     if item.status == ItemStatus.done and batch.to_library:
-        await asyncio.to_thread(self.shelf.remove, item.saved_name, item.history_id)
+        # The saved file stays until the chosen copy has landed and passed its checks.
+        self.runner.pipeline.replaces[item.id] = (item.saved_name, item.history_id)
     logger.info("chat=%s item %d: picked #%d %s", batch.chat_id, item.id, index + 1, copies.ranked[index].basename)
     self.cards.show(batch.id, View(board.ITEM, item_id=item.id))
     await self.runner.requeue(item, forced=True, pick=copies.ranked[index])
@@ -69,6 +70,12 @@ async def retry(self, query, batch: Batch, item: Item, _number: int) -> None:
         await self.runner.requeue(item, forced=bool(item.forced))
 
 
+async def skip(self, query, batch: Batch, item: Item, _number: int) -> None:
+    """Leave a track that waits for a decision; it can still be fetched again later."""
+    if item.status == ItemStatus.review:
+        await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.cancelled)
+
+
 TRACK_ACTIONS = {
     actions.PICKER: open_picker,
     actions.GET: get_copy,
@@ -76,4 +83,5 @@ TRACK_ACTIONS = {
     actions.SEND: send_file,
     actions.AGAIN: fetch_again,
     actions.RETRY: retry,
+    actions.SKIP: skip,
 }

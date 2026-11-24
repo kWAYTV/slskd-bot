@@ -74,7 +74,7 @@ async def test_only_lossy_goes_to_review(store):
     pipeline = make_pipeline(store, ranked=[make_result(extension="mp3")], lossy=True)
     item = await run(pipeline, store, make_batch(store))
     assert item.status == ItemStatus.review
-    assert "MP3" in item.detail
+    assert item.detail == "MP3 · 16/44.1 · 29 MB"
 
 
 async def test_saves_best_copy(store):
@@ -89,7 +89,7 @@ async def test_saves_best_copy(store):
     assert item.saved_name == "Nancy Sinatra - Bang Bang.flac"
     assert item.history_id == 7
     assert item.quality.startswith("FLAC")
-    assert item.detail == "AUTHENTIC display"
+    assert item.detail == "verdict:AUTHENTIC:15.2"
     discard.assert_awaited_once()
 
 
@@ -214,3 +214,26 @@ async def test_two_items_wanting_the_same_remote_file_take_turns(store):
     assert [item.status for item in results] == [ItemStatus.done, ItemStatus.done]
     assert peak == 1
     assert pipeline._copy_locks == {}
+
+
+async def test_replaced_file_is_removed_only_once_the_new_copy_is_ready(store):
+    pipeline = make_pipeline(store)
+    batch = make_batch(store)
+    item = store.items(batch.id)[0]
+    pipeline.picks[item.id] = make_result(1)
+    pipeline.replaces[item.id] = ("old.flac", 3)
+    with patch(f"{PIPELINE}.fetch", AsyncMock(return_value=Landed(error="timed out"))):
+        failed = await run(pipeline, store, batch)
+    assert failed.status == ItemStatus.failed
+    pipeline.shelf.remove.assert_not_called()
+
+    pipeline.picks[item.id] = make_result(1)
+    pipeline.replaces[item.id] = ("old.flac", 3)
+    with (
+        patch(f"{PIPELINE}.fetch", landed()),
+        patch(f"{PIPELINE}.discard", AsyncMock()),
+        patch(f"{PIPELINE}.analyze_lossless", verdict()),
+    ):
+        done = await run(pipeline, store, batch)
+    assert done.status == ItemStatus.done
+    pipeline.shelf.remove.assert_called_once_with("old.flac", 3)

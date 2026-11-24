@@ -25,6 +25,21 @@ _NUMBERING_RE = re.compile(
 _BARE_NUMBER_RE = re.compile(rf"^\s*\d{{1,3}}{_SEPARATOR}\s*(?=.*{_SEPARATOR})")
 _UNKNOWN_RE = re.compile(r"^(?:id|\?+|unknown|tba|n/?a)$", re.IGNORECASE)
 
+# A trailing "[…]" is a label or catalogue tag ("[Drumcode]", "[ISH EP 04]") unless it names a version.
+_TRAILING_TAG_RE = re.compile(r"\s*\[([^\]]+)\]\s*$")
+_VERSION_WORD_RE = re.compile(
+    r"\b(?:mix|remix|edit|version|dub|vip|bootleg|rework|flip|instrumental|acapella|original|extended|live|feat)\b",
+    re.IGNORECASE,
+)
+
+
+def strip_label_tag(text: str) -> str:
+    """Drop a trailing ``[Label]`` / ``[CAT 004]`` tag; ``[Extended Mix]`` and the like stay."""
+    match = _TRAILING_TAG_RE.search(text)
+    if match is None or _VERSION_WORD_RE.search(match.group(1)):
+        return text
+    return text[: match.start()].rstrip()
+
 
 def has_separator(text: str) -> bool:
     """True when *text* already reads like ``Artist - Title``."""
