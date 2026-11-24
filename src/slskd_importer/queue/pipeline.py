@@ -17,6 +17,7 @@ from slskd_importer.library.files import FileProcessor
 from slskd_importer.library.lossless import CHECKABLE_EXTENSIONS, analyze_lossless
 from slskd_importer.queue import progress as phases
 from slskd_importer.queue.batch import Batch, Item, ItemStatus
+from slskd_importer.queue.confidence import sure_copies
 from slskd_importer.queue.copies import CopyFinder
 from slskd_importer.queue.fetch import Landed, discard, fetch
 from slskd_importer.queue.progress import Progress
@@ -110,7 +111,11 @@ class ItemPipeline:
                 best = found.ranked[0]
                 await self._finish(item, ItemStatus.review, detail=describe_copy(best))
                 return
-            copies = found.ranked[:MAX_TRIES]
+            copies = sure_copies(track, found.ranked)[:MAX_TRIES]
+            if not copies:
+                # Something turned up, but nothing that names this song: the requester decides.
+                await self._finish(item, ItemStatus.choose)
+                return
 
         notes: list[str] = []
         for result in copies:

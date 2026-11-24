@@ -10,11 +10,11 @@ from slskd_importer.queue.batch import OPEN_STATUSES, RETRYABLE_STATUSES, Batch,
 from slskd_importer.queue.progress import Progress
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card
-from slskd_importer.telegram.card.status import ATTENTION, Translate, item_icon, phase_text
+from slskd_importer.telegram.card.status import ATTENTION, Translate, item_icon, open_action, phase_text
 from slskd_importer.telegram.ui.formatting import clip, progress_bar
 from slskd_importer.telegram.ui.markdown import bold, escape_md
 
-ATTENTION_BUTTONS = 5
+ATTENTION_BUTTONS = 8
 
 
 def render_summary(t: Translate, batch: Batch, items: list[Item], progress: dict[int, Progress]) -> Card:
@@ -47,7 +47,7 @@ def _tally(t: Translate, batch: Batch, counts: Counter) -> str:
     parts = [
         (done_key, counts[ItemStatus.done]),
         ("count_owned", counts[ItemStatus.owned]),
-        ("count_review", counts[ItemStatus.review]),
+        ("count_review", counts[ItemStatus.review] + counts[ItemStatus.choose]),
         ("count_failed", failed),
         ("count_removed", counts[ItemStatus.removed]),
         ("count_cancelled", counts[ItemStatus.cancelled]),
@@ -63,7 +63,8 @@ def _keyboard(t: Translate, batch: Batch, counts: Counter, attention: list[Item]
     rows = [
         [
             InlineKeyboardButton(
-                clip(f"{item_icon(item)}  {item.label}"), callback_data=actions.encode(actions.ITEM, batch.id, item.id)
+                clip(f"{item_icon(item)}  {item.label}"),
+                callback_data=actions.encode(open_action(item), batch.id, item.id),
             )
         ]
         for item in attention[:ATTENTION_BUTTONS]

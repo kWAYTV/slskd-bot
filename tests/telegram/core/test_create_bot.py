@@ -43,8 +43,8 @@ class TestCreateBot:
             app = create_bot(config)
             assert app is mock_app
             mock_app.add_handler.assert_called()
-            # nine command handlers (aliases share one) + callback + text
-            assert mock_app.add_handler.call_count == 11
+            # ten command handlers (aliases share one) + callback + text
+            assert mock_app.add_handler.call_count == 12
             mock_builder.base_url.assert_not_called()
             mock_builder.post_shutdown.assert_called_once()
 

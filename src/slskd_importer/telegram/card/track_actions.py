@@ -41,7 +41,7 @@ async def get_copy(self, query, batch: Batch, item: Item, index: int) -> None:
         # The saved file stays until the chosen copy has landed and passed its checks.
         self.runner.pipeline.replaces[item.id] = (item.saved_name, item.history_id)
     logger.info("chat=%s item %d: picked #%d %s", batch.chat_id, item.id, index + 1, copies.ranked[index].basename)
-    self.cards.focus(batch.id, board.ITEM, item.id)
+    self.cards.leave(batch.id)  # picked: back to where the track was opened from
     await self.runner.requeue(item, forced=True, pick=copies.ranked[index])
 
 
@@ -62,17 +62,20 @@ async def send_file(self, query, batch: Batch, item: Item, _number: int) -> None
 async def fetch_again(self, query, batch: Batch, item: Item, _number: int) -> None:
     """Fetch a track that is owned, removed or cancelled, skipping the owned check."""
     if item.status in (ItemStatus.owned, ItemStatus.removed, ItemStatus.cancelled):
+        self.cards.leave(batch.id)
         await self.runner.requeue(item, forced=True)
 
 
 async def retry(self, query, batch: Batch, item: Item, _number: int) -> None:
     if item.status in (ItemStatus.failed, ItemStatus.no_match, ItemStatus.review):
+        self.cards.leave(batch.id)
         await self.runner.requeue(item, forced=bool(item.forced))
 
 
 async def skip(self, query, batch: Batch, item: Item, _number: int) -> None:
     """Leave a track that needs attention (lossy only, not found, failed); it can be fetched again later."""
-    if item.status in (*ATTENTION, ItemStatus.choose):
+    if item.status in ATTENTION:
+        self.cards.leave(batch.id)
         await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.cancelled)
 
 

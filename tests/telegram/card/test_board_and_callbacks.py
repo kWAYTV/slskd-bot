@@ -277,9 +277,38 @@ async def test_back_returns_to_where_the_track_was_opened_from(bot):
     await press(bot, actions.ITEM, batch, items[0].id)  # from the summary
     assert back_button(bot) == actions.encode(actions.SUMMARY, batch.id)
     await press(bot, actions.PICKER, batch, items[0].id)
-    await press(bot, actions.ITEM, batch, items[0].id)  # the picker's Back keeps the origin... of a fresh open
+    await press(bot, actions.ITEM, batch, items[0].id)  # the picker's Back
     assert back_button(bot) == actions.encode(actions.SUMMARY, batch.id)
 
     await press(bot, actions.LIST, batch, 0, 1)
-    await press(bot, actions.ITEM, batch, items[5].id, 2)  # from page 2 of the list
+    await press(bot, actions.ITEM, batch, items[5].id)  # from page 2 of the list
     assert back_button(bot) == actions.encode(actions.LIST, batch.id, 0, 1)
+
+
+async def test_acting_on_a_track_returns_to_the_summary(bot):
+    batch, items = queue(bot, 3)
+    bot.queue_store.update_item(items[0].id, status=ItemStatus.choose)
+    bot.queue_store.update_item(items[1].id, status=ItemStatus.no_match)
+    bot.runner.pipeline.finder._found[items[0].id] = Copies([make_result(0)])
+
+    await press(bot, actions.PICKER, batch, items[0].id)  # tapped on the summary
+    assert "1 copies — choose one" in drawn_text(bot)
+    assert back_button(bot) == actions.encode(actions.SUMMARY, batch.id)
+    await press(bot, actions.GET, batch, items[0].id, 0)
+    assert "/ 3" in drawn_text(bot)  # the summary again, no Back needed
+
+    await press(bot, actions.ITEM, batch, items[1].id)
+    await press(bot, actions.SKIP, batch, items[1].id)
+    assert "/ 3" in drawn_text(bot)
+
+
+async def test_track_waiting_for_a_pick_in_a_list_opens_on_its_copies(bot):
+    batch, items = queue(bot, 3)
+    bot.queue_store.update_item(items[1].id, status=ItemStatus.choose)
+    bot.runner.pipeline.finder._found[items[1].id] = Copies([make_result(0), make_result(1)])
+    await bot.cards.draw(batch.id)
+    assert "👂 1 to review" in drawn_text(bot)
+    markup = bot.telegram.edit_message_text.call_args.kwargs["reply_markup"]
+    assert markup.inline_keyboard[0][0].callback_data == actions.encode(actions.PICKER, batch.id, items[1].id)
+    await press(bot, actions.PICKER, batch, items[1].id)
+    assert "2 copies — choose one" in drawn_text(bot)

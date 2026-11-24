@@ -76,6 +76,14 @@ class QueueRepository:
         with self._db.locked() as conn:
             return [Batch(**dict(row)) for row in conn.execute(sql + " ORDER BY id", params).fetchall()]
 
+    def recent_batches(self, chat_id: int, limit: int) -> list[Batch]:
+        """The chat's latest batches, newest first, whatever their status."""
+        with self._db.locked() as conn:
+            rows = conn.execute(
+                "SELECT * FROM queue_batches WHERE chat_id = ? ORDER BY id DESC LIMIT ?", (chat_id, limit)
+            )
+            return [Batch(**dict(row)) for row in rows.fetchall()]
+
     def set_message(self, batch_id: int, message_id: int) -> None:
         with self._db.locked() as conn:
             conn.execute("UPDATE queue_batches SET message_id = ? WHERE id = ?", (message_id, batch_id))

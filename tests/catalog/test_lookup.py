@@ -28,6 +28,28 @@ def test_free_text_when_no_separator_or_fielded_is_empty():
     spotify.search_multiple.assert_called_with("Daft Punk - One More Time", 50)
 
 
+def test_identify_keeps_the_typed_song_when_the_catalog_returns_another():
+    spotify = MagicMock()
+    spotify.search_fielded.return_value = []
+    spotify.search_multiple.return_value = [track(artist="Some Pop Star", title="Hit Single")]
+    found = identify(spotify, "William Marqs - no.0101")
+    assert (found.artist, found.title, found.duration_ms) == ("William Marqs", "No.0101", 0)
+
+
+def test_identify_uses_the_catalog_track_when_it_is_the_typed_song():
+    spotify = MagicMock()
+    remix = track(title="One More Time - Extended Remix", secs=500)
+    spotify.search_fielded.return_value = [remix, track(title="One More Time - Original Mix")]
+    found = identify(spotify, "daft punk - one more time")
+    assert found.title == "One More Time - Original Mix" and found.duration_ms == 320_000
+
+
+def test_identify_without_separator_takes_the_best_candidate():
+    spotify = MagicMock()
+    spotify.search_multiple.return_value = [track()]
+    assert identify(spotify, "daft punk one more time") == track()
+
+
 def test_identify_falls_back_to_the_text():
     spotify = MagicMock()
     spotify.search_fielded.return_value = []

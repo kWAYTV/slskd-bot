@@ -98,3 +98,36 @@ def test_ui_helpers():
 
 def test_stats_string_has_no_stale_placeholders(bot):
     assert "{" not in bot.t(1, "stats_totals", total=3, success=2, failed=1)
+
+
+async def test_check_lists_tracks_that_are_not_what_was_asked(bot):
+    from slskd_importer.catalog.track import TrackInfo
+
+    def saved(query, artist, title, remote):
+        batch = bot.queue_store.create_batch(67890, 12345, "Set", "list", [Entry(query=query)])
+        item = bot.queue_store.items(batch.id)[0]
+        bot.queue_store.set_identity(item.id, TrackInfo(artist, title, "", 0, "", ""))
+        history_id = bot.history_repo.add(
+            artist, title, f"{artist} - {title}.flac", "peer", "success", remote_path=remote, chat_id=67890
+        )
+        bot.queue_store.update_item(
+            item.id, status=ItemStatus.done, saved_name=f"{artist} - {title}.flac", history_id=history_id
+        )
+
+    saved("Patient - Rhythm Dancer", "Vault Records", "Rhythm Dancer", "\\x\\Vault Records - Rhythm Dancer.flac")
+    saved("Phil Berg - Void", "Phil Berg", "Void", "\\x\\Someone Else - Void.flac")
+    saved("UMEK - Gatex", "UMEK", "Gatex", "\\UMEK\\01 Gatex.flac")
+
+    update = _make_update()
+    await bot.cmd_check(update, _make_context())
+    text = update.message.reply_text.call_args.args[0]
+    assert "*2 to check*  ·  of 3 recently saved" in text
+    assert "`Patient - Rhythm Dancer`" in text and "`Vault Records - Rhythm Dancer.flac`" in text
+    assert "`Someone Else - Void.flac`" in text
+    assert "Gatex" not in text
+
+
+async def test_check_when_everything_matches(bot):
+    update = _make_update()
+    await bot.cmd_check(update, _make_context())
+    update.message.reply_text.assert_awaited_once_with("All 0 recently saved tracks match what you asked for.")

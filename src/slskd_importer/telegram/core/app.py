@@ -31,7 +31,7 @@ from slskd_importer.soulseek.scoring import ResultScorer
 from slskd_importer.sweep import LibrarySweep
 from slskd_importer.telegram.card import callbacks as card_callbacks
 from slskd_importer.telegram.card.board import CardBoard
-from slskd_importer.telegram.commands import basics, cancel, history, preferences, stats, status, undo
+from slskd_importer.telegram.commands import basics, cancel, check, history, preferences, stats, status, undo
 from slskd_importer.telegram.core import access, routing
 from slskd_importer.telegram.delivery import handoff
 from slskd_importer.telegram.i18n import DEFAULT_LOCALE, normalize_locale
@@ -135,6 +135,7 @@ class MusicBot:
     cmd_history = history.cmd_history
     cmd_stats = stats.cmd_stats
     cmd_cancel = cancel.cmd_cancel
+    cmd_check = check.cmd_check
     _handle_cancel_all = cancel.handle_cancel_all
     _handle_history_undo = undo.handle_history_undo
 
@@ -196,6 +197,7 @@ def create_bot(config: Config) -> Application:
     app.add_handler(CommandHandler("status", bot.cmd_status))
     app.add_handler(CommandHandler("history", bot.cmd_history))
     app.add_handler(CommandHandler("stats", bot.cmd_stats))
+    app.add_handler(CommandHandler("check", bot.cmd_check))
     app.add_handler(CommandHandler("sweep", bot.cmd_sweep))
     app.add_handler(CommandHandler("cancel", bot.cmd_cancel))
     app.add_handler(CallbackQueryHandler(bot.handle_callback))

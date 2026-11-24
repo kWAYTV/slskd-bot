@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from slskd_importer.queue.batch import Batch, Item
+from slskd_importer.queue.batch import Batch, Item, ItemStatus
 from slskd_importer.queue.copies import Copies
 from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.card import actions
@@ -13,9 +13,13 @@ from slskd_importer.telegram.card.status import Translate
 from slskd_importer.telegram.ui.markdown import bold, code_span
 
 
-def render_picker(t: Translate, batch: Batch, item: Item, copies: Copies | None, page: int, page_size: int) -> Card:
-    """*copies* None means the search is still running."""
-    back = [InlineKeyboardButton(t("btn_back"), callback_data=actions.encode(actions.ITEM, batch.id, item.id))]
+def render_picker(
+    t: Translate, batch: Batch, item: Item, copies: Copies | None, page: int, page_size: int, *, back: str = ""
+) -> Card:
+    """*copies* None means the search is still running. *back*: callback data of Back (the item view by default)."""
+    back = [InlineKeyboardButton(t("btn_back"), callback_data=back or actions.encode(actions.ITEM, batch.id, item.id))]
+    if item.status in (ItemStatus.choose, ItemStatus.review):
+        back.append(InlineKeyboardButton(t("btn_skip"), callback_data=actions.encode(actions.SKIP, batch.id, item.id)))
     head = bold(item.label)
     if copies is None:
         return f"{head}\n{t('picker_searching')}", InlineKeyboardMarkup([back])

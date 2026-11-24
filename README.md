@@ -67,6 +67,7 @@ uv run python -m slskd_importer run
 | *(any link)* | Queue what the link holds: a track, an album, a playlist, a mix tracklist |
 | `/status` | What this chat has in the queue, with *Cancel all* |
 | `/history` | Recent downloads — tap ↩️ to remove one |
+| `/check` | Compare the latest saved tracks with what you asked for and list the doubtful ones |
 | `/undo` | Remove the last track saved to the library |
 | `/stats` | Download totals and library size for this chat |
 | `/sweep` | Start a library sweep now (`/sweep force`, `/sweep stop`, `/sweep status`, `/sweep reviews`) |
