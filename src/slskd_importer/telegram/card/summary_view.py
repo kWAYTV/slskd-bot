@@ -47,7 +47,7 @@ def _tally(t: Translate, batch: Batch, counts: Counter) -> str:
     parts = [
         (done_key, counts[ItemStatus.done]),
         ("count_owned", counts[ItemStatus.owned]),
-        ("count_review", counts[ItemStatus.review] + counts[ItemStatus.choose]),
+        ("count_review", counts[ItemStatus.review] + counts[ItemStatus.choose] + counts[ItemStatus.doubt]),
         ("count_failed", failed),
         ("count_removed", counts[ItemStatus.removed]),
         ("count_cancelled", counts[ItemStatus.cancelled]),

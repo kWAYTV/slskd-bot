@@ -5,7 +5,7 @@ from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from slskd_importer.queue import progress as phases
-from slskd_importer.queue.batch import Batch, Item, ItemStatus
+from slskd_importer.queue.batch import SAVED_STATUSES, Batch, Item, ItemStatus
 from slskd_importer.queue.pipeline import VERDICT_PREFIX
 from slskd_importer.queue.progress import Progress
 from slskd_importer.telegram.card import actions
@@ -37,9 +37,10 @@ def _body(t: Translate, batch: Batch, item: Item, progress: Progress | None) -> 
         return [t("item_pending")]
     if status == ItemStatus.working:
         return _working(t, progress)
-    if status == ItemStatus.done:
+    if status in SAVED_STATUSES:
         first = t("item_saved", name=code_span(item.saved_name)) if batch.to_library else t("item_sent")
-        return [first, *(line for line in (escape_md(item.quality), _detail(t, item.detail)) if line)]
+        lines = [first, *(line for line in (escape_md(item.quality), _detail(t, item.detail)) if line)]
+        return [*lines, t("item_doubt")] if status == ItemStatus.doubt else lines
     if status == ItemStatus.owned:
         return [t("item_owned"), code_span(item.saved_name)]
     lines = [t(f"item_{status}")]
@@ -74,7 +75,13 @@ def _keyboard(t: Translate, batch: Batch, item: Item, *, alone: bool, back: str)
 
     status = item.status
     row: list[InlineKeyboardButton] = []
-    if status == ItemStatus.done:
+    if status == ItemStatus.doubt:
+        row += [
+            button("btn_keep", actions.KEEP),
+            button("btn_other_versions", actions.PICKER),
+            button("btn_undo", actions.UNDO),
+        ]
+    elif status == ItemStatus.done:
         row.append(button("btn_other_versions", actions.PICKER))
         if batch.to_library:
             row += [button("btn_undo", actions.UNDO), button("btn_send_file", actions.SEND)]

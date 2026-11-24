@@ -12,7 +12,7 @@ from telegram import Bot
 from telegram.constants import ParseMode
 from telegram.error import RetryAfter
 
-from slskd_importer.queue.batch import Batch, BatchStatus, Item, ItemStatus
+from slskd_importer.queue.batch import SAVED_STATUSES, Batch, BatchStatus, Item, ItemStatus
 from slskd_importer.queue.runner import QueueRunner
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card, render_item
@@ -164,7 +164,7 @@ class CardBoard:
         if batch.status != BatchStatus.done or batch.id in self._reacted:
             return
         self._reacted.add(batch.id)
-        got = any(item.status in (ItemStatus.done, ItemStatus.owned) for item in items)
+        got = any(item.status in (*SAVED_STATUSES, ItemStatus.owned) for item in items)
         if not got and any(item.status in (ItemStatus.choose, ItemStatus.review) for item in items):
             return  # still waiting for the requester: the request keeps its 👀
         await react(self.telegram, batch.chat_id, batch.query_message_id, REACTION_SAVED if got else REACTION_NOTHING)

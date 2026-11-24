@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from slskd_importer.queue.batch import Batch, Item, ItemStatus
+from slskd_importer.queue.batch import SAVED_STATUSES, Batch, Item, ItemStatus
 from slskd_importer.telegram.card import actions, board
 from slskd_importer.telegram.card.status import ATTENTION
 
@@ -37,7 +37,7 @@ async def get_copy(self, query, batch: Batch, item: Item, index: int) -> None:
         return
     if batch.to_library and not self._can_save_library(query.from_user.id):
         return
-    if item.status == ItemStatus.done and batch.to_library:
+    if item.status in SAVED_STATUSES and batch.to_library:
         # The saved file stays until the chosen copy has landed and passed its checks.
         self.runner.pipeline.replaces[item.id] = (item.saved_name, item.history_id)
     logger.info("chat=%s item %d: picked #%d %s", batch.chat_id, item.id, index + 1, copies.ranked[index].basename)
@@ -47,15 +47,16 @@ async def get_copy(self, query, batch: Batch, item: Item, index: int) -> None:
 
 async def undo_save(self, query, batch: Batch, item: Item, _number: int) -> None:
     """Take a saved track back out of the library."""
-    if item.status != ItemStatus.done or not batch.to_library or not self._can_save_library(query.from_user.id):
+    if item.status not in SAVED_STATUSES or not batch.to_library or not self._can_save_library(query.from_user.id):
         return
+    self.cards.leave(batch.id)
     await asyncio.to_thread(self.shelf.remove, item.saved_name, item.history_id)
     await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.removed)
     logger.info("chat=%s item %d: removed %s from the library", batch.chat_id, item.id, item.saved_name)
 
 
 async def send_file(self, query, batch: Batch, item: Item, _number: int) -> None:
-    if item.status == ItemStatus.done and batch.to_library:
+    if item.status in SAVED_STATUSES and batch.to_library:
         await self._send_saved_file(batch, item)
 
 
@@ -79,6 +80,13 @@ async def skip(self, query, batch: Batch, item: Item, _number: int) -> None:
         await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.cancelled)
 
 
+async def keep(self, query, batch: Batch, item: Item, _number: int) -> None:
+    """Keep a saved copy although the audio check doubts it."""
+    if item.status == ItemStatus.doubt:
+        self.cards.leave(batch.id)
+        await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.done)
+
+
 TRACK_ACTIONS = {
     actions.PICKER: open_picker,
     actions.GET: get_copy,
@@ -87,4 +95,5 @@ TRACK_ACTIONS = {
     actions.AGAIN: fetch_again,
     actions.RETRY: retry,
     actions.SKIP: skip,
+    actions.KEEP: keep,
 }

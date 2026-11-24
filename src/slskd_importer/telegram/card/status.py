@@ -16,6 +16,7 @@ _STATUS_ICONS = {
     ItemStatus.pending: "⏳",
     ItemStatus.working: "⬇️",
     ItemStatus.done: "✅",
+    ItemStatus.doubt: "⚠️",
     ItemStatus.owned: "📀",
     ItemStatus.review: "👂",
     ItemStatus.choose: "👉",
@@ -35,7 +36,7 @@ _PHASE_ICONS = {
 
 # Items waiting for the requester, in the order a summary lists them. A track nothing was found for
 # is not one of them: there is nothing to decide, it is only counted (and can be retried).
-ATTENTION = (ItemStatus.choose, ItemStatus.review, ItemStatus.failed)
+ATTENTION = (ItemStatus.choose, ItemStatus.doubt, ItemStatus.review, ItemStatus.failed)
 
 
 def open_action(item: Item) -> str:

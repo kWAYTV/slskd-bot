@@ -201,9 +201,11 @@ class ItemPipeline:
             await discard(self._slskd, self._processor, result, landed.path, landed.transfer_id)
             if placed is None:
                 return "could not be saved to the library"
+            # A copy the audio check does not vouch for is saved, then put back in front of the requester.
+            sound = verdict is None or verdict.verdict == "AUTHENTIC"
             await self._finish(
                 item,
-                ItemStatus.done,
+                ItemStatus.done if sound else ItemStatus.doubt,
                 detail=detail,
                 saved_name=placed.name,
                 quality=quality,

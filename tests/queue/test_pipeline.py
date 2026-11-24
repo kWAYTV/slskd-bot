@@ -269,3 +269,19 @@ async def test_without_auto_pick_every_list_track_waits_for_a_pick(store):
         item = await run(pipeline, store, make_batch(store))
     assert item.status == ItemStatus.choose
     fetch.assert_not_called()
+
+
+@pytest.mark.parametrize(("kind", "status"), [("WARNING", ItemStatus.doubt), ("AUTHENTIC", ItemStatus.done)])
+async def test_a_doubted_picked_copy_is_saved_but_comes_back_for_review(store, kind, status):
+    pipeline = make_pipeline(store)
+    batch = make_batch(store)
+    item = store.items(batch.id)[0]
+    pipeline.picks[item.id] = make_result(1)
+    with (
+        patch(f"{PIPELINE}.fetch", landed()),
+        patch(f"{PIPELINE}.discard", AsyncMock()),
+        patch(f"{PIPELINE}.analyze_lossless", verdict(kind)),
+    ):
+        saved = await run(pipeline, store, batch)
+    assert saved.status == status
+    assert saved.saved_name == "Nancy Sinatra - Bang Bang.flac"

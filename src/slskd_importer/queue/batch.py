@@ -23,6 +23,7 @@ class ItemStatus(StrEnum):
     pending = "pending"
     working = "working"
     done = "done"  # saved to the library, or delivered
+    doubt = "doubt"  # saved, but the audio check says it may be a transcode: keep it or pick another
     owned = "owned"  # already in the library, not fetched
     review = "review"  # only lossy copies exist: the requester picks one or leaves it
     choose = "choose"  # a song asked for on its own: the requester picks the copy
@@ -34,6 +35,8 @@ class ItemStatus(StrEnum):
 
 OPEN_STATUSES = (ItemStatus.pending, ItemStatus.working)
 RETRYABLE_STATUSES = (ItemStatus.failed, ItemStatus.no_match)
+# The track's file is in the library.
+SAVED_STATUSES = (ItemStatus.done, ItemStatus.doubt)
 
 
 @dataclass
