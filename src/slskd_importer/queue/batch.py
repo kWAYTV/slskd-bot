@@ -25,6 +25,7 @@ class ItemStatus(StrEnum):
     done = "done"  # saved to the library, or delivered
     owned = "owned"  # already in the library, not fetched
     review = "review"  # only lossy copies exist: the requester picks one or leaves it
+    choose = "choose"  # a song asked for on its own: the requester picks the copy
     no_match = "no_match"
     failed = "failed"
     removed = "removed"  # saved, then undone
@@ -53,6 +54,14 @@ class Batch:
     @property
     def to_library(self) -> bool:
         return self.destination == Destination.library
+
+    @property
+    def asks_which_copy(self) -> bool:
+        """A single requested song is never fetched blind: the first match may be another version.
+
+        Lists, playlists and tracklists are worked through without asking.
+        """
+        return self.kind == "track"
 
 
 @dataclass

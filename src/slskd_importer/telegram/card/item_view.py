@@ -16,14 +16,19 @@ from slskd_importer.telegram.ui.markdown import bold, code_span, escape_md
 Card = tuple[str, InlineKeyboardMarkup | None]
 
 
-def render_item(t: Translate, batch: Batch, item: Item, progress: Progress | None, *, alone: bool) -> Card:
-    """*alone*: the batch is this one track, so the card offers Cancel instead of Back."""
+def render_item(
+    t: Translate, batch: Batch, item: Item, progress: Progress | None, *, alone: bool, back: str = ""
+) -> Card:
+    """*alone*: the batch is this one track, so the card offers Cancel instead of Back.
+
+    *back*: callback data of the Back button (where the track was opened from); the track list by default.
+    """
     track = item.track
     head = f"{item_icon(item, progress)}  {bold(item.label)}"
     if track is not None and track.duration_ms:
         head += f"  ·  {track.duration_display}"
     lines = [head, *_body(t, batch, item, progress)]
-    return "\n".join(lines), _keyboard(t, batch, item, alone=alone)
+    return "\n".join(lines), _keyboard(t, batch, item, alone=alone, back=back)
 
 
 def _body(t: Translate, batch: Batch, item: Item, progress: Progress | None) -> list[str]:
@@ -63,7 +68,7 @@ def _working(t: Translate, progress: Progress | None) -> list[str]:
     return [f"{t('item_downloading')}  {percent:.0f}%", progress_bar(percent)]
 
 
-def _keyboard(t: Translate, batch: Batch, item: Item, *, alone: bool) -> InlineKeyboardMarkup | None:
+def _keyboard(t: Translate, batch: Batch, item: Item, *, alone: bool, back: str) -> InlineKeyboardMarkup | None:
     def button(label_key: str, action: str) -> InlineKeyboardButton:
         return InlineKeyboardButton(t(label_key), callback_data=actions.encode(action, batch.id, item.id))
 
@@ -75,7 +80,7 @@ def _keyboard(t: Translate, batch: Batch, item: Item, *, alone: bool) -> InlineK
             row += [button("btn_undo", actions.UNDO), button("btn_send_file", actions.SEND)]
     elif status == ItemStatus.owned:
         row.append(button("btn_anyway", actions.AGAIN))
-    elif status == ItemStatus.review:
+    elif status in (ItemStatus.review, ItemStatus.choose):
         row += [button("btn_choose", actions.PICKER), button("btn_skip", actions.SKIP)]
     elif status == ItemStatus.no_match:
         row += [button("btn_search_again", actions.RETRY), button("btn_skip", actions.SKIP)]
@@ -92,5 +97,5 @@ def _keyboard(t: Translate, batch: Batch, item: Item, *, alone: bool) -> InlineK
 
     rows = [row] if row else []
     if not alone:
-        rows.append([InlineKeyboardButton(t("btn_back"), callback_data=actions.encode(actions.LIST, batch.id))])
+        rows.append([InlineKeyboardButton(t("btn_back"), callback_data=back or actions.encode(actions.LIST, batch.id))])
     return InlineKeyboardMarkup(rows) if rows else None

@@ -236,3 +236,50 @@ async def test_skip_clears_unfound_and_failed_tracks_from_the_summary(bot):
     await press(bot, actions.SKIP, batch, items[1].id)
     await press(bot, actions.SKIP, batch, items[2].id)  # a saved track is not skippable
     assert bot.queue_store.counts(batch.id) == {"cancelled": 2, "done": 1}
+
+
+async def test_single_song_card_opens_on_its_copies_and_a_pick_fetches(bot):
+    batch = bot.queue_store.create_batch(CHAT, 12345, "Bang Bang", "track", [Entry(track=make_track())], message_id=900)
+    item = bot.queue_store.items(batch.id)[0]
+    bot.queue_store.update_item(item.id, status=ItemStatus.choose)
+    bot.runner.pipeline.finder._found[item.id] = Copies([make_result(0), make_result(1)])
+    await bot.cards.draw(batch.id)
+    assert "2 copies — choose one" in drawn_text(bot)
+
+    await press(bot, actions.ITEM, batch, item.id)  # Back from the picker
+    assert "Which copy do you want?" in drawn_text(bot)
+
+    await press(bot, actions.GET, batch, item.id, 1)
+    assert bot.queue_store.get_item(item.id).status == ItemStatus.pending
+    assert bot.runner.pipeline.picks[item.id].username == "user1"
+
+
+async def test_single_song_without_remembered_copies_offers_to_choose(bot):
+    batch = bot.queue_store.create_batch(CHAT, 12345, "Bang Bang", "track", [Entry(track=make_track())], message_id=900)
+    item = bot.queue_store.items(batch.id)[0]
+    bot.queue_store.update_item(item.id, status=ItemStatus.choose)
+    await bot.cards.draw(batch.id)  # after a restart nothing is remembered
+    assert "Which copy do you want?" in drawn_text(bot)
+    await press(bot, actions.SKIP, batch, item.id)
+    assert bot.queue_store.get_item(item.id).status == ItemStatus.cancelled
+
+
+def back_button(bot) -> str:
+    markup = bot.telegram.edit_message_text.call_args.kwargs["reply_markup"]
+    return markup.inline_keyboard[-1][0].callback_data
+
+
+async def test_back_returns_to_where_the_track_was_opened_from(bot):
+    batch, items = queue(bot, 12)
+    bot.queue_store.update_item(items[0].id, status=ItemStatus.failed)
+    bot.runner.pipeline.finder._found[items[0].id] = Copies([make_result(0)])
+
+    await press(bot, actions.ITEM, batch, items[0].id)  # from the summary
+    assert back_button(bot) == actions.encode(actions.SUMMARY, batch.id)
+    await press(bot, actions.PICKER, batch, items[0].id)
+    await press(bot, actions.ITEM, batch, items[0].id)  # the picker's Back keeps the origin... of a fresh open
+    assert back_button(bot) == actions.encode(actions.SUMMARY, batch.id)
+
+    await press(bot, actions.LIST, batch, 0, 1)
+    await press(bot, actions.ITEM, batch, items[5].id, 2)  # from page 2 of the list
+    assert back_button(bot) == actions.encode(actions.LIST, batch.id, 0, 1)

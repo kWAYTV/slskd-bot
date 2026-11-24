@@ -17,6 +17,7 @@ _STATUS_ICONS = {
     ItemStatus.done: "✅",
     ItemStatus.owned: "📀",
     ItemStatus.review: "👂",
+    ItemStatus.choose: "👉",
     ItemStatus.no_match: "🤷",
     ItemStatus.failed: "❌",
     ItemStatus.removed: "↩️",

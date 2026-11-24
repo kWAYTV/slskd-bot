@@ -39,7 +39,11 @@ async def handle_card_action(self, update: Update, context: ContextTypes.DEFAULT
     elif action.name == actions.LIST:
         self.cards.show(batch.id, View(board.LIST, page=action.number))
     elif action.name == actions.ITEM:
-        self.cards.show(batch.id, View(board.ITEM, item_id=action.item_id))
+        # number > 0: opened from that (1-based) list page; 0: opened from the summary.
+        origin = board.LIST if action.number else board.SUMMARY
+        self.cards.show(
+            batch.id, View(board.ITEM, item_id=action.item_id, back=origin, back_page=max(action.number - 1, 0))
+        )
     elif action.name in TRACK_ACTIONS:
         item = await asyncio.to_thread(self.queue_store.get_item, action.item_id)
         if item is None or item.batch_id != batch.id:

@@ -14,7 +14,8 @@
 
 - **Send anything, as much as you like** — one song per line, or links: Spotify (track, album, playlist), YouTube and YouTube Music (video, playlist, album, and the chapters of a DJ mix), SoundCloud, Bandcamp, 1001Tracklists and MixesDB pages. A tracklist copied from anywhere works too: numbering, timestamps and `[Label]` tags are stripped
 - **One card per message** — every message becomes a batch with a single message that updates in place: progress, counts, what is downloading. Several batches run side by side without mixing. Your own message is reacted 👀 while it works, 👍 when something arrived, 🤷 when nothing did
-- **Nothing to confirm** — the queue picks the best lossless copy, downloads it, runs a spectrum check, skips fake FLACs for the next copy, and saves. Only exceptions wait for you: no lossless copy exists (*Choose a copy*), nothing found, every copy failed
+- **One song: you pick the copy** — a song sent on its own shows the copies found (format, length, quality, size) and waits for your tap, so you never get the wrong version
+- **Lists run on their own** — for a list, playlist or tracklist the queue picks the best lossless copy of each track, downloads it, runs a spectrum check, skips fake FLACs for the next copy, and saves. Only exceptions wait for you: no lossless copy exists (*Choose a copy*), nothing found, every copy failed
 - **Every track stays in reach** — tap a track on its card to choose another copy, undo the save, get the file sent to the chat, or retry
 - **Fair queue** — a fixed number of tracks at a time (`MAX_CONCURRENT_DOWNLOADS`), shared fairly: one song never waits behind a 300-track playlist. The queue survives restarts
 - **Friends without touching your library** — people in `TELEGRAM_ALLOWED_USERS` but not in `TELEGRAM_LIBRARY_USERS` get their files sent to the chat (up to 2000 MB with a self-hosted Bot API server); nothing of theirs is ever saved to the library

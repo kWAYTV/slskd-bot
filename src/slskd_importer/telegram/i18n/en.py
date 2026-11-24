@@ -6,7 +6,7 @@ STRINGS: dict[str, str] = {
     "auth_library": "This needs library access. You can still send songs and get the files here.",
     "auth_library_undo": "Removing library files requires library access.",
     # Welcome and profile
-    "welcome": "*Send me songs* and I'll get them from Soulseek — lossless first (FLAC, WAV, AIFF).\n\nOne per line, as many as you like:\n`Nancy Sinatra - Bang Bang`\n`daft punk one more time`\n\nOr paste links: Spotify, YouTube, SoundCloud, Bandcamp, a 1001Tracklists page, or a tracklist copied from anywhere.\n\nEvery message gets one card that updates as it goes. Nothing to confirm: the best copy is picked, checked and saved. Tap a track to choose another copy, undo it, or get the file.\n\n/status — what's in the queue\n/history — recent saves, with undo\n/stats — totals\n/sweep — look for better copies of what you own\n/lang — language\n/cancel — stop everything",
+    "welcome": "*Send me songs* and I'll get them from Soulseek — lossless first (FLAC, WAV, AIFF).\n\nOne per line, as many as you like:\n`Nancy Sinatra - Bang Bang`\n`daft punk one more time`\n\nOr paste links: Spotify, YouTube, SoundCloud, Bandcamp, a 1001Tracklists page, or a tracklist copied from anywhere.\n\nEvery message gets one card that updates as it goes. One song: you pick the copy. A list, playlist or tracklist: the best copy of each is picked, checked and saved without asking. Tap a track to choose another copy, undo it, or get the file.\n\n/status — what's in the queue\n/history — recent saves, with undo\n/stats — totals\n/sweep — look for better copies of what you own\n/lang — language\n/cancel — stop everything",
     "bot_description": "Send song names or links (Spotify, YouTube, SoundCloud, Bandcamp, tracklists) and get them from Soulseek in the best quality around — FLAC first. Send as many as you like; each message gets one live card.",
     "bot_short_description": "Gets songs from Soulseek in the best quality: names, links, playlists or whole tracklists.",
     "lang_pick": "Choose your language:",
@@ -86,6 +86,7 @@ STRINGS: dict[str, str] = {
     "item_sent": "Sent to this chat",
     "item_owned": "Already in your library",
     "item_review": "No lossless copy. Best there is:",
+    "item_choose": "Which copy do you want?",
     "item_no_match": "Nothing found on Soulseek.",
     "item_failed": "Could not get it.",
     "item_removed": "Removed from the library.",
