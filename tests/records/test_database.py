@@ -17,8 +17,8 @@ class TestDatabaseNormalCreation:
         cursor = db.connection.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables = {row[0] for row in cursor.fetchall()}
         assert "download_history" in tables
-        assert "import_jobs" in tables
-        assert "import_tracks" in tables
+        assert "queue_batches" in tables
+        assert "queue_items" in tables
         assert "chat_prefs" in tables
         assert "sweep_songs" in tables
         assert "sweep_runs" in tables
@@ -27,13 +27,13 @@ class TestDatabaseNormalCreation:
         db.close()
 
     def test_database_schema_version(self, tmp_path):
-        """Verify user_version is set to 7."""
+        """Verify user_version is set to 8."""
         db_path = str(tmp_path / "version.db")
         db = Database(db_path)
 
         cursor = db.connection.execute("PRAGMA user_version")
         version = cursor.fetchone()[0]
-        assert version == 7
+        assert version == 8
         cols = {row[1] for row in db.connection.execute("PRAGMA table_info(chat_prefs)")}
         assert "locale" in cols
         db.close()
@@ -56,8 +56,8 @@ class TestDatabaseCorruptRecovery:
         cursor = db.connection.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables = {row[0] for row in cursor.fetchall()}
         assert "download_history" in tables
-        assert "import_jobs" in tables
-        assert "import_tracks" in tables
+        assert "queue_batches" in tables
+        assert "queue_items" in tables
         backups = list(tmp_path.glob("corrupt.db.bak.*"))
         assert len(backups) == 1
         db.close()
@@ -74,7 +74,7 @@ class TestDatabaseCorruptRecovery:
 
             db = Database(db_path)
             cursor = db.connection.execute("PRAGMA user_version")
-            assert cursor.fetchone()[0] == 7
+            assert cursor.fetchone()[0] == 8
             db.close()
 
 
@@ -136,11 +136,10 @@ class TestDatabaseMigration:
         cols = {row[1] for row in db.connection.execute("PRAGMA table_info(download_history)")}
         assert "chat_id" in cols
         assert "spotify_url" in cols
-        job_cols = {row[1] for row in db.connection.execute("PRAGMA table_info(import_jobs)")}
-        assert "auto_save" in job_cols
         version = db.connection.execute("PRAGMA user_version").fetchone()[0]
-        assert version == 7
+        assert version == 8
         tables = {row[0] for row in db.connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert {"queue_batches", "queue_items"} <= tables
         assert "chat_prefs" in tables
         prefs_cols = {row[1] for row in db.connection.execute("PRAGMA table_info(chat_prefs)")}
         assert "locale" in prefs_cols

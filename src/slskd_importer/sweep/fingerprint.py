@@ -30,21 +30,6 @@ def fpcalc_available() -> bool:
     return shutil.which("fpcalc") is not None
 
 
-def missing_tools() -> list[str]:
-    """What the sweep cannot measure without: ffmpeg (strict decode) and the analysis extra (cutoff, fingerprint math).
-
-    fpcalc is optional (judge() falls back to length and tags), so it is not listed.
-    """
-    from music_downloader.processor.lossless_analyzer import HAS_ANALYSIS
-
-    missing = []
-    if shutil.which("ffmpeg") is None:
-        missing.append("ffmpeg")
-    if not HAS_ANALYSIS:
-        missing.append("numpy, scipy and soundfile (pip install 'telegram-slskd-local-bot[analysis]')")
-    return missing
-
-
 def fingerprint(path: str, length_secs: int = FP_LENGTH_SECS) -> list[int] | None:
     """The raw Chromaprint fingerprint of the first *length_secs* of *path*; None without fpcalc or on failure."""
     if not fpcalc_available():

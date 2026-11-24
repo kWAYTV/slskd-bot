@@ -1,7 +1,7 @@
 # CLAUDE.md — telegram-slskd-local-bot
 
 ## Overview
-Telegram bot that automates music discovery and download. Resolves track metadata from catalogs like Spotify, searches and downloads audio from Soulseek via slskd (FLAC, WAV, AIFF, then the best available), renames them to `Artist - Title`, and places them in a music library directory.
+Telegram bot that gets music from Soulseek. Every chat message (song names, links, pasted tracklists) becomes a batch in a download queue; each track is identified against a catalog (Spotify), searched on Soulseek via slskd (FLAC, WAV, AIFF first), fetched, spectrum-checked, renamed to `Artist - Title` and placed in the library — or sent to the chat for people without library access. Nothing is confirmed by hand.
 
 ## Tech Stack
 - Python 3.11+
@@ -10,6 +10,7 @@ Telegram bot that automates music discovery and download. Resolves track metadat
 - slskd-api (Soulseek/slskd REST API)
 - stdlib `HTTPServer` (health check endpoint)
 - mutagen (audio metadata)
+- yt-dlp (metadata only: YouTube / SoundCloud / Bandcamp tracklists)
 - Docker (image: `ghcr.io/kwaytv/slskd-bot`)
 - Published on PyPI
 - pytest + pytest-asyncio for testing
@@ -37,45 +38,51 @@ Configuration via `.env` (see `.env.example`).
 
 ## Architecture
 
-The package is organized by **what the app does** (Screaming Architecture), not by technical layers.
+The package is organized by **what the app does** (Screaming Architecture), not by technical layers. A directory holds either modules or subpackages, never both (only `telegram/` holds subpackages).
 
 ```
 src/slskd_importer/
-  catalog/           # Track identity — Spotify, MusicBrainz, playlists, TrackInfo
-  soulseek/          # Find and fetch files — search lifecycle, transfers, ranking, fallbacks
-  library/           # Organize the collection — rename, tags, formats, ownership, lossless, previews
-  sweep/             # Library upgrade scout — audit, fingerprint, sound, judge, fetch, decide, schedule
-  history/           # Download history records
-  playlist_import/   # Playlist/album import jobs
-  records/           # Shared SQLite (history, import, sweep)
-  telegram/          # Conversation delivery (feature subpackages, see below)
-  settings/          # Environment configuration and logging
-  health/            # Process health-check endpoint
+  catalog/     # Track identity — TrackInfo, Spotify, MusicBrainz, query -> track lookup
+  sources/     # What a message asks for — Spotify links, media pages (yt-dlp), tracklist pages, typed lines
+  queue/       # The download queue — batches/items, store, runner, per-item pipeline, fetch, library shelf
+  soulseek/    # Find and fetch files — search lifecycle, transfers, ranking, fallbacks
+  library/     # The collection on disk — rename, tags, formats, ownership, lossless check, OGG conversion
+  sweep/       # Library upgrade scout — audit, fingerprint, sound, judge, fetch, decide, schedule
+  history/     # Download history records
+  records/     # Shared SQLite (queue, history, prefs, sweep)
+  telegram/    # Conversation delivery (feature subpackages, see below)
+  settings/    # Environment configuration and logging
+  health/      # Process health-check endpoint
 ```
 
-Telegram is a delivery mechanism, not the domain. The `telegram/` package contains only feature subpackages, each made of small single-purpose modules:
+How a request flows: `telegram/intake` reads the message with `sources.message.read_message` (a `Tracklist` of `Entry`s) and stores a batch → `queue.runner.QueueRunner` claims items fairly across batches → `queue.pipeline.ItemPipeline` runs each one (identify → owned? → search → fetch → lossless check → save or deliver) → the runner's `on_change` hook makes `telegram/card` redraw the batch's one message.
+
+Telegram is a delivery mechanism, not the domain. `queue/` and `sources/` never import Telegram.
 
 ```
 telegram/
-  core/              # MusicBot composition root (app), callback routing, access, cleanup, session
-  ui/                # presentation primitives only — markdown, safe edits, text formatting
-  commands/          # one module per command family: basics, preferences, status, history, undo, cancel
-  search/            # text entry, pasted links, Spotify pick, Soulseek search, direct search, results
-  download/          # selection, run, transfer, delivery, approval, retry
-  playlist_import/   # /import command, callbacks, job queue, per-track search/download, summary, resume
-  library_sweep/     # /sweep, review pairs, Keep mine reasons, schedule lifecycle
-  i18n/              # per-locale string modules (en/es/gl/de) + thin catalog lookup
+  core/           # MusicBot composition root (app), callback routing, access
+  intake/         # a chat message -> a queue batch + its card
+  card/           # the batch's live message: views (summary, list, item, picker), button actions, redraw board
+  delivery/       # sending track files to a chat (audio, document fallback, OGG when oversize)
+  commands/       # one module per command: basics, preferences, status, stats, history, undo, cancel
+  library_sweep/  # /sweep, review pairs, Keep mine reasons, schedule lifecycle
+  ui/             # presentation primitives only — markdown, safe edits, reactions, reply-to
+  i18n/           # per-locale string modules (en/es/gl/de) + thin catalog lookup
 ```
 
-- `telegram/core/app.py` wires domain services into `MusicBot` and binds the conversation handlers from the feature modules as class attributes (handler functions take the bot as `self`)
-- Inline keyboards live with the feature that owns the callback prefix (`search/keyboards.py`, `download/keyboards.py`, `playlist_import/keyboards.py`, `commands/keyboards.py`) — not in a generic UI dump
-- The shared download pipeline (`download/transfer.py`, `download/delivery.py`) and the save sequence (`download/approval.save_to_library`) are reused by the playlist import flow — never duplicate enqueue/wait/progress/save logic
-- Soulseek search policy (FLAC → WAV → AIFF, then any audio; four-tier query fallbacks) lives in `soulseek/scoring.py` and `soulseek/fallbacks.py`, not in the Telegram layer
-- Domain packages do not import Telegram
+- `telegram/core/app.py` wires domain services into `MusicBot` and binds handlers from the feature modules as class attributes (handler functions take the bot as `self`)
+- **Batch / item states** live in `queue/batch.py`. `working` is the only in-flight status in the store; the phase (searching, downloading 42%, checking…) is `queue.progress.Progress`, in memory on the runner
+- **One pipeline**: enqueue/wait/locate is `queue/fetch.py`, placing and undoing is `queue/shelf.py`. Never duplicate that logic in the Telegram layer
+- **Destination** (`Destination.library` / `Destination.deliver`) is fixed per batch at intake from `can_save_library(user)`. A `deliver` batch never calls the shelf's `place`; the pipeline's `deliver` hook (`telegram/delivery/handoff.deliver_copy`) sends the file
+- **Exceptions, not questions**: only-lossy results end as `review`, nothing found as `no_match`, all copies failing as `failed`. The requester acts from the card; a hand-picked copy (`ItemPipeline.picks`) is fetched as is, with no owned check and no fake-lossless gate
+- **Sources return text** unless they know the catalog identity: only Spotify builds `TrackInfo`. Media pages and tracklists yield `Entry(query="Artist - Title")` and never carry durations (video lengths would break duration scoring)
+- **Sweep scope**: `LibrarySweep.root` is `Config.library_sweep_dir` and is walked recursively (`sweep.place.library_files`, hidden folders skipped). A song's `file` / `stem` are its path under that root with forward slashes; use `sweep.identity.leaf(stem)` wherever only the file name is meant (identity, judging, staged names)
+- Soulseek search policy (FLAC → WAV → AIFF, then any audio; four-tier query fallbacks) lives in `soulseek/scoring.py` and `soulseek/fallbacks.py`
 - Audio format allow-list is defined once in `library/formats.py`
 
 - `scripts/` — utility scripts
-- `tests/` — test suite (mirrors `src/`: `tests/<package>/…`, `tests/telegram/<feature>/…`; shared mock builders live in `helpers.py` modules)
+- `tests/` — test suite (mirrors `src/`: `tests/<package>/…`, `tests/telegram/<feature>/…`; shared builders live in `helpers.py` modules)
 - `docker-compose.yml` — full stack deployment
 - `Dockerfile` — container build
 - `.pre-commit-config.yaml` — code quality hooks
@@ -97,31 +104,29 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **Async wrapping**: All synchronous `slskd-api` calls must be wrapped with `asyncio.to_thread()` to avoid blocking the Telegram bot event loop
 - **Timeouts**: Hard timeout via `asyncio.wait_for()` around the entire search+poll loop; `searches.stop()` actively cancels the server-side search on timeout
 - **Cleanup**: Stale slskd searches are deleted only when their IDs are not in `_active_search_ids` (serialized with search start)
-- **Import search**: Playlist import uses the same four-tier fallbacks as manual search (`search_with_fallbacks`)
-- **Import resume**: Active jobs auto-resume on startup; `/import` with no URL (or the hidden `resume` argument) continues the chat's pending/active job after resetting `searching` / `awaiting_approval` tracks
+- **Queue search**: every queue item uses the four-tier fallbacks (`queue.copies.CopyFinder` → `search_with_fallbacks`) and remembers the top copies so the picker needs no second search
+- **Failed transfers**: slskd reports failures as `Completed, Errored`; check `DownloadStatus.is_failed`, never `not is_complete`
+
 ## Telegram UX Patterns
 
-- **Markdown escaping**: Dynamic text (filenames, paths from Soulseek) must be escaped with `escape_md()` or wrapped in backtick code spans via `code_span()` / `md_code_safe()` (plain backtick wrapping breaks when the value itself contains a backtick) to avoid `BadRequest` from Telegram's Markdown parser
-- **Safe edits**: Always use the `safe_edit()` / `safe_query_edit()` wrappers (catch `BadRequest`, `TimedOut`, `NetworkError`) instead of raw `msg.edit_text()`
-- **Result identification**: Download messages must include `#number` labels matching the result list so users can tell concurrent downloads apart. The results keyboard is a compact row of `#n` buttons; details live in the card text
-- **Feedback without messages** (`ui/feedback.py`, all errors swallowed): every callback tap answers with a localized toast chosen in `core/routing.toast_key`; the user's query message (`PendingSearch.query_message_id`, carried to `PendingDownload`) is reacted 👀 on search, 🤷 on no results, 👍 on save (Telegram's fixed reaction set has no ✅); `show_typing` / `show_uploading` chat actions bracket lookups and uploads; the import status message is pinned for the job's life and unpinned in `send_import_summary` / cancel paths
-- **Startup registration**: `basics.register_bot_commands` sets the command menu plus `set_my_description` / `set_my_short_description` per locale (keys `bot_description`, `bot_short_description`; limits 512 / 120 chars)
-- **Download progress**: `wait_for_download()` accepts an async `progress_callback`; conversation flows use it to edit the status message (throttled to ~10% steps or on transfer-state change) with a `progress_bar()` and update `PendingDownload.progress_percent` / `transfer_state` for `/status`
-- **Quality ranking**: always prefers higher bit depth / sample rate. Format order is FLAC, then WAV, then AIFF (`library/formats.py` + `soulseek/scoring.py`)
-- **Canonical tags**: `FileProcessor.process_file` writes artist/title/album/year via mutagen at save time
-- **Import skip-owned**: `process_next_import_track` skips tracks already in the library (`find_exact`) or successful history (`find_success`)
-- **Import progress**: one in-place status message per job (`_import_status_msg`); extra messages only when the user must act
-- **Approval TTL**: `core/ttl.py` expires awaiting-approval downloads older than `APPROVAL_TTL_SECS` (default 24h)
-- **Download concurrency**: `fetch_from_peer` takes `MusicBot._download_sem` (`MAX_CONCURRENT_DOWNLOADS`, default 3)
-- **Pasted links**: `catalog/links.py` detects Spotify track links/URIs in free text; tracks resolve via `SpotifyResolver.get_track`. Playlist/album links start the import flow directly (library users only)
-- **Duplicates**: `notify_if_already_owned` (in `search/soulseek.py`) sends a non-blocking "already in the library" notice after Spotify resolve; the search always continues
-- **Direct search**: when Spotify has no match, `do_search` falls through to `do_direct_slskd_search` at once (no button); the Spotify picker keeps a "Search Soulseek" button. Artist/title come from `parse_query_artist_title` (separators `-`, `–`, `—`, `|`; `clean_query` strips `(Official Video)`-style noise; `smart_case` only capitalizes all-lowercase input)
-- **Spotify lookup**: `Artist - Title` queries try `SpotifyResolver.search_fielded` (`artist:`/`track:` filters) first, free text as fallback. `_collapse_editions` merges candidates with the same artist, title and length (±2s), keeping the earliest year
-- **Import auto-save**: `import_jobs.auto_save` (schema v7, `ImportJob.saves_automatically`) is set by the `ib:` confirm button; `do_import_download` then calls `save_to_library` directly and skips the preview and approval keyboard
-- **Undo**: `/undo` deletes the last chat save via `FileProcessor.delete_library_file` (refuses paths outside OUTPUT_DIR) and marks the history row `undone`
-- **Large files**: the send limit is `Config.telegram_file_limit`, not a constant — 50MB on the cloud Bot API, 2000MB when `TELEGRAM_API_BASE_URL` points at a self-hosted `telegram-bot-api` server (wired via `base_url`/`base_file_url`/`local_mode` in `create_bot`). Over-limit files fall back to OGG Opus / preview clips in `delivery.send_large_file`
-- **Spotify results cap**: Show 5 results per page to the user; fetch up to 50 from the API for filtering headroom
-- **Spotify artist filter**: When the query has an `artist - title` separator, filter Spotify results by artist substring match before dedup to remove noise; fall back to unfiltered if the filter empties the list
+- **One card per message**: a batch owns exactly one message (`queue_batches.message_id`), sent as a reply to the request. Everything after that is an edit of it. Do not send extra messages for progress or results; the only other messages are files delivered to the chat and command replies
+- **Redraws** go through `card.board.CardBoard.request(batch_id)` (throttled, bursts collapse) or `draw()` right after a button tap. The board skips edits whose text and keyboard did not change and backs off on `RetryAfter`
+- **Views** (`card/board.View`): summary, list, item, picker. A one-track batch always shows the item view. View state is in memory; after a restart cards fall back to the summary
+- **Buttons**: callback data is `q:<action>:<batch>:<item>:<number>` (`card/actions.py`). `core/routing` dispatches by prefix (`q`, `hu`, `swp`, `swr`, `cancel_all`, `lang`) and answers every tap, with a toast for the ones that start work
+- **Batch ownership**: card callbacks load the batch with `get_batch_for_chat`, so a button can never reach another chat's queue. Undo and replacing a saved track also need `can_save_library`
+- **Markdown escaping**: Dynamic text (filenames, paths from Soulseek, item details) must be escaped with `escape_md()` or wrapped via `code_span()` / `md_code_safe()` to avoid `BadRequest` from Telegram's legacy Markdown parser
+- **Safe edits**: use `safe_edit()` / `safe_query_edit()` / `safe_bot_edit()` (catch `BadRequest`, `TimedOut`, `NetworkError`; "message is not modified" counts as success) instead of raw edits
+- **Feedback without messages** (`ui/feedback.py`, all errors swallowed): the request message is reacted 👀 at intake and 👍 / 🤷 by the board when the batch finishes (Telegram's fixed reaction set has no ✅); `show_typing` / `show_uploading` bracket lookups and uploads
+- **Startup**: `basics.register_bot_commands` sets the command menu and the per-locale descriptions (`bot_description` ≤ 512 chars, `bot_short_description` ≤ 120); `runner.start()` requeues items a restart interrupted and every active batch's card is redrawn
+- **Concurrency**: `Application.concurrent_updates(True)` — a button that searches (the picker) must not block other updates. `QueueRunner` runs at most `MAX_CONCURRENT_DOWNLOADS` items; `QueueRepository.claim_next` prefers the batch with the fewest items in flight
+- **Owned check**: `LibraryShelf.owned_as` — an exact library file name, or a past successful save whose file still exists. Skipped for `forced` items (*Download anyway*) and for delivery batches
+- **Lossless gate**: a checkable lossless copy whose spectrum verdict is `FAKE` is discarded and the next copy tried, up to `pipeline.MAX_TRIES`
+- **Catalog lookup** (`catalog/lookup.py`): `Artist - Title` queries try `SpotifyResolver.search_fielded` first, free text as fallback; candidates are filtered by the named artist and editions of one recording collapsed (±2s, earliest year). No catalog match gives a duration-free track parsed from the text (`parse_query_artist_title`; `clean_query` strips `(Official Video)`-style noise)
+- **Canonical tags**: `FileProcessor.process_file` writes artist/title/album/year via mutagen at save time; artwork is embedded by the shelf
+- **Undo**: the card's Undo and `/undo` delete via `FileProcessor.delete_library_file` (refuses paths outside OUTPUT_DIR) and mark the history row `undone`
+- **Large files**: the send limit is `Config.telegram_file_limit` — 50MB on the cloud Bot API, 2000MB when `TELEGRAM_API_BASE_URL` points at a self-hosted `telegram-bot-api` server. Over-limit files are sent as OGG Opus with a note (`delivery/send.py`)
+- **i18n**: every user-facing string is a key in `i18n/en.py` mirrored in es/gl/de (a test enforces equal key sets). Exceptions: `SourceError` messages and item `detail` text come from the domain in English
+
 ## Deployment
 
 ### Release Steps
@@ -142,12 +147,12 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 
 - **Spotify API**: Client Credentials flow (no user login). Used only for metadata resolution.
 - **slskd API**: REST API with API key auth. Used for search, download, and file management.
-- **Telegram Bot API**: Long-polling mode. Restricted to allowed user IDs via `TELEGRAM_ALLOWED_USERS`. Library writes (save + `/import`) can be further restricted with `TELEGRAM_LIBRARY_USERS`.
+- **Telegram Bot API**: Long-polling mode. Restricted to allowed user IDs via `TELEGRAM_ALLOWED_USERS`. `TELEGRAM_LIBRARY_USERS` narrows who saves to the library; other allowed users get files sent to their chat.
 
 ## Testing Strategy
 
-- **Unit:** Scorer, config parsing, file handler, TrackInfo
-- **Integration:** slskd client, Spotify resolver (with mocks)
+- **Unit:** scorer, config parsing, file handler, sources (injected `extract` / `fetch`, no network), card views
+- **Integration:** queue store/runner/pipeline against a real SQLite file with fake slskd; `MusicBot` with mocked Telegram
 - **Coverage target:** 80%
 
 ## Key Rules

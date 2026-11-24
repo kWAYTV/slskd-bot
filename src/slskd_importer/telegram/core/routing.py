@@ -10,41 +10,35 @@ from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
+from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.i18n import LABELS, LOCALES
 from slskd_importer.telegram.ui.editing import safe_query_edit
-from slskd_importer.telegram.ui.formatting import welcome_text
 
 logger = logging.getLogger(__name__)
 
 
 # Toast shown on the tap itself, before the handler edits anything.
 _TOASTS = {
-    "dl": "toast_downloading",
-    "approve": "toast_saving",
-    "reject": "toast_discarded",
-    "next": "toast_next",
-    "retry": "toast_retrying",
-    "sp": "toast_searching",
-    "direct": "toast_searching",
     "hu": "toast_removing",
-    "ic": "toast_import_started",
-    "ib": "toast_import_started",
-    "ix": "toast_cancelled",
-    "is": "toast_skipped",
-    "ir": "toast_discarded",
-    "ia": "toast_saving",
-    "iy": "toast_retrying",
-    "if": "toast_retrying",
     "cancel_all": "toast_cancelled",
+}
+_CARD_TOASTS = {
+    actions.CANCEL: "toast_cancelled",
+    actions.RETRY_FAILED: "toast_retrying",
+    actions.RETRY: "toast_retrying",
+    actions.AGAIN: "toast_downloading",
+    actions.GET: "toast_downloading",
+    actions.UNDO: "toast_removing",
+    actions.SEND: "toast_sending",
 }
 
 
 def toast_key(data: str) -> str | None:
-    """The i18n key of the toast for a callback, or None for silent taps (paging, locks)."""
-    prefix, _, rest = data.partition(":")
-    if prefix in ("dl", "sp") and rest.endswith(":cancel"):
-        return "toast_cancelled"
-    return _TOASTS.get(prefix)
+    """The i18n key of the toast for a callback, or None for silent taps (navigation)."""
+    action = actions.decode(data)
+    if action is not None:
+        return _CARD_TOASTS.get(action.name)
+    return _TOASTS.get(data.partition(":")[0])
 
 
 async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -64,37 +58,18 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
 
     prefix = data.split(":", 1)[0]
     handler = {
-        "direct": self._handle_direct_search,
-        "ic": self._handle_import_callback,
-        "ib": self._handle_import_callback,
-        "ix": self._handle_import_callback,
-        "ia": self._handle_import_callback,
-        "ir": self._handle_import_callback,
-        "is": self._handle_import_callback,
-        "iy": self._handle_import_callback,
-        "if": self._handle_import_callback,
-        "retry": self._handle_retry,
-        "next": self._handle_next_result,
-        "sp_page": self._handle_spotify_page,
-        "sp": self._handle_spotify_selection,
-        "dl_page": self._handle_results_page,
-        "dl": self._handle_download_selection,
-        "approve": self._handle_approval,
-        "reject": self._handle_approval,
+        actions.PREFIX: self._handle_card_action,
         "hu": self._handle_history_undo,
         "swp": self._handle_sweep_decision,
         "swr": self._handle_sweep_reason,
         "cancel_all": self._handle_cancel_all,
     }.get(prefix)
 
-    if prefix == "lock":
-        return
-
     if handler:
         await handler(update, context, chat_id, data)
         return
 
-    if data.startswith("lang:"):
+    if prefix == "lang":
         await _switch_locale(self, query, chat_id, data)
         return
 
@@ -109,7 +84,7 @@ async def _switch_locale(self, query, chat_id: int, data: str) -> None:
     await asyncio.to_thread(self.prefs_repo.set_locale, chat_id, self.locale(chat_id))
     logger.info("chat=%s locale=%s first=%s", chat_id, self.locale(chat_id), first)
     if first:
-        await safe_query_edit(query, welcome_text(self.locale(chat_id)), parse_mode="Markdown")
+        await safe_query_edit(query, self.t(chat_id, "welcome"), parse_mode="Markdown")
         return
     await safe_query_edit(
         query,

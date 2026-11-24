@@ -17,7 +17,7 @@ from slskd_importer.sweep import judge
 from slskd_importer.sweep import sound as sound_mod
 from slskd_importer.sweep.audit import Audit
 from slskd_importer.sweep.fetch import discard, fetch_gated
-from slskd_importer.sweep.identity import identity
+from slskd_importer.sweep.identity import identity, leaf
 from slskd_importer.sweep.outcomes import (
     CD_TRIES,
     OTHER_TRIES,
@@ -194,7 +194,7 @@ class CheckMixin:
 
         def stage() -> str:
             _make_library_dir(self.review_dir)
-            staged = free_path(os.path.join(self.review_dir, f"{stem}.{cand.ext}{PARKED_SUFFIX}"))
+            staged = free_path(os.path.join(self.review_dir, f"{leaf(stem)}.{cand.ext}{PARKED_SUFFIX}"))
             shutil.copyfile(cand_path, staged)
             match_owner(staged, path)
             return staged

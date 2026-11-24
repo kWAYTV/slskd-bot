@@ -1,6 +1,5 @@
-"""Telegram conversation: search, download, playlist import."""
+"""Telegram conversation: messages in, live queue cards out."""
 
 from slskd_importer.telegram.core.app import MusicBot, create_bot
-from slskd_importer.telegram.core.session import PendingDownload, PendingSearch
 
-__all__ = ["MusicBot", "PendingDownload", "PendingSearch", "create_bot"]
+__all__ = ["MusicBot", "create_bot"]

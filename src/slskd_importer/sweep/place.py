@@ -18,16 +18,19 @@ logger = logging.getLogger(__name__)
 
 
 def library_files(root: str) -> list[str]:
-    """Audio files at the top level of *root* (hidden ones left out), by name."""
-    try:
-        entries = os.listdir(root)
-    except OSError:
-        return []
+    """Every audio file under *root*, as paths relative to it with forward slashes, sorted.
+
+    Hidden files and folders are left out: the sweep's own ``.sweep-*`` folders,
+    and what sync tools keep (``.stfolder``, ``.stversions``).
+    """
     names = []
-    for name in entries:
-        ext = os.path.splitext(name)[1].lstrip(".").lower()
-        if not name.startswith(".") and ext in AUDIO_EXTENSIONS and os.path.isfile(os.path.join(root, name)):
-            names.append(name)
+    for folder, subfolders, files in os.walk(root):
+        subfolders[:] = [name for name in subfolders if not name.startswith(".")]
+        for name in files:
+            ext = os.path.splitext(name)[1].lstrip(".").lower()
+            if name.startswith(".") or ext not in AUDIO_EXTENSIONS:
+                continue
+            names.append(os.path.relpath(os.path.join(folder, name), root).replace(os.sep, "/"))
     return sorted(names)
 
 

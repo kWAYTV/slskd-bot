@@ -85,9 +85,10 @@ async def fetch_one(
     if not ok:
         return FetchOutcome(error="enqueue failed")
     status = await slskd.wait_for_download(result.username, result.filename, timeout_secs=timeout_secs)
-    if status is None or not status.is_complete:
+    # slskd reports failures as "Completed, Errored": check is_failed, not is_complete.
+    if status is None or status.is_failed:
         err = status.state if status else "timeout"
-        await asyncio.to_thread(slskd.cancel_transfer, result.username, result.basename, None)
+        await asyncio.to_thread(slskd.cancel_transfer, result.username, result.filename, None)
         return FetchOutcome(error=err or "download failed")
     path = await asyncio.to_thread(processor.find_downloaded_file, result.username, result.filename)
     if not path:

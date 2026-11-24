@@ -29,6 +29,8 @@ async def _edit_text(edit, text: str, **kwargs) -> bool:
             except BadRequest as retry_exc:
                 logger.warning("Telegram edit failed (BadRequest): %s", retry_exc)
                 return False
+        if "message is not modified" in str(exc).lower():
+            return True
         logger.warning("Telegram edit failed (BadRequest): %s", exc)
         return False
     except TimedOut:
@@ -46,6 +48,15 @@ async def safe_edit(msg: Message, text: str, **kwargs) -> bool:
     Entity-parse errors retry once without parse_mode so the user still sees results.
     """
     return await _edit_text(msg.edit_text, text, **kwargs)
+
+
+async def safe_bot_edit(bot, chat_id: int, message_id: int, text: str, **kwargs) -> bool:
+    """Edit a message known only by its ids (a card redrawn outside any update)."""
+
+    async def edit(new_text: str, **edit_kwargs) -> None:
+        await bot.edit_message_text(new_text, chat_id=chat_id, message_id=message_id, **edit_kwargs)
+
+    return await _edit_text(edit, text, **kwargs)
 
 
 async def safe_query_edit(query, text: str, **kwargs) -> bool:
