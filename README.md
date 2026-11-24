@@ -20,7 +20,7 @@
 - **Friends without touching your library** — people in `TELEGRAM_ALLOWED_USERS` but not in `TELEGRAM_LIBRARY_USERS` get their files sent to the chat (up to 2000 MB with a self-hosted Bot API server); nothing of theirs is ever saved to the library
 - **Smart ranking** — FLAC, then WAV, then AIFF; scored by duration, hi-res quality, source reliability and filename; live/remix noise filtered out unless you asked for it
 - **Library sweep** — walks the library (subfolders included; `LIBRARY_SWEEP_DIR` can point at your whole collection), looks on Soulseek for a better lossless copy of each song, and sends side-by-side pairs (`Keep mine` / `Take new` / `Keep both`). Never auto-replaces. Runs on a schedule or via `/sweep`
-- **Library hygiene** — canonical tags and artwork on save, songs you already own are skipped, `/undo` and `/history` ↩️ remove saves, `/stats` for totals
+- **Library hygiene** — canonical tags and artwork on save, songs you already have anywhere in your collection are skipped (matched by `Artist - Title` file name; versions like `(Extended Mix)` are kept apart), `/undo` and `/history` ↩️ remove saves, `/stats` for totals
 - **Languages** — English (default), Spanish, Galician, German. First `/start` picks a language; `/lang` changes it later
 - **Docker-ready** — image published to `ghcr.io/kwaytv/slskd-bot` on every push to `main`
 
@@ -103,7 +103,7 @@ uv run python -m slskd_importer run
 | `DOWNLOAD_TIMEOUT_SECS` | No | `600` | Download completion timeout |
 | `EXCLUDE_KEYWORDS` | No | `live,remix,...` | Keywords filtered from results |
 | `FILENAME_TEMPLATE` | No | `{artist} - {title}` | Output filename template |
-| `LIBRARY_SWEEP_DIR` | No | `OUTPUT_DIR` | Folder the sweep walks, subfolders included; hidden folders are skipped |
+| `LIBRARY_SWEEP_DIR` | No | `OUTPUT_DIR` | Root of your collection: the sweep walks it (subfolders included), and a song found anywhere under it by its `Artist - Title` file name is not downloaded again. Hidden folders are skipped |
 | `LIBRARY_SWEEP_SCHEDULE` | No | `weekly:sun:04:00` | When the sweep starts on its own (`weekly:<mon..sun>:HH:MM`, `daily:HH:MM`, or `off`) |
 | `LIBRARY_SWEEP_PAUSE_SECS` | No | `20` | Pause between songs that searched Soulseek |
 | `LIBRARY_SWEEP_KEEP_DAYS` | No | `7` | Days a replaced original stays in `.sweep-replaced/` (`0` = purge at once, `never` = keep) |
