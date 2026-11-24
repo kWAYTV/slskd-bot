@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from slskd_importer.library.index import LibraryIndex, same_artist, split_name
+from slskd_importer.catalog.names import same_artist
+from slskd_importer.library.index import LibraryIndex, split_name
 
 
 def touch(path: Path) -> None:

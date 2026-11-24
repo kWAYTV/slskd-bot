@@ -62,9 +62,27 @@ class CardBoard:
         self._views[batch_id] = view
 
     def focus(self, batch_id: int, kind: str, item_id: int, page: int = 0) -> None:
-        """Show a track's item or picker view, remembering where the track was opened from."""
+        """Show a track's item or picker view, remembering the summary or list page it was opened from."""
         current = self._views.get(batch_id, View())
-        self._views[batch_id] = View(kind, item_id, page, current.back, current.back_page)
+        if current.kind == LIST:
+            back, back_page = LIST, current.page
+        elif current.kind == SUMMARY:
+            back, back_page = SUMMARY, 0
+        else:
+            back, back_page = current.back, current.back_page
+        self._views[batch_id] = View(kind, item_id, page, back, back_page)
+
+    def leave(self, batch_id: int) -> None:
+        """Go back to where the current track was opened from: done with it."""
+        current = self._views.get(batch_id, View())
+        self._views[batch_id] = View(current.back, page=current.back_page)
+
+    @staticmethod
+    def _origin(batch: Batch, view: View) -> str:
+        """Callback data that returns to the view's origin."""
+        if view.back == LIST:
+            return actions.encode(actions.LIST, batch.id, 0, view.back_page)
+        return actions.encode(actions.SUMMARY, batch.id)
 
     def request(self, batch_id: int) -> None:
         """Redraw the batch's card soon. Calls while a redraw is cooling down collapse into one."""
@@ -122,7 +140,10 @@ class CardBoard:
         if view.kind == PICKER and item is not None:
             # Nothing remembered yet means the callback that opened the picker is still searching.
             copies = self._runner.pipeline.finder.remembered(item.id)
-            return render_picker(t, batch, item, copies, view.page, self._page_size)
+            # A track that only waits for a pick has no item view worth returning to.
+            waiting = item.status == ItemStatus.choose and len(items) > 1
+            back = self._origin(batch, view) if waiting else ""
+            return render_picker(t, batch, item, copies, view.page, self._page_size, back=back)
         if len(items) == 1:
             only = items[0]
             copies = self._runner.pipeline.finder.remembered(only.id)
@@ -131,12 +152,7 @@ class CardBoard:
                 return render_picker(t, batch, only, copies, view.page, self._page_size)
             return render_item(t, batch, only, progress.get(only.id), alone=True)
         if view.kind == ITEM and item is not None:
-            back = (
-                actions.encode(actions.LIST, batch.id, 0, view.back_page)
-                if view.back == LIST
-                else actions.encode(actions.SUMMARY, batch.id)
-            )
-            return render_item(t, batch, item, progress.get(item.id), alone=False, back=back)
+            return render_item(t, batch, item, progress.get(item.id), alone=False, back=self._origin(batch, view))
         if view.kind == LIST:
             return render_list(t, batch, items, progress, view.page)
         return render_summary(t, batch, items, progress)

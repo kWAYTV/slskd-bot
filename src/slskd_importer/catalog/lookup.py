@@ -7,6 +7,7 @@ same recording are collapsed, so the first candidate is the best guess.
 
 from __future__ import annotations
 
+from slskd_importer.catalog.names import normalize, same_artist, same_title
 from slskd_importer.catalog.spotify import SpotifyResolver
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.soulseek.query import clean_query, parse_query_artist_title
@@ -34,8 +35,25 @@ def find_candidates(spotify: SpotifyResolver, query: str) -> list[TrackInfo]:
 
 
 def identify(spotify: SpotifyResolver, query: str) -> TrackInfo:
-    """The track *query* most likely means; a duration-free track parsed from the text when the catalog has none."""
+    """The track *query* means.
+
+    ``Artist - Title`` is taken at its word: a catalog candidate is used only
+    when its artist and title are the ones typed (it adds album, year and
+    length). Otherwise the track is built from the text, so an unreleased or
+    underground song is never swapped for whatever the catalog returned first.
+    A query without a separator has no reliable artist/title split, so its
+    best catalog candidate is used.
+    """
     candidates = find_candidates(spotify, query)
+    artist, title = parse_query_artist_title(query)
+    if artist and title and has_separator(clean_query(query)):
+        wanted_artist, wanted_title = normalize(artist), normalize(title)
+        for candidate in candidates:
+            if same_artist(wanted_artist, normalize(candidate.artist)) and same_title(
+                wanted_title, normalize(candidate.title)
+            ):
+                return candidate
+        return track_from_text(query)
     return candidates[0] if candidates else track_from_text(query)
 
 

@@ -261,3 +261,29 @@ async def test_only_hand_picked_copies_wait_out_a_peer_queue(store):
         pipeline.picks[store.items(batch.id)[0].id] = make_result(1)
         await run(pipeline, store, batch)
         assert fetch.await_args.kwargs["queue_patience_secs"] is None
+
+
+async def test_copies_that_do_not_name_the_song_wait_for_a_pick(store):
+    from slskd_importer.soulseek.result import SearchResult
+
+    other = SearchResult(username="u", filename="\\Music\\Cher - Bang Bang.flac", size=1, length=162)
+    pipeline = make_pipeline(store, ranked=[other])
+    with patch(f"{PIPELINE}.fetch", landed()) as fetch:
+        item = await run(pipeline, store, make_batch(store))
+    assert item.status == ItemStatus.choose
+    fetch.assert_not_called()
+
+
+async def test_only_copies_naming_the_song_are_fetched_unasked(store):
+    from slskd_importer.soulseek.result import SearchResult
+
+    other = SearchResult(username="u", filename="\\Music\\Cher - Bang Bang.flac", size=1, length=162)
+    pipeline = make_pipeline(store, ranked=[other, make_result(4)])
+    with (
+        patch(f"{PIPELINE}.fetch", landed()) as fetch,
+        patch(f"{PIPELINE}.discard", AsyncMock()),
+        patch(f"{PIPELINE}.analyze_lossless", verdict()),
+    ):
+        item = await run(pipeline, store, make_batch(store))
+    assert item.status == ItemStatus.done
+    assert fetch.await_args.args[2].username == "user4"

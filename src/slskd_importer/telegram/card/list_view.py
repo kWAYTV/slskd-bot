@@ -8,7 +8,7 @@ from slskd_importer.queue.batch import Batch, Item
 from slskd_importer.queue.progress import Progress
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card
-from slskd_importer.telegram.card.status import ATTENTION, Translate, item_icon
+from slskd_importer.telegram.card.status import ATTENTION, Translate, item_icon, open_action
 from slskd_importer.telegram.ui.formatting import clip
 from slskd_importer.telegram.ui.markdown import bold
 
@@ -31,8 +31,7 @@ def render_list(t: Translate, batch: Batch, items: list[Item], progress: dict[in
         [
             InlineKeyboardButton(
                 clip(f"{item_icon(item, progress.get(item.id))}  {item.label}"),
-                # The page rides along (1-based) so Back returns to this page of the list.
-                callback_data=actions.encode(actions.ITEM, batch.id, item.id, page + 1),
+                callback_data=actions.encode(open_action(item), batch.id, item.id),
             )
         ]
         for item in shown

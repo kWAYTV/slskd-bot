@@ -7,6 +7,7 @@ from collections.abc import Callable
 from slskd_importer.queue import progress as phases
 from slskd_importer.queue.batch import Item, ItemStatus
 from slskd_importer.queue.progress import Progress
+from slskd_importer.telegram.card import actions
 
 # ``t(key, **kwargs)`` bound to the chat's locale.
 Translate = Callable[..., str]
@@ -33,7 +34,12 @@ _PHASE_ICONS = {
 }
 
 # Items the requester may want to act on, in the order a summary lists them.
-ATTENTION = (ItemStatus.review, ItemStatus.failed, ItemStatus.no_match)
+ATTENTION = (ItemStatus.choose, ItemStatus.review, ItemStatus.failed, ItemStatus.no_match)
+
+
+def open_action(item: Item) -> str:
+    """What tapping a track does: a track waiting for a pick opens on its copies, any other on itself."""
+    return actions.PICKER if item.status == ItemStatus.choose else actions.ITEM
 
 
 def item_icon(item: Item, progress: Progress | None = None) -> str:

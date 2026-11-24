@@ -13,20 +13,12 @@ from __future__ import annotations
 import os
 import re
 import time
-import unicodedata
 
+from slskd_importer.catalog.names import normalize, same_artist
 from slskd_importer.library.formats import AUDIO_SUFFIXES
 
 REFRESH_SECS = 120
 _TRACK_PREFIX = re.compile(r"^\d{1,3}(?:\s*[-.]\s*|\s+)(?=\S)")
-
-
-def normalize(text: str) -> str:
-    """Lowercase ASCII words: accents dropped, ``&`` as ``and``, punctuation as spaces."""
-    # Apostrophes vanish in both spellings ("Ain't" / "Ain’t" / "Aint"), not turn into a space.
-    text = re.sub(r"['’‘`´]", "", text)
-    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", " ", text.replace("&", " and ")).strip()
 
 
 def split_name(stem: str) -> tuple[str, str] | None:
@@ -39,14 +31,6 @@ def split_name(stem: str) -> tuple[str, str] | None:
     artist = normalize(_TRACK_PREFIX.sub("", parts[0], count=1))
     title = normalize(_TRACK_PREFIX.sub("", parts[-1], count=1))
     return (artist, title) if artist and title else None
-
-
-def same_artist(wanted: str, found: str) -> bool:
-    """Equal, or one names all of the other's words ("A" and "A and B", "A feat B")."""
-    if wanted == found:
-        return True
-    a, b = set(wanted.split()), set(found.split())
-    return bool(a) and bool(b) and (a <= b or b <= a)
 
 
 class LibraryIndex:
