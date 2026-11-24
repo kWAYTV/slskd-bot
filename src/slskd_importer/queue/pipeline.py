@@ -34,6 +34,9 @@ MAX_TRIES = 3
 # An automatically chosen copy that sits this long in its peer's upload queue is dropped for the next
 # one, so a busy peer cannot hold a queue slot for the whole download timeout.
 QUEUE_PATIENCE_SECS = 90
+# A copy picked by hand may wait this long in its peer's queue: busy peers take hours, and a queued
+# transfer costs nothing (it holds no queue slot).
+PICKED_QUEUE_PATIENCE_SECS = 6 * 3600
 # A lossless verdict is stored on the item as ``verdict:<KIND>:<cutoff kHz>`` so a front end can word it.
 VERDICT_PREFIX = "verdict:"
 
@@ -156,7 +159,7 @@ class ItemPipeline:
                     self._config.download_timeout_secs,
                     on_progress,
                     # A copy picked by hand is worth waiting for; an automatic one has alternatives.
-                    queue_patience_secs=None if trusted else QUEUE_PATIENCE_SECS,
+                    queue_patience_secs=PICKED_QUEUE_PATIENCE_SECS if trusted else QUEUE_PATIENCE_SECS,
                 )
                 if not landed.ok:
                     return landed.error

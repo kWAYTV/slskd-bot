@@ -44,8 +44,9 @@ async def fetch(
 ) -> Landed:
     """Enqueue on slskd, wait for the transfer, find the file. A cancelled or failed transfer is removed from slskd.
 
-    *queue_patience_secs*: give up on a copy that sits this long in the peer's
-    upload queue without starting (None waits the whole timeout).
+    *timeout_secs* limits a transfer that is running. *queue_patience_secs* limits
+    how long a copy may sit in the peer's upload queue before it starts (None: as
+    long as it takes).
     """
     if not await asyncio.to_thread(slskd.enqueue_download, result):
         return Landed(error="peer offline or refused")
@@ -66,27 +67,32 @@ async def fetch(
         if on_progress is not None:
             await on_progress(status)
 
-    transfer = asyncio.ensure_future(
-        slskd.wait_for_download(result.username, result.filename, timeout_secs=timeout_secs, progress_callback=track)
-    )
     patience = asyncio.ensure_future(out_of_patience.wait())
     try:
-        await asyncio.wait({transfer, patience}, return_when=asyncio.FIRST_COMPLETED)
-    except BaseException:
-        transfer.cancel()
-        await _stop_transfer(slskd, result, transfer_id)
-        raise
+        while True:
+            transfer = asyncio.ensure_future(
+                slskd.wait_for_download(
+                    result.username, result.filename, timeout_secs=timeout_secs, progress_callback=track
+                )
+            )
+            try:
+                await asyncio.wait({transfer, patience}, return_when=asyncio.FIRST_COMPLETED)
+                if not transfer.done():
+                    transfer.cancel()
+                    await _stop_transfer(slskd, result, transfer_id)
+                    return Landed(error=QUEUED_TOO_LONG)
+                status = transfer.result()
+            except BaseException:
+                transfer.cancel()
+                await _stop_transfer(slskd, result, transfer_id)
+                raise
+            # *timeout_secs* is for a transfer that is running. One still waiting in the peer's queue
+            # has not started yet: wait again, until the queue patience runs out.
+            if status is None and queued_since is not None:
+                continue
+            break
     finally:
         patience.cancel()
-    if not transfer.done():
-        transfer.cancel()
-        await _stop_transfer(slskd, result, transfer_id)
-        return Landed(error=QUEUED_TOO_LONG)
-    try:
-        status = transfer.result()
-    except BaseException:
-        await _stop_transfer(slskd, result, transfer_id)
-        raise
     # slskd reports failures as "Completed, Errored": check is_failed, not is_complete.
     if status is None or status.is_failed:
         await _stop_transfer(slskd, result, status.transfer_id if status else transfer_id)

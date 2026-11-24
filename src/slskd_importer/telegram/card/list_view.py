@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from slskd_importer.queue.batch import Batch, Item
+from slskd_importer.queue.batch import RETRYABLE_STATUSES, Batch, Item
 from slskd_importer.queue.progress import Progress
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card
@@ -16,8 +16,14 @@ PAGE_SIZE = 8
 
 
 def attention_first(items: list[Item]) -> list[Item]:
-    """Tracks that need a decision first, then the rest in playlist order."""
-    return sorted(items, key=lambda item: (item.status not in ATTENTION, item.position))
+    """Tracks that need a decision first, then the ones that were not downloaded, then the rest in playlist order."""
+
+    def rank(item: Item) -> int:
+        if item.status in ATTENTION:
+            return 0
+        return 1 if item.status in RETRYABLE_STATUSES else 2
+
+    return sorted(items, key=lambda item: (rank(item), item.position))
 
 
 def render_list(t: Translate, batch: Batch, items: list[Item], progress: dict[int, Progress], page: int) -> Card:
