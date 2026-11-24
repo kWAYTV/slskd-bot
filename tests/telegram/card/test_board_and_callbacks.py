@@ -12,6 +12,7 @@ from slskd_importer.queue.pick import decode_pick
 from slskd_importer.sources.tracklist import Entry
 from slskd_importer.telegram.card import actions, board
 from slskd_importer.telegram.card.board import View
+from slskd_importer.telegram.card.copy_token import copy_number
 from slskd_importer.telegram.core.app import MusicBot
 from tests.queue.helpers import make_result, make_track
 from tests.telegram.helpers import _make_callback_update, _make_config, _make_context
@@ -28,7 +29,8 @@ def bot():
         music_bot = MusicBot(_make_config())
     music_bot.attach(AsyncMock())
     music_bot.runner.wake = MagicMock()
-    return music_bot
+    with patch.object(board, "TAP_GUARD_SECS", 0):
+        yield music_bot
 
 
 def queue(bot, n=1, **kwargs):
@@ -140,7 +142,7 @@ async def test_picker_searches_then_get_requeues_with_the_pick(bot):
     search.assert_awaited_once()
     assert "2 copies — choose one" in drawn_text(bot)
 
-    await press(bot, actions.GET, batch, item.id, 1)
+    await press(bot, actions.GET, batch, item.id, copy_number(1, copies.ranked[1]))
     again = bot.queue_store.get_item(item.id)
     assert decode_pick(again.pick) == copies.ranked[1]
     assert again.status == ItemStatus.pending and again.forced == 1
@@ -152,7 +154,7 @@ async def test_get_replaces_a_saved_track(bot):
     bot.queue_store.update_item(item.id, status=ItemStatus.done, saved_name="old.flac", history_id=3)
     bot.runner.pipeline.finder._found[item.id] = Copies([make_result(0)])
     with patch.object(bot.shelf, "remove", MagicMock(return_value=True)) as remove:
-        await press(bot, actions.GET, batch, item.id, 0)
+        await press(bot, actions.GET, batch, item.id, copy_number(0, make_result(0)))
     remove.assert_not_called()  # the old file stays until the new copy has landed
     again = bot.queue_store.get_item(item.id)
     assert (again.saved_name, again.history_id, bool(again.pick)) == ("old.flac", 3, True)
@@ -251,7 +253,7 @@ async def test_single_song_card_opens_on_its_copies_and_a_pick_fetches(bot):
     await press(bot, actions.ITEM, batch, item.id)  # Back from the picker
     assert "Which copy do you want?" in drawn_text(bot)
 
-    await press(bot, actions.GET, batch, item.id, 1)
+    await press(bot, actions.GET, batch, item.id, copy_number(1, make_result(1)))
     assert bot.queue_store.get_item(item.id).status == ItemStatus.pending
     assert decode_pick(bot.queue_store.get_item(item.id).pick).username == "user1"
 
@@ -296,7 +298,7 @@ async def test_acting_on_a_track_returns_to_the_summary(bot):
     await press(bot, actions.PICKER, batch, items[0].id)  # tapped on the summary
     assert "1 copies — choose one" in drawn_text(bot)
     assert back_button(bot) == actions.encode(actions.SUMMARY, batch.id)
-    await press(bot, actions.GET, batch, items[0].id, 0)
+    await press(bot, actions.GET, batch, items[0].id, copy_number(0, make_result(0)))
     assert "/ 3" in drawn_text(bot)  # the summary again, no Back needed
 
     await press(bot, actions.ITEM, batch, items[1].id)
@@ -309,9 +311,10 @@ async def test_track_waiting_for_a_pick_in_a_list_opens_on_its_copies(bot):
     bot.queue_store.update_item(items[1].id, status=ItemStatus.choose)
     bot.runner.pipeline.finder._found[items[1].id] = Copies([make_result(0), make_result(1)])
     await bot.cards.draw(batch.id)
-    assert "👂 1 to review" in drawn_text(bot)
+    assert "👉 1 to pick" in drawn_text(bot)
     markup = bot.telegram.edit_message_text.call_args.kwargs["reply_markup"]
-    assert markup.inline_keyboard[0][0].callback_data == actions.encode(actions.PICKER, batch.id, items[1].id)
+    assert markup.inline_keyboard[0][0].callback_data == actions.encode(actions.TOUR, batch.id)
+    assert markup.inline_keyboard[1][0].callback_data == actions.encode(actions.PICKER, batch.id, items[1].id)
     await press(bot, actions.PICKER, batch, items[1].id)
     assert "2 copies — choose one" in drawn_text(bot)
 
@@ -344,7 +347,83 @@ async def test_doubted_copy_can_be_undone_or_replaced(bot):
     bot.runner.pipeline.finder._found[items[1].id] = Copies([make_result(0)])
     with patch.object(bot.shelf, "remove", MagicMock(return_value=True)) as remove:
         await press(bot, actions.UNDO, batch, items[0].id)
-        await press(bot, actions.GET, batch, items[1].id, 0)
+        await press(bot, actions.GET, batch, items[1].id, copy_number(0, make_result(0)))
     remove.assert_called_once_with("x.flac", 3)
     assert bot.queue_store.get_item(items[0].id).status == ItemStatus.removed
     assert bot.queue_store.get_item(items[1].id).pick
+
+
+async def test_going_through_the_waiting_tracks_one_after_another(bot):
+    batch, items = queue(bot, 4)
+    for item in items[:3]:
+        bot.queue_store.update_item(item.id, status=ItemStatus.choose)
+        bot.runner.pipeline.finder._found[item.id] = Copies([make_result(item.position)])
+    bot.queue_store.update_item(items[3].id, status=ItemStatus.done)
+    bot.queue_store.close_if_finished(batch.id)
+
+    await press(bot, actions.TOUR, batch)
+    assert "Song 0" in drawn_text(bot) and "👉 Left to pick: 3" in drawn_text(bot)
+
+    await press(bot, actions.GET, batch, items[0].id, copy_number(0, make_result(1)))
+    assert bot.queue_store.get_item(items[0].id).status == ItemStatus.pending
+    assert "Song 1" in drawn_text(bot) and "👉 Left to pick: 2" in drawn_text(bot)  # straight on to the next
+
+    await press(bot, actions.SKIP, batch, items[1].id)
+    assert "Song 2" in drawn_text(bot) and "👉 Left to pick: 1" in drawn_text(bot)
+
+    await press(bot, actions.GET, batch, items[2].id, copy_number(0, make_result(3)))
+    assert "/ 4" in drawn_text(bot)  # nothing left: back on the summary
+
+
+async def test_double_tap_does_not_pick_for_the_next_track(bot):
+    batch, items = queue(bot, 2)
+    for item in items:
+        bot.queue_store.update_item(item.id, status=ItemStatus.choose)
+        bot.runner.pipeline.finder._found[item.id] = Copies([make_result(0)])
+    await press(bot, actions.TOUR, batch)
+    with patch.object(board, "TAP_GUARD_SECS", 60):
+        await press(bot, actions.GET, batch, items[0].id, copy_number(0, make_result(0)))
+    assert bot.queue_store.get_item(items[0].id).status == ItemStatus.choose  # too soon after it came on screen
+
+
+async def test_a_copy_button_from_an_old_list_fetches_nothing(bot):
+    batch, items = queue(bot)
+    bot.queue_store.update_item(items[0].id, status=ItemStatus.choose)
+    stale = copy_number(0, make_result(7))
+    bot.runner.pipeline.finder._found[items[0].id] = Copies([make_result(0)])  # searched again since
+    await press(bot, actions.GET, batch, items[0].id, stale)
+    assert bot.queue_store.get_item(items[0].id).status == ItemStatus.choose
+
+
+async def test_skip_all_lets_go_of_waiting_tracks_only(bot):
+    batch, items = queue(bot, 4)
+    bot.queue_store.update_item(items[0].id, status=ItemStatus.choose)
+    bot.queue_store.update_item(items[1].id, status=ItemStatus.review)
+    bot.queue_store.update_item(items[2].id, status=ItemStatus.doubt, saved_name="x.flac")
+    bot.queue_store.update_item(items[3].id, status=ItemStatus.done)
+    await press(bot, actions.SKIP_ALL, batch)
+    assert bot.queue_store.counts(batch.id) == {"cancelled": 2, "doubt": 1, "done": 1}
+
+
+async def test_summary_stays_within_a_message_with_many_tracks_in_flight(bot):
+    from slskd_importer.queue.progress import DOWNLOADING, SEARCHING, Progress
+
+    batch, items = queue(bot, 80)
+    for item in items[:70]:
+        bot.queue_store.update_item(item.id, status=ItemStatus.working)
+        queued = item.position > 8
+        bot.runner.progress[item.id] = Progress(DOWNLOADING if queued else SEARCHING, 0.0, queued=queued)
+    await bot.cards.draw(batch.id)
+    text = drawn_text(bot)
+    assert len(text) < 1000
+    assert "… and 3 more" in text and "⌛ 62 waiting in peer queues" in text
+
+
+async def test_waiting_batch_says_so_instead_of_done(bot):
+    batch, items = queue(bot, 2, query_message_id=500)
+    bot.queue_store.update_item(items[0].id, status=ItemStatus.choose)
+    bot.queue_store.update_item(items[1].id, status=ItemStatus.done)
+    bot.queue_store.close_if_finished(batch.id)
+    await bot.cards.draw(batch.id)
+    assert "👉 Waiting for your pick: 1" in drawn_text(bot) and "Done" not in drawn_text(bot)
+    bot.telegram.set_message_reaction.assert_awaited_once()  # 👍: one track did arrive

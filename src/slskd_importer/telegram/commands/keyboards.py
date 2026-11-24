@@ -1,13 +1,8 @@
-"""Inline keyboards for slash-command surfaces: language, history, status."""
+"""Inline keyboards for slash-command surfaces: language, history."""
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from slskd_importer.telegram.i18n import DEFAULT_LOCALE, LABELS, LOCALES, t
-
-
-def build_status_keyboard(*, locale: str = DEFAULT_LOCALE) -> InlineKeyboardMarkup:
-    """One button under /status: stop everything listed."""
-    return InlineKeyboardMarkup([[InlineKeyboardButton(t(locale, "btn_cancel_all"), callback_data="cancel_all")]])
+from slskd_importer.telegram.i18n import LABELS, LOCALES
 
 
 def build_language_keyboard() -> InlineKeyboardMarkup:

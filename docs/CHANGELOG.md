@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A transfer waiting in a peer's upload queue no longer holds a queue slot, so busy peers cannot stall the other searches and downloads
 - The copies found for a track are stored too (schema v10), so *Other copies* and late reviews open at once instead of searching Soulseek again
 - The copy you picked is stored with the track (schema v9), so a restart resumes the download instead of asking again
+- *Pick copies (n)* on a batch card goes through the waiting tracks one picker after another: one tap per track, *Skip* to pass, the summary again when none are left. *Skip the n waiting* lets them all go at once
+- The picker shows the track's expected length, each peer's queue length, and marks a copy that already failed
+- A batch card says what it is waiting for (your pick, your review) instead of "Done", names a typed list in your language, and stays within one message however many tracks are in flight
+- `/status` also lists batches waiting for your picks, with 📍 buttons that bring a card back to the bottom of the chat
+- A stale copy button (the track was searched again since) or the second tap of a double tap no longer fetches a copy you did not choose
+- When a replacement copy fails, the track stays saved with its old file instead of showing as failed
 - A song sent on its own shows the copies found and waits for a pick; lists, playlists and tracklists run without asking
 - **No confirmation step for lists.** The best lossless copy is fetched, spectrum-checked and saved. A fake FLAC is discarded and the next copy tried (three per track). Tracks with only lossy copies wait under *Choose a copy* instead of being saved silently
 - Each track on a card can be opened: *Other copies*, *Undo*, *Send file*, *Retry*, *Download anyway* for songs already owned

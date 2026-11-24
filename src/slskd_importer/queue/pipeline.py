@@ -126,7 +126,12 @@ class ItemPipeline:
                 return
             logger.info("Queue item %d: %s from %s: %s", item.id, result.basename, result.username, note)
             notes.append(note)
-        await self._finish(item, ItemStatus.failed, detail="; ".join(notes)[:300])
+        detail = "; ".join(notes)[:300]
+        if replaces is not None:
+            # The copy meant to replace a saved file never arrived: that file is still in the library.
+            await self._finish(item, ItemStatus.done, detail=f"kept: the other copy failed ({detail})"[:300], pick="")
+            return
+        await self._finish(item, ItemStatus.failed, detail=detail)
 
     async def _try_copy(
         self,

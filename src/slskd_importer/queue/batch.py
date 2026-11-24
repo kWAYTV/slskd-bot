@@ -35,6 +35,8 @@ class ItemStatus(StrEnum):
 
 OPEN_STATUSES = (ItemStatus.pending, ItemStatus.working)
 RETRYABLE_STATUSES = (ItemStatus.failed, ItemStatus.no_match)
+# Waiting for the requester to pick a copy or let the track go; nothing is saved yet.
+WAITING_STATUSES = (ItemStatus.choose, ItemStatus.review)
 # The track's file is in the library.
 SAVED_STATUSES = (ItemStatus.done, ItemStatus.doubt)
 

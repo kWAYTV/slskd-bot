@@ -19,6 +19,8 @@ AGAIN = "a"  # fetch again, skipping the owned check
 RETRY = "t"  # run one track through the queue again
 SKIP = "k"  # leave a track that waits for a decision
 KEEP = "o"  # keep a saved copy the audio check doubts
+TOUR = "w"  # go through the tracks waiting for a pick, one picker after another
+SKIP_ALL = "z"  # let go of every track still waiting for a pick
 
 
 @dataclass(frozen=True)

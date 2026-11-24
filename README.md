@@ -16,6 +16,7 @@
 - **One card per message** — every message becomes a batch with a single message that updates in place: progress, counts, what is downloading. Several batches run side by side without mixing. Your own message is reacted 👀 while it works, 👍 when something arrived, 🤷 when nothing did
 - **You pick every copy** — each track shows the copies found (format, length, quality, size, file and folder name) and waits for your tap, so you never get the wrong song or version. Only copies whose file path names the song are offered; a track with none simply counts as not found
 - **Optional auto-pick** — with `AUTO_PICK=true`, lists, playlists and tracklists fetch the best lossless copy that names the song on their own, run a spectrum check, skip fake FLACs for the next copy, and save. Only exceptions wait for you: no lossless copy exists (*Choose a copy*), nothing found, every copy failed
+- **Fast review** — *Pick copies* walks through the waiting tracks one after another: one tap picks a copy and shows the next track
 - **Every track stays in reach** — tap a track on its card to choose another copy, undo the save, get the file sent to the chat, or retry
 - **Fair queue** — a fixed number of tracks at a time (`MAX_CONCURRENT_DOWNLOADS`), shared fairly: one song never waits behind a 300-track playlist. The queue survives restarts
 - **Friends without touching your library** — people in `TELEGRAM_ALLOWED_USERS` but not in `TELEGRAM_LIBRARY_USERS` get their files sent to the chat (up to 2000 MB with a self-hosted Bot API server); nothing of theirs is ever saved to the library
@@ -65,7 +66,7 @@ uv run python -m slskd_importer run
 |---------|-------------|
 | *(any text)* | Queue the songs named, one per line |
 | *(any link)* | Queue what the link holds: a track, an album, a playlist, a mix tracklist |
-| `/status` | What this chat has in the queue, with *Cancel all* |
+| `/status` | Batches that are working or waiting for your picks; 📍 brings a card back to the bottom of the chat |
 | `/history` | Recent downloads — tap ↩️ to remove one |
 | `/check` | Compare the latest saved tracks with what you asked for and list the doubtful ones |
 | `/undo` | Remove the last track saved to the library |
