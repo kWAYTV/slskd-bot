@@ -8,11 +8,16 @@ import unicodedata
 # Words a catalog or a file name adds to a title without making it another version.
 NEUTRAL_TITLE_WORDS = frozenset({"original", "mix", "version", "remaster", "remastered", "digital"})
 
+# Letters Unicode does not decompose into a base letter plus an accent.
+_LETTERS = str.maketrans(
+    {"ø": "o", "Ø": "O", "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE", "ß": "ss", "đ": "d", "Đ": "D", "ł": "l", "Ł": "L"}
+)
+
 
 def normalize(text: str) -> str:
     """Lowercase ASCII words: accents dropped, ``&`` as ``and``, punctuation as spaces."""
     # Apostrophes vanish in both spellings ("Ain't" / "Ain’t" / "Aint"), not turn into a space.
-    text = re.sub(r"['’‘`´]", "", text)
+    text = re.sub(r"['’‘`´]", "", text).translate(_LETTERS)
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
     return re.sub(r"[^a-z0-9]+", " ", text.replace("&", " and ")).strip()
 

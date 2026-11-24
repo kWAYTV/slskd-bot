@@ -136,6 +136,7 @@ class MusicBot:
     cmd_stats = stats.cmd_stats
     cmd_cancel = cancel.cmd_cancel
     cmd_check = check.cmd_check
+    _handle_check_undo = check.handle_check_undo
     _handle_cancel_all = cancel.handle_cancel_all
     _handle_history_undo = undo.handle_history_undo
 

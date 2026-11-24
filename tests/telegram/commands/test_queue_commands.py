@@ -123,11 +123,27 @@ async def test_check_lists_tracks_that_are_not_what_was_asked(bot):
     text = update.message.reply_text.call_args.args[0]
     assert "*2 to check*  ·  of 3 recently saved" in text
     assert "`Patient - Rhythm Dancer`" in text and "`Vault Records - Rhythm Dancer.flac`" in text
-    assert "`Someone Else - Void.flac`" in text
+    assert "`x/Someone Else - Void.flac`" in text
     assert "Gatex" not in text
+    markup = update.message.reply_text.call_args.kwargs["reply_markup"]
+    assert [row[0].text for row in markup.inline_keyboard] == ["🗑  Phil Berg - Void", "🗑  Patient - Rhythm Dancer"]
+
+    wrong = next(
+        i
+        for b in bot.queue_store.recent_batches(67890, 10)
+        for i in bot.queue_store.items(b.id)
+        if i.query == "Phil Berg - Void"
+    )
+    with patch.object(bot.shelf, "remove", return_value=True) as remove:
+        tap = _make_callback_update(data=f"cu:{wrong.id}")
+        await bot.handle_callback(tap, _make_context())
+    remove.assert_called_once_with("Phil Berg - Void.flac", wrong.history_id)
+    assert bot.queue_store.get_item(wrong.id).status == ItemStatus.removed
+    redrawn = tap.callback_query.edit_message_text.call_args.args[0]
+    assert "*1 to check*" in redrawn and "Phil Berg" not in redrawn
 
 
 async def test_check_when_everything_matches(bot):
     update = _make_update()
     await bot.cmd_check(update, _make_context())
-    update.message.reply_text.assert_awaited_once_with("All 0 recently saved tracks match what you asked for.")
+    assert update.message.reply_text.call_args.args[0] == "All 0 recently saved tracks match what you asked for."
