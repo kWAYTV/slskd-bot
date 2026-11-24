@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # Toast shown on the tap itself, before the handler edits anything.
 _TOASTS = {
     "hu": "toast_removing",
+    "cu": "toast_removing",
     "cancel_all": "toast_cancelled",
 }
 _CARD_TOASTS = {
@@ -61,6 +62,7 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
     handler = {
         actions.PREFIX: self._handle_card_action,
         "hu": self._handle_history_undo,
+        "cu": self._handle_check_undo,
         "swp": self._handle_sweep_decision,
         "swr": self._handle_sweep_reason,
         "cancel_all": self._handle_cancel_all,

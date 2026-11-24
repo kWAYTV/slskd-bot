@@ -40,7 +40,7 @@ STRINGS: dict[str, str] = {
     "check_clean": "As {n} pistas gardadas hai pouco coinciden co que pediches.",
     "check_header": "*{n} por comprobar*  ·  de {total} gardadas hai pouco",
     "check_line": "⚠️ pediches {asked}\n     gardado {saved}\n     desde {source}",
-    "check_hint": "Algunha non é? Abre a súa tarxeta, toca a pista e preme Desfacer. Tamén vale /history.",
+    "check_hint": "Toca unha pista de abaixo para quitala da biblioteca.",
     "cancel_done": "Cancelado.",
     "cancel_nothing": "Nada que cancelar.",
     "get_usage": "Envía nomes de cancións ou ligazóns, un por liña. Non fai falta ningún comando.",

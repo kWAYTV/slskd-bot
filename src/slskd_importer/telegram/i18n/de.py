@@ -40,7 +40,7 @@ STRINGS: dict[str, str] = {
     "check_clean": "Alle {n} zuletzt gespeicherten Tracks passen zu dem, was du wolltest.",
     "check_header": "*{n} zu prüfen*  ·  von {total} zuletzt gespeicherten",
     "check_line": "⚠️ gewünscht {asked}\n     gespeichert {saved}\n     von {source}",
-    "check_hint": "Falscher Track? Öffne seine Karte, tippe auf den Track und dann Rückgängig. /history geht auch.",
+    "check_hint": "Tippe unten auf einen Track, um ihn aus der Bibliothek zu entfernen.",
     "cancel_done": "Abgebrochen.",
     "cancel_nothing": "Nichts abzubrechen.",
     "get_usage": "Schick Songnamen oder Links, einen pro Zeile. Kein Befehl nötig.",

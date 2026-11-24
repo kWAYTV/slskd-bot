@@ -35,3 +35,10 @@ def test_name_comparisons():
     assert same_title(normalize("Void"), normalize("Void - Original Mix"))
     assert not same_title(normalize("Losing It"), normalize("Losing It (Extended Mix)"))
     assert not same_title(normalize("Void"), normalize("Original Mix"))
+
+
+def test_letters_without_an_accent_form_compare_as_their_plain_spelling():
+    assert normalize("BACKBØNE") == "backbone"
+    assert normalize("DHÆÜR") == "dhaeur"
+    track = song("BACKBØNE", "Permanent Pressure")
+    assert names_the_song(track, SearchResult("u", "\\Backbone - Pressure EP\\01. Permanent Pressure.flac", 1))

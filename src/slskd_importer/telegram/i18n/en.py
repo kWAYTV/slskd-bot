@@ -40,7 +40,7 @@ STRINGS: dict[str, str] = {
     "check_clean": "All {n} recently saved tracks match what you asked for.",
     "check_header": "*{n} to check*  ·  of {total} recently saved",
     "check_line": "⚠️ asked {asked}\n     saved {saved}\n     from {source}",
-    "check_hint": "Wrong one? Open its card, tap the track, then Undo. /history works too.",
+    "check_hint": "Tap a track below to remove it from the library.",
     "cancel_done": "Cancelled.",
     "cancel_nothing": "Nothing to cancel.",
     "get_usage": "Send song names or links, one per line. No command needed.",
