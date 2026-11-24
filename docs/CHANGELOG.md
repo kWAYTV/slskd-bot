@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/check` lists recently saved tracks whose name or source file does not match what was asked
 - Every track now waits for its copy to be picked by hand; the unasked fetching of lists is behind `AUTO_PICK=true` (off by default). Only copies whose path names the song are offered; a track with none counts as not found and asks for nothing
 - A saved copy the audio check does not vouch for (possible, likely or certain transcode) comes back to the main panel as ⚠️ with *Keep*, *Other copies* and *Undo*
+- A copy you picked waits up to six hours in its peer's queue instead of failing after `DOWNLOAD_TIMEOUT_SECS` (which now only limits a transfer that is running)
+- Failed tracks, like not-found ones, are counted and retried together but no longer listed one by one on the batch card
 - A transfer waiting in a peer's upload queue no longer holds a queue slot, so busy peers cannot stall the other searches and downloads
 - The copy you picked is stored with the track (schema v9), so a restart resumes the download instead of asking again
 - A song sent on its own shows the copies found and waits for a pick; lists, playlists and tracklists run without asking

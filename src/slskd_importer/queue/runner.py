@@ -18,7 +18,7 @@ from slskd_importer.soulseek.result import SearchResult
 logger = logging.getLogger(__name__)
 
 # Transfers allowed to wait in peer queues at once, beyond the working slots.
-MAX_PARKED = 20
+MAX_PARKED = 60
 
 # Called with a batch id whenever something about that batch changed. Must not block.
 ChangeHook = Callable[[int], None]

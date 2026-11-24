@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from slskd_importer.queue.batch import SAVED_STATUSES, Batch, Item, ItemStatus
+from slskd_importer.queue.batch import RETRYABLE_STATUSES, SAVED_STATUSES, Batch, Item, ItemStatus
 from slskd_importer.telegram.card import actions, board
 from slskd_importer.telegram.card.status import ATTENTION
 
@@ -76,7 +76,7 @@ async def retry(self, query, batch: Batch, item: Item, _number: int) -> None:
 
 async def skip(self, query, batch: Batch, item: Item, _number: int) -> None:
     """Leave a track that needs attention (lossy only, not found, failed); it can be fetched again later."""
-    if item.status in (*ATTENTION, ItemStatus.no_match):
+    if item.status in (*ATTENTION, *RETRYABLE_STATUSES):
         self.cards.leave(batch.id)
         await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.cancelled)
 

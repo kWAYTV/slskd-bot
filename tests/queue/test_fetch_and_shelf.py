@@ -169,3 +169,37 @@ async def test_fetch_without_patience_waits_out_the_peer_queue():
     processor.find_downloaded_file.return_value = "/downloads/x.flac"
     landed = await fetch(slskd, processor, make_result(), 5, queue_patience_secs=None)
     assert landed.ok
+
+
+async def test_fetch_waits_again_while_the_copy_is_still_in_the_peer_queue():
+    windows = 0
+
+    async def wait(username, filename, timeout_secs=600, progress_callback=None):
+        nonlocal windows
+        windows += 1
+        if windows < 3:  # two download timeouts pass with the transfer still queued
+            await progress_callback(DownloadStatus(username, filename, "Queued, Remotely", transfer_id="t9"))
+            return None
+        await progress_callback(DownloadStatus(username, filename, "InProgress", 50.0, transfer_id="t9"))
+        return DownloadStatus(username, filename, "Completed, Succeeded", transfer_id="t9")
+
+    slskd = MagicMock()
+    slskd.enqueue_download.return_value = True
+    slskd.wait_for_download = wait
+    processor = MagicMock()
+    processor.find_downloaded_file.return_value = "/downloads/x.flac"
+    landed = await fetch(slskd, processor, make_result(), 5, queue_patience_secs=3600)
+    assert landed.ok and windows == 3
+    slskd.cancel_transfer.assert_not_called()
+
+
+async def test_a_running_transfer_that_times_out_still_fails():
+    async def wait(username, filename, timeout_secs=600, progress_callback=None):
+        await progress_callback(DownloadStatus(username, filename, "InProgress", 10.0, transfer_id="t9"))
+        return None
+
+    slskd = MagicMock()
+    slskd.enqueue_download.return_value = True
+    slskd.wait_for_download = wait
+    landed = await fetch(slskd, MagicMock(), make_result(), 5, queue_patience_secs=3600)
+    assert landed.error == "timed out"

@@ -259,7 +259,7 @@ async def test_only_hand_picked_copies_wait_out_a_peer_queue(store):
         batch = make_batch(store)
         store.update_item(store.items(batch.id)[0].id, pick=encode_pick(make_result(1)))
         await run(pipeline, store, batch)
-        assert fetch.await_args.kwargs["queue_patience_secs"] is None
+        assert fetch.await_args.kwargs["queue_patience_secs"] == 6 * 3600
 
 
 async def test_without_auto_pick_every_list_track_waits_for_a_pick(store):

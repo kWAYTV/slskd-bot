@@ -37,7 +37,10 @@ def render_summary(t: Translate, batch: Batch, items: list[Item], progress: dict
         lines.append("")
         lines += [_working_line(t, item, progress.get(item.id)) for item in working]
 
-    attention = [item for item in items if item.status in ATTENTION]
+    attention = sorted(
+        (item for item in items if item.status in ATTENTION),
+        key=lambda item: (ATTENTION.index(item.status), item.position),
+    )
     return "\n".join(lines), _keyboard(t, batch, counts, attention)
 
 

@@ -123,7 +123,6 @@ def test_summary_counts_progress_and_attention(store):
     )
     assert "Nancy Sinatra — Song 4  ·  50%" in text
     assert labels(markup) == [
-        "❌  Nancy Sinatra — Song 2",
         "👂  Nancy Sinatra — Song 3",
         "All tracks",
         "Retry 1",

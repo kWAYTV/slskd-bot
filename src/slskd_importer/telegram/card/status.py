@@ -34,9 +34,10 @@ _PHASE_ICONS = {
     phases.SENDING: "📤",
 }
 
-# Items waiting for the requester, in the order a summary lists them. A track nothing was found for
-# is not one of them: there is nothing to decide, it is only counted (and can be retried).
-ATTENTION = (ItemStatus.choose, ItemStatus.doubt, ItemStatus.review, ItemStatus.failed)
+# Items waiting for a decision from the requester, in the order a summary lists them. Tracks that
+# were not found or failed are not among them: there is nothing to decide, they are counted and can be
+# retried together.
+ATTENTION = (ItemStatus.choose, ItemStatus.doubt, ItemStatus.review)
 
 
 def open_action(item: Item) -> str:
