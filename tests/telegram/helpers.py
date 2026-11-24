@@ -23,6 +23,7 @@ def _make_config():
     config.telegram_allowed_users = {12345}
     config.max_results = 5
     config.max_concurrent_downloads = 3
+    config.auto_pick = False
     config.duration_tolerance_secs = 5
     config.exclude_keywords = ["live", "remix"]
     config.download_dir = os.path.join(td, "downloads")

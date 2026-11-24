@@ -104,7 +104,7 @@ class ItemPipeline:
             if not found.ranked:
                 await self._finish(item, ItemStatus.no_match)
                 return
-            if batch.asks_which_copy:
+            if batch.asks_which_copy or not self._config.auto_pick:
                 await self._finish(item, ItemStatus.choose)
                 return
             if found.lossy:

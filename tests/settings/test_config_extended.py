@@ -70,3 +70,14 @@ class TestConfigParseIdSet:
 
     def test_trailing_comma(self):
         assert Config._parse_id_set("1,2,") == {1, 2}
+
+
+def test_auto_pick_is_off_unless_asked_for(monkeypatch):
+    from slskd_importer.settings import Config
+
+    for name in ("TELEGRAM_BOT_TOKEN", "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "SLSKD_HOST", "SLSKD_API_KEY"):
+        monkeypatch.setenv(name, "x")
+    monkeypatch.delenv("AUTO_PICK", raising=False)
+    assert Config().auto_pick is False
+    monkeypatch.setenv("AUTO_PICK", "true")
+    assert Config().auto_pick is True

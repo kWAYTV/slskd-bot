@@ -195,3 +195,14 @@ def test_saved_item_words_the_lossless_verdict(store):
     assert "⚠️ Possible transcode · cutoff 19.5 kHz" in text
     es, _ = render_item(partial(translate, "es"), batch, item, None, alone=True)
     assert "Posible transcodificación" in es
+
+
+def test_picker_marks_copies_that_do_not_name_the_song(store):
+    from slskd_importer.soulseek.result import SearchResult
+
+    batch, item = one_item(store)
+    other = SearchResult(username="u", filename="\\Music\\Cher - Bang Bang.flac", size=1, length=162)
+    text, _ = render_picker(t, batch, item, Copies([make_result(0), other]), 0, 5)
+    first, second = text.split("*#2*")
+    assert "❓" not in first.split("*#1*")[1]
+    assert second.lstrip().startswith("🔴 ❓") and "❓ = the file name does not mention this song" in second

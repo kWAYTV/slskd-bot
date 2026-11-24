@@ -57,9 +57,9 @@ class Batch:
 
     @property
     def asks_which_copy(self) -> bool:
-        """A single requested song is never fetched blind: the first match may be another version.
+        """A single requested song is never fetched blind, whatever AUTO_PICK says.
 
-        Lists, playlists and tracklists are worked through without asking.
+        Lists, playlists and tracklists also wait for a pick per track unless AUTO_PICK is on.
         """
         return self.kind == "track"
 

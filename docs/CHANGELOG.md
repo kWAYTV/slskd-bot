@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In a list, a copy is fetched unasked only when its remote path names the song (every title word, one artist word); otherwise the track waits for a pick
 - After picking, skipping or retrying a track the card returns to where the track was opened from
 - `/check` lists recently saved tracks whose name or source file does not match what was asked
+- Every track now waits for its copy to be picked by hand; the unasked fetching of lists is behind `AUTO_PICK=true` (off by default). The picker marks copies whose file name does not mention the song with ❓
 - A song sent on its own shows the copies found and waits for a pick; lists, playlists and tracklists run without asking
 - **No confirmation step for lists.** The best lossless copy is fetched, spectrum-checked and saved. A fake FLAC is discarded and the next copy tried (three per track). Tracks with only lossy copies wait under *Choose a copy* instead of being saved silently
 - Each track on a card can be opened: *Other copies*, *Undo*, *Send file*, *Retry*, *Download anyway* for songs already owned
