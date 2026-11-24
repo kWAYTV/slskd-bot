@@ -1,9 +1,9 @@
-"""Whether a Soulseek copy can be taken without asking: its path must name the song.
+"""Whether a Soulseek copy is the requested song at all: its path must name it.
 
 The search falls back to looser queries (title only, fewer keywords) when the
 full one finds nothing, so a ranked copy may be another artist's song with the
 same title. Only copies whose remote path carries every word of the title and
-at least one word of the artist are fetched unasked; the rest wait for a pick.
+at least one word of the artist count as found; the rest are dropped.
 """
 
 from __future__ import annotations

@@ -104,7 +104,6 @@ STRINGS: dict[str, str] = {
     "picker_searching": "Searching Soulseek",
     "picker_choose": "{total} copies — choose one",
     "picker_lossy": "No lossless copy — {total} lossy copies",
-    "picker_unsure": "❓ = the file name does not mention this song",
     "oversize_note": "OGG copy: the original is over this bot's {limit} MB limit.",
     # Buttons
     "btn_cancel": "Cancel",

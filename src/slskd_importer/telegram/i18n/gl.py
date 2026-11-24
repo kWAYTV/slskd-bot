@@ -104,7 +104,6 @@ STRINGS: dict[str, str] = {
     "picker_searching": "Buscando en Soulseek",
     "picker_choose": "{total} copias — escolle unha",
     "picker_lossy": "Ningunha copia sen perda — {total} con perda",
-    "picker_unsure": "❓ = o nome do ficheiro non menciona esta canción",
     "oversize_note": "Copia OGG: o orixinal supera o límite de {limit} MB deste bot.",
     # Buttons
     "btn_cancel": "Cancelar",
