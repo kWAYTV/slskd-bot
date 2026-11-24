@@ -8,6 +8,7 @@ import logging
 from collections.abc import Callable
 
 from slskd_importer.queue.batch import Item, ItemStatus
+from slskd_importer.queue.pick import encode_pick
 from slskd_importer.queue.pipeline import ItemPipeline
 from slskd_importer.queue.progress import Progress
 from slskd_importer.queue.store import QueueRepository
@@ -15,6 +16,9 @@ from slskd_importer.soulseek.errors import SlskdUnavailableError
 from slskd_importer.soulseek.result import SearchResult
 
 logger = logging.getLogger(__name__)
+
+# Transfers allowed to wait in peer queues at once, beyond the working slots.
+MAX_PARKED = 20
 
 # Called with a batch id whenever something about that batch changed. Must not block.
 ChangeHook = Callable[[int], None]
@@ -28,6 +32,7 @@ class QueueRunner:
         self.progress: dict[int, Progress] = {}
         self.on_change: ChangeHook | None = None
         self._tasks: dict[int, tuple[int, asyncio.Task]] = {}  # item id -> (batch id, task)
+        self._parked: set[int] = set()  # items whose transfer waits in a peer's upload queue
         self._wake = asyncio.Event()
         self._dispatcher: asyncio.Task | None = None
 
@@ -74,11 +79,16 @@ class QueueRunner:
             await self.cancel_batch(batch.id)
         return len(batches)
 
-    async def requeue(self, item: Item, *, forced: bool = False, pick: SearchResult | None = None) -> None:
-        """Run one item again: *forced* skips the owned check, *pick* fetches exactly that copy."""
-        if pick is not None:
-            self.pipeline.picks[item.id] = pick
-        await asyncio.to_thread(self.store.requeue, item.id, forced=forced)
+    async def requeue(
+        self, item: Item, *, forced: bool = False, pick: SearchResult | None = None, same_copy: bool = False
+    ) -> None:
+        """Run one item again.
+
+        *forced* skips the owned check. *pick* fetches exactly that copy; *same_copy* keeps the
+        copy picked before (a retry); with neither, the queue searches afresh.
+        """
+        stored = encode_pick(pick) if pick is not None else (None if same_copy else "")
+        await asyncio.to_thread(self.store.requeue, item.id, forced=forced, pick=stored)
         self._changed(item.batch_id)
         self.wake()
 
@@ -92,7 +102,7 @@ class QueueRunner:
 
     async def _dispatch(self) -> None:
         while True:
-            while len(self._tasks) < self.workers:
+            while self._has_free_slot():
                 item = await asyncio.to_thread(self.store.claim_next)
                 if item is None:
                     break
@@ -100,12 +110,22 @@ class QueueRunner:
             await self._wake.wait()
             self._wake.clear()
 
+    def _has_free_slot(self) -> bool:
+        """A transfer waiting in a peer's upload queue does no work here, so it does not hold a slot.
+
+        Otherwise three busy peers would stall every other search and download. MAX_PARKED bounds
+        how many such transfers can pile up.
+        """
+        busy = len(self._tasks) - len(self._parked)
+        return busy < self.workers and len(self._parked) <= MAX_PARKED
+
     def _launch(self, item: Item) -> None:
         task = asyncio.get_running_loop().create_task(self._work(item), name=f"queue-item-{item.id}")
         self._tasks[item.id] = (item.batch_id, task)
 
         def done(_task: asyncio.Task) -> None:
             self._tasks.pop(item.id, None)
+            self._parked.discard(item.id)
             self.progress.pop(item.id, None)
             self._changed(item.batch_id)
             self.wake()
@@ -120,6 +140,9 @@ class QueueRunner:
 
         def report(progress: Progress) -> None:
             self.progress[item.id] = progress
+            if progress.queued != (item.id in self._parked):
+                (self._parked.add if progress.queued else self._parked.discard)(item.id)
+                self.wake()
             self._changed(item.batch_id)
 
         try:

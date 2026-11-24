@@ -14,7 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_VERSION = 8
+_SCHEMA_VERSION = 9
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS download_history (
@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS queue_items (
     quality TEXT NOT NULL DEFAULT '',
     history_id INTEGER,
     forced INTEGER NOT NULL DEFAULT 0,
+    pick TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(batch_id, position)
@@ -225,6 +226,9 @@ class Database:
         )
         # v8 replaced playlist imports with the download queue. The old import_jobs /
         # import_tracks tables are left in place, unused, so a rollback still finds them.
+        item_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(queue_items)")}
+        if "pick" not in item_cols:
+            self._conn.execute("ALTER TABLE queue_items ADD COLUMN pick TEXT NOT NULL DEFAULT ''")
         prefs_exists = self._conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='chat_prefs'"
         ).fetchone()

@@ -9,6 +9,7 @@ import pytest
 from slskd_importer.queue.batch import Destination, ItemStatus
 from slskd_importer.queue.copies import Copies
 from slskd_importer.queue.fetch import Landed
+from slskd_importer.queue.pick import decode_pick, encode_pick
 from slskd_importer.queue.pipeline import ItemPipeline, describe_copy
 from slskd_importer.queue.shelf import Placed
 from slskd_importer.sources.tracklist import Entry
@@ -123,7 +124,7 @@ async def test_picked_copy_is_trusted_and_skips_search(store):
     pipeline = make_pipeline(store, owned="already.flac")
     batch = make_batch(store)
     item = store.items(batch.id)[0]
-    pipeline.picks[item.id] = make_result(3, "mp3")
+    store.update_item(item.id, pick=encode_pick(make_result(3, "mp3")))
     with (
         patch(f"{PIPELINE}.fetch", landed("/downloads/x.mp3")) as fetch,
         patch(f"{PIPELINE}.discard", AsyncMock()),
@@ -132,7 +133,7 @@ async def test_picked_copy_is_trusted_and_skips_search(store):
     assert done.status == ItemStatus.done
     assert fetch.await_args.args[2].username == "user3"
     pipeline.finder.find.assert_not_called()
-    assert pipeline.picks == {}
+    assert done.pick == ""
 
 
 async def test_deliver_sends_and_never_places(store):
@@ -220,15 +221,13 @@ async def test_replaced_file_is_removed_only_once_the_new_copy_is_ready(store):
     pipeline = make_pipeline(store)
     batch = make_batch(store)
     item = store.items(batch.id)[0]
-    pipeline.picks[item.id] = make_result(1)
-    pipeline.replaces[item.id] = ("old.flac", 3)
+    store.update_item(item.id, pick=encode_pick(make_result(1)), saved_name="old.flac", history_id=3)
     with patch(f"{PIPELINE}.fetch", AsyncMock(return_value=Landed(error="timed out"))):
         failed = await run(pipeline, store, batch)
     assert failed.status == ItemStatus.failed
     pipeline.shelf.remove.assert_not_called()
+    assert failed.pick  # a failed pick is kept, so Retry fetches the same copy
 
-    pipeline.picks[item.id] = make_result(1)
-    pipeline.replaces[item.id] = ("old.flac", 3)
     with (
         patch(f"{PIPELINE}.fetch", landed()),
         patch(f"{PIPELINE}.discard", AsyncMock()),
@@ -258,7 +257,7 @@ async def test_only_hand_picked_copies_wait_out_a_peer_queue(store):
         await run(pipeline, store, make_batch(store))
         assert fetch.await_args.kwargs["queue_patience_secs"] == 90
         batch = make_batch(store)
-        pipeline.picks[store.items(batch.id)[0].id] = make_result(1)
+        store.update_item(store.items(batch.id)[0].id, pick=encode_pick(make_result(1)))
         await run(pipeline, store, batch)
         assert fetch.await_args.kwargs["queue_patience_secs"] is None
 
@@ -276,7 +275,7 @@ async def test_a_doubted_picked_copy_is_saved_but_comes_back_for_review(store, k
     pipeline = make_pipeline(store)
     batch = make_batch(store)
     item = store.items(batch.id)[0]
-    pipeline.picks[item.id] = make_result(1)
+    store.update_item(item.id, pick=encode_pick(make_result(1)))
     with (
         patch(f"{PIPELINE}.fetch", landed()),
         patch(f"{PIPELINE}.discard", AsyncMock()),
@@ -285,3 +284,9 @@ async def test_a_doubted_picked_copy_is_saved_but_comes_back_for_review(store, k
         saved = await run(pipeline, store, batch)
     assert saved.status == status
     assert saved.saved_name == "Nancy Sinatra - Bang Bang.flac"
+
+
+def test_pick_round_trip():
+    copy = make_result(2)
+    assert decode_pick(encode_pick(copy)) == copy
+    assert decode_pick("") is None and decode_pick("not json") is None

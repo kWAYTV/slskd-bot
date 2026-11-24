@@ -31,15 +31,16 @@ async def open_picker(self, query, batch: Batch, item: Item, page: int) -> None:
 
 
 async def get_copy(self, query, batch: Batch, item: Item, index: int) -> None:
-    """Fetch the copy the requester chose. A track already saved is replaced by it once it arrives."""
+    """Fetch the copy the requester chose.
+
+    A track already saved keeps its file until the chosen copy has landed and passed its checks;
+    the pipeline then replaces it.
+    """
     copies = self.runner.pipeline.finder.remembered(item.id)
     if copies is None or index >= len(copies.ranked) or item.status in (ItemStatus.pending, ItemStatus.working):
         return
     if batch.to_library and not self._can_save_library(query.from_user.id):
         return
-    if item.status in SAVED_STATUSES and batch.to_library:
-        # The saved file stays until the chosen copy has landed and passed its checks.
-        self.runner.pipeline.replaces[item.id] = (item.saved_name, item.history_id)
     logger.info("chat=%s item %d: picked #%d %s", batch.chat_id, item.id, index + 1, copies.ranked[index].basename)
     self.cards.leave(batch.id)  # picked: back to where the track was opened from
     await self.runner.requeue(item, forced=True, pick=copies.ranked[index])
@@ -70,7 +71,7 @@ async def fetch_again(self, query, batch: Batch, item: Item, _number: int) -> No
 async def retry(self, query, batch: Batch, item: Item, _number: int) -> None:
     if item.status in (ItemStatus.failed, ItemStatus.no_match, ItemStatus.review):
         self.cards.leave(batch.id)
-        await self.runner.requeue(item, forced=bool(item.forced))
+        await self.runner.requeue(item, forced=bool(item.forced), same_copy=True)
 
 
 async def skip(self, query, batch: Batch, item: Item, _number: int) -> None:

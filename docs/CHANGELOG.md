@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/check` lists recently saved tracks whose name or source file does not match what was asked
 - Every track now waits for its copy to be picked by hand; the unasked fetching of lists is behind `AUTO_PICK=true` (off by default). Only copies whose path names the song are offered; a track with none counts as not found and asks for nothing
 - A saved copy the audio check does not vouch for (possible, likely or certain transcode) comes back to the main panel as ⚠️ with *Keep*, *Other copies* and *Undo*
+- A transfer waiting in a peer's upload queue no longer holds a queue slot, so busy peers cannot stall the other searches and downloads
+- The copy you picked is stored with the track (schema v9), so a restart resumes the download instead of asking again
 - A song sent on its own shows the copies found and waits for a pick; lists, playlists and tracklists run without asking
 - **No confirmation step for lists.** The best lossless copy is fetched, spectrum-checked and saved. A fake FLAC is discarded and the next copy tried (three per track). Tracks with only lossy copies wait under *Choose a copy* instead of being saved silently
 - Each track on a card can be opened: *Other copies*, *Undo*, *Send file*, *Retry*, *Download anyway* for songs already owned

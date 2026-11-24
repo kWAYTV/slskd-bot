@@ -6,7 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from slskd_importer.queue.batch import BatchStatus, ItemStatus
-from slskd_importer.queue.progress import SEARCHING, Progress
+from slskd_importer.queue.pick import decode_pick
+from slskd_importer.queue.progress import DOWNLOADING, SEARCHING, Progress
 from slskd_importer.queue.runner import QueueRunner
 from slskd_importer.soulseek.errors import SlskdUnavailableError
 from slskd_importer.sources.tracklist import Entry
@@ -20,7 +21,6 @@ class FakePipeline:
         self.store = store
         self.gate = gate
         self.error = error
-        self.picks = {}
         self.finder = MagicMock()
         self.running = 0
         self.peak = 0
@@ -123,7 +123,7 @@ async def test_requeue_with_pick_runs_the_item_again(store):
     item = store.items(batch.id)[0]
     pick = make_result(2)
     await runner.requeue(item, forced=True, pick=pick)
-    assert pipeline.picks[item.id] is pick
+    assert decode_pick(store.get_item(item.id).pick) == pick
     assert store.get_batch(batch.id).status == BatchStatus.active
     await settle(store, batch.id)
     await runner.stop()
@@ -165,3 +165,36 @@ async def test_change_hook_errors_do_not_stop_the_queue(store):
     runner.start()
     await settle(store, batch.id)
     await runner.stop()
+
+
+async def test_transfers_waiting_in_a_peer_queue_do_not_hold_a_slot(store):
+    class QueuedAtPeer(FakePipeline):
+        async def run(self, batch, item, report):
+            if item.query == "s0":
+                report(Progress(DOWNLOADING, 0.0, queued=True))  # parked for as long as the gate is shut
+                await self.gate.wait()
+            self.store.update_item(item.id, status=ItemStatus.done)
+
+    gate = asyncio.Event()
+    batch = make_batch(store, [Entry(query=f"s{n}") for n in range(4)])
+    runner = QueueRunner(store, QueuedAtPeer(store, gate), workers=1)
+    runner.start()
+    for _ in range(200):
+        if store.counts(batch.id).get("done") == 3:
+            break
+        await asyncio.sleep(0.01)
+    assert store.counts(batch.id) == {"working": 1, "done": 3}  # the other three ran past the parked one
+    gate.set()
+    await settle(store, batch.id)
+    await runner.stop()
+
+
+async def test_requeue_keeps_or_clears_the_pick(store):
+    batch = make_batch(store)
+    item = store.items(batch.id)[0]
+    runner = QueueRunner(store, FakePipeline(store), workers=1)
+    await runner.requeue(item, pick=make_result(1))
+    await runner.requeue(item, same_copy=True)
+    assert decode_pick(store.get_item(item.id).pick) == make_result(1)
+    await runner.requeue(item, forced=True)
+    assert store.get_item(item.id).pick == ""
