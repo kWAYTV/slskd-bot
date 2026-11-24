@@ -78,8 +78,8 @@ def test_delivered_item_has_no_library_buttons(store):
     [
         (ItemStatus.owned, "Already in your library", ["Download anyway"]),
         (ItemStatus.review, "No lossless copy. Best there is:", ["Choose a copy", "Skip"]),
-        (ItemStatus.no_match, "Nothing found on Soulseek", ["Search again"]),
-        (ItemStatus.failed, "Could not get it", ["Retry", "Choose a copy"]),
+        (ItemStatus.no_match, "Nothing found on Soulseek", ["Search again", "Skip"]),
+        (ItemStatus.failed, "Could not get it", ["Retry", "Choose a copy", "Skip"]),
         (ItemStatus.removed, "Removed from the library", ["Download again"]),
         (ItemStatus.cancelled, "Cancelled", ["Download again"]),
     ],

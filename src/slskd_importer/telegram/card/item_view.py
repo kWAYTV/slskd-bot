@@ -78,9 +78,13 @@ def _keyboard(t: Translate, batch: Batch, item: Item, *, alone: bool) -> InlineK
     elif status == ItemStatus.review:
         row += [button("btn_choose", actions.PICKER), button("btn_skip", actions.SKIP)]
     elif status == ItemStatus.no_match:
-        row.append(button("btn_search_again", actions.RETRY))
+        row += [button("btn_search_again", actions.RETRY), button("btn_skip", actions.SKIP)]
     elif status == ItemStatus.failed:
-        row += [button("btn_retry", actions.RETRY), button("btn_choose", actions.PICKER)]
+        row += [
+            button("btn_retry", actions.RETRY),
+            button("btn_choose", actions.PICKER),
+            button("btn_skip", actions.SKIP),
+        ]
     elif status in (ItemStatus.removed, ItemStatus.cancelled):
         row.append(button("btn_again", actions.AGAIN))
     elif alone:
