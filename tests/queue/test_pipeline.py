@@ -223,11 +223,13 @@ async def test_replaced_file_is_removed_only_once_the_new_copy_is_ready(store):
     item = store.items(batch.id)[0]
     store.update_item(item.id, pick=encode_pick(make_result(1)), saved_name="old.flac", history_id=3)
     with patch(f"{PIPELINE}.fetch", AsyncMock(return_value=Landed(error="timed out"))):
-        failed = await run(pipeline, store, batch)
-    assert failed.status == ItemStatus.failed
+        kept = await run(pipeline, store, batch)
+    # The replacement never arrived: the saved file is untouched and the track is still saved.
+    assert kept.status == ItemStatus.done and kept.detail.startswith("kept: the other copy failed")
+    assert kept.saved_name == "old.flac" and kept.pick == ""
     pipeline.shelf.remove.assert_not_called()
-    assert failed.pick  # a failed pick is kept, so Retry fetches the same copy
 
+    store.update_item(item.id, pick=encode_pick(make_result(1)))
     with (
         patch(f"{PIPELINE}.fetch", landed()),
         patch(f"{PIPELINE}.discard", AsyncMock()),
@@ -290,3 +292,13 @@ def test_pick_round_trip():
     copy = make_result(2)
     assert decode_pick(encode_pick(copy)) == copy
     assert decode_pick("") is None and decode_pick("not json") is None
+
+
+async def test_a_failed_pick_is_kept_for_retry(store):
+    pipeline = make_pipeline(store)
+    batch = make_batch(store)
+    item = store.items(batch.id)[0]
+    store.update_item(item.id, pick=encode_pick(make_result(1)))
+    with patch(f"{PIPELINE}.fetch", AsyncMock(return_value=Landed(error="timed out"))):
+        failed = await run(pipeline, store, batch)
+    assert failed.status == ItemStatus.failed and decode_pick(failed.pick) == make_result(1)

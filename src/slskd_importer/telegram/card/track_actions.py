@@ -1,4 +1,4 @@
-"""Card buttons that act on one track: choose a copy, undo, send the file, fetch again.
+"""Card buttons that act on one track: choose a copy, keep, undo, send the file, fetch again, skip.
 
 Functions take the ``MusicBot`` instance as ``self``; ``card.callbacks`` dispatches to them.
 """
@@ -8,8 +8,9 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from slskd_importer.queue.batch import RETRYABLE_STATUSES, SAVED_STATUSES, Batch, Item, ItemStatus
+from slskd_importer.queue.batch import OPEN_STATUSES, RETRYABLE_STATUSES, SAVED_STATUSES, Batch, Item, ItemStatus
 from slskd_importer.telegram.card import actions, board
+from slskd_importer.telegram.card.copy_token import copy_at
 from slskd_importer.telegram.card.status import ATTENTION
 
 logger = logging.getLogger(__name__)
@@ -30,30 +31,48 @@ async def open_picker(self, query, batch: Batch, item: Item, page: int) -> None:
         self.cards.focus(batch.id, board.ITEM, item.id)
 
 
-async def get_copy(self, query, batch: Batch, item: Item, index: int) -> None:
+async def done_with(self, batch: Batch, item: Item) -> None:
+    """The requester has dealt with *item*: show the next waiting track when going through them, else go back."""
+    if self.cards.view_of(batch.id).tour:
+        following = await asyncio.to_thread(self.queue_store.next_waiting, batch.id, item.position)
+        if following is not None:
+            await open_picker(self, None, batch, following, 0)
+            return
+    self.cards.leave(batch.id)
+
+
+async def get_copy(self, query, batch: Batch, item: Item, number: int) -> None:
     """Fetch the copy the requester chose.
 
     A track already saved keeps its file until the chosen copy has landed and passed its checks;
     the pipeline then replaces it.
     """
     copies = self.runner.pipeline.finder.remembered(item.id)
-    if copies is None or index >= len(copies.ranked) or item.status in (ItemStatus.pending, ItemStatus.working):
+    copy = copy_at(copies.ranked, number) if copies is not None else None
+    if copy is None or item.status in OPEN_STATUSES or self.cards.just_opened(batch.id):
         return
     if batch.to_library and not self._can_save_library(query.from_user.id):
         return
-    logger.info("chat=%s item %d: picked #%d %s", batch.chat_id, item.id, index + 1, copies.ranked[index].basename)
-    self.cards.leave(batch.id)  # picked: back to where the track was opened from
-    await self.runner.requeue(item, forced=True, pick=copies.ranked[index])
+    logger.info("chat=%s item %d: picked %s from %s", batch.chat_id, item.id, copy.basename, copy.username)
+    await self.runner.requeue(item, forced=True, pick=copy)
+    await done_with(self, batch, item)
+
+
+async def keep(self, query, batch: Batch, item: Item, _number: int) -> None:
+    """Keep a saved copy although the audio check doubts it."""
+    if item.status == ItemStatus.doubt:
+        await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.done)
+        self.cards.leave(batch.id)
 
 
 async def undo_save(self, query, batch: Batch, item: Item, _number: int) -> None:
     """Take a saved track back out of the library."""
     if item.status not in SAVED_STATUSES or not batch.to_library or not self._can_save_library(query.from_user.id):
         return
-    self.cards.leave(batch.id)
     await asyncio.to_thread(self.shelf.remove, item.saved_name, item.history_id)
     await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.removed)
     logger.info("chat=%s item %d: removed %s from the library", batch.chat_id, item.id, item.saved_name)
+    self.cards.leave(batch.id)
 
 
 async def send_file(self, query, batch: Batch, item: Item, _number: int) -> None:
@@ -64,37 +83,31 @@ async def send_file(self, query, batch: Batch, item: Item, _number: int) -> None
 async def fetch_again(self, query, batch: Batch, item: Item, _number: int) -> None:
     """Fetch a track that is owned, removed or cancelled, skipping the owned check."""
     if item.status in (ItemStatus.owned, ItemStatus.removed, ItemStatus.cancelled):
-        self.cards.leave(batch.id)
         await self.runner.requeue(item, forced=True)
+        self.cards.leave(batch.id)
 
 
 async def retry(self, query, batch: Batch, item: Item, _number: int) -> None:
-    if item.status in (ItemStatus.failed, ItemStatus.no_match, ItemStatus.review):
-        self.cards.leave(batch.id)
+    """Run a track again: the same copy when one was picked, a new search otherwise."""
+    if item.status in (*RETRYABLE_STATUSES, ItemStatus.review):
         await self.runner.requeue(item, forced=bool(item.forced), same_copy=True)
+        self.cards.leave(batch.id)
 
 
 async def skip(self, query, batch: Batch, item: Item, _number: int) -> None:
-    """Leave a track that needs attention (lossy only, not found, failed); it can be fetched again later."""
-    if item.status in (*ATTENTION, *RETRYABLE_STATUSES):
-        self.cards.leave(batch.id)
+    """Let a track go (waiting for a pick, lossy only, not found, failed); it can be fetched again later."""
+    if item.status in (*ATTENTION, *RETRYABLE_STATUSES) and item.status != ItemStatus.doubt:
         await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.cancelled)
-
-
-async def keep(self, query, batch: Batch, item: Item, _number: int) -> None:
-    """Keep a saved copy although the audio check doubts it."""
-    if item.status == ItemStatus.doubt:
-        self.cards.leave(batch.id)
-        await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.done)
+        await done_with(self, batch, item)
 
 
 TRACK_ACTIONS = {
     actions.PICKER: open_picker,
     actions.GET: get_copy,
+    actions.KEEP: keep,
     actions.UNDO: undo_save,
     actions.SEND: send_file,
     actions.AGAIN: fetch_again,
     actions.RETRY: retry,
     actions.SKIP: skip,
-    actions.KEEP: keep,
 }

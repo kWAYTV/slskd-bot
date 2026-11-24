@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
@@ -12,7 +13,7 @@ from telegram import Bot
 from telegram.constants import ParseMode
 from telegram.error import RetryAfter
 
-from slskd_importer.queue.batch import SAVED_STATUSES, Batch, BatchStatus, Item, ItemStatus
+from slskd_importer.queue.batch import SAVED_STATUSES, WAITING_STATUSES, Batch, BatchStatus, Item, ItemStatus
 from slskd_importer.queue.runner import QueueRunner
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card, render_item
@@ -27,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 # Telegram allows about one edit a second per chat; several cards may share a chat.
 REDRAW_INTERVAL_SECS = 2.5
+# Taps on copy buttons are ignored this long after another track came on screen.
+TAP_GUARD_SECS = 0.6
 
 SUMMARY = "summary"
 LIST = "list"
@@ -43,6 +46,8 @@ class View:
     page: int = 0
     back: str = SUMMARY
     back_page: int = 0
+    # Going through the tracks waiting for a pick: after each pick the next one's picker opens.
+    tour: bool = False
 
 
 class CardBoard:
@@ -57,24 +62,46 @@ class CardBoard:
         self._redraws: dict[int, asyncio.Task] = {}
         self._dirty: set[int] = set()
         self._reacted: set[int] = set()
+        self._opened_at: dict[int, float] = {}
 
     def show(self, batch_id: int, view: View) -> None:
         self._views[batch_id] = view
 
-    def focus(self, batch_id: int, kind: str, item_id: int, page: int = 0) -> None:
-        """Show a track's item or picker view, remembering the summary or list page it was opened from."""
-        current = self._views.get(batch_id, View())
+    def view_of(self, batch_id: int) -> View:
+        return self._views.get(batch_id, View())
+
+    def focus(self, batch_id: int, kind: str, item_id: int, page: int = 0, *, tour: bool | None = None) -> None:
+        """Show a track's item or picker view, remembering the summary or list page it was opened from.
+
+        *tour* starts (True) or ends (False) going through the waiting tracks; None keeps it as it is
+        while moving between a track's views, and ends it when the track is opened from elsewhere.
+        """
+        current = self.view_of(batch_id)
         if current.kind == LIST:
-            back, back_page = LIST, current.page
+            back, back_page, touring = LIST, current.page, False
         elif current.kind == SUMMARY:
-            back, back_page = SUMMARY, 0
+            back, back_page, touring = SUMMARY, 0, False
         else:
-            back, back_page = current.back, current.back_page
-        self._views[batch_id] = View(kind, item_id, page, back, back_page)
+            back, back_page, touring = current.back, current.back_page, current.tour
+        if current.item_id != item_id or current.kind not in (ITEM, PICKER):
+            self._opened_at[batch_id] = time.monotonic()
+        self._views[batch_id] = View(kind, item_id, page, back, back_page, touring if tour is None else tour)
+
+    def just_opened(self, batch_id: int) -> bool:
+        """True for a moment after another track came on screen.
+
+        A second tap of a double tap lands where the first one was, which is now a button of
+        the next track; such a tap must not pick a copy.
+        """
+        return time.monotonic() - self._opened_at.get(batch_id, 0.0) < TAP_GUARD_SECS
+
+    def forget_drawn(self, batch_id: int) -> None:
+        """Make the next draw edit the message even if the content did not change (the message is new)."""
+        self._drawn.pop(batch_id, None)
 
     def leave(self, batch_id: int) -> None:
         """Go back to where the current track was opened from: done with it."""
-        current = self._views.get(batch_id, View())
+        current = self.view_of(batch_id)
         self._views[batch_id] = View(current.back, page=current.back_page)
 
     @staticmethod
@@ -130,6 +157,7 @@ class CardBoard:
                 self._dirty.add(batch_id)
                 wait = exc.retry_after
                 await asyncio.sleep(wait.total_seconds() if hasattr(wait, "total_seconds") else float(wait))
+                self.request(batch_id)  # a draw asked for by a tap has no redraw loop behind it
         await self._react_when_finished(batch, items)
 
     def compose(self, batch: Batch, items: list[Item]) -> Card:
@@ -143,7 +171,8 @@ class CardBoard:
             # A track that only waits for a pick has no item view worth returning to.
             waiting = item.status == ItemStatus.choose and len(items) > 1
             back = self._origin(batch, view) if waiting else ""
-            return render_picker(t, batch, item, copies, view.page, self._page_size, back=back)
+            remaining = sum(1 for other in items if other.status == ItemStatus.choose) if view.tour else 0
+            return render_picker(t, batch, item, copies, view.page, self._page_size, back=back, remaining=remaining)
         if len(items) == 1:
             only = items[0]
             copies = self._runner.pipeline.finder.remembered(only.id)
@@ -165,6 +194,6 @@ class CardBoard:
             return
         self._reacted.add(batch.id)
         got = any(item.status in (*SAVED_STATUSES, ItemStatus.owned) for item in items)
-        if not got and any(item.status in (ItemStatus.choose, ItemStatus.review) for item in items):
+        if not got and any(item.status in WAITING_STATUSES for item in items):
             return  # still waiting for the requester: the request keeps its 👀
         await react(self.telegram, batch.chat_id, batch.query_message_id, REACTION_SAVED if got else REACTION_NOTHING)

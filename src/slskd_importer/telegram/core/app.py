@@ -132,6 +132,7 @@ class MusicBot:
     cmd_lang = preferences.cmd_lang
     cmd_undo = undo.cmd_undo
     cmd_status = status.cmd_status
+    _handle_bring_card = status.handle_bring_card
     cmd_history = history.cmd_history
     cmd_stats = stats.cmd_stats
     cmd_cancel = cancel.cmd_cancel

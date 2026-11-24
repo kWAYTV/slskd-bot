@@ -42,8 +42,9 @@ async def test_status_lists_only_this_chats_batches(bot):
     update = _make_update()
     await bot.cmd_status(update, _make_context())
     text = update.message.reply_text.call_args.args[0]
-    assert text.count("•") == 1 and "My\\_Set  ·  1 / 2" in text
-    assert update.message.reply_text.call_args.kwargs["reply_markup"] is not None
+    assert text.count("•") == 1 and "2 tracks  ·  1 / 2" in text
+    markup = update.message.reply_text.call_args.kwargs["reply_markup"]
+    assert [row[0].text for row in markup.inline_keyboard] == ["📍 2 tracks", "Cancel all"]
 
 
 async def test_cancel_command(bot):
@@ -147,3 +148,27 @@ async def test_check_when_everything_matches(bot):
     update = _make_update()
     await bot.cmd_check(update, _make_context())
     assert update.message.reply_text.call_args.args[0] == "All 0 recently saved tracks match what you asked for."
+
+
+async def test_status_lists_batches_waiting_for_a_pick_and_brings_their_card_down(bot):
+    batch = bot.queue_store.create_batch(67890, 12345, "Discovery", "album", [Entry(query="a"), Entry(query="b")])
+    bot.queue_store.set_message(batch.id, 900)
+    for item in bot.queue_store.items(batch.id):
+        bot.queue_store.update_item(item.id, status=ItemStatus.choose)
+    bot.queue_store.close_if_finished(batch.id)
+
+    update = _make_update()
+    await bot.cmd_status(update, _make_context())
+    text = update.message.reply_text.call_args.args[0]
+    assert "• Discovery  ·  👉 2 to pick" in text
+    markup = update.message.reply_text.call_args.kwargs["reply_markup"]
+    assert [row[0].text for row in markup.inline_keyboard] == ["📍 Discovery"]  # nothing running: no Cancel all
+
+    tap = _make_callback_update(data=f"sb:{batch.id}")
+    context = _make_context()
+    context.bot.send_message.return_value.message_id = 950
+    await bot.handle_callback(tap, context)
+    assert bot.queue_store.get_batch(batch.id).message_id == 950
+    old = context.bot.edit_message_text.call_args
+    assert old.args[0] == "This card moved further down." and old.kwargs["message_id"] == 900
+    assert bot.telegram.edit_message_text.call_args.kwargs["message_id"] == 950

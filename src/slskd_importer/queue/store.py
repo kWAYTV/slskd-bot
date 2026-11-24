@@ -76,6 +76,38 @@ class QueueRepository:
         with self._db.locked() as conn:
             return [Batch(**dict(row)) for row in conn.execute(sql + " ORDER BY id", params).fetchall()]
 
+    def open_batches(self, chat_id: int, limit: int = 10) -> list[Batch]:
+        """The chat's batches that are still working or have tracks waiting for a decision, newest first."""
+        with self._db.locked() as conn:
+            rows = conn.execute(
+                "SELECT * FROM queue_batches b WHERE b.chat_id = ? AND (b.status = 'active' OR EXISTS ("
+                "SELECT 1 FROM queue_items i WHERE i.batch_id = b.id AND i.status IN ('choose', 'review', 'doubt'))) "
+                "ORDER BY b.id DESC LIMIT ?",
+                (chat_id, limit),
+            )
+            return [Batch(**dict(row)) for row in rows.fetchall()]
+
+    def next_waiting(self, batch_id: int, after_position: int = 0) -> Item | None:
+        """The next track waiting for a pick, after *after_position*, wrapping round to the first one."""
+        with self._db.locked() as conn:
+            row = conn.execute(
+                "SELECT * FROM queue_items WHERE batch_id = ? AND status = 'choose' "
+                "ORDER BY (position <= ?), position LIMIT 1",
+                (batch_id, after_position),
+            ).fetchone()
+            return Item(**dict(row)) if row else None
+
+    def skip_waiting(self, batch_id: int) -> int:
+        """Let go of every track still waiting for a pick; returns how many."""
+        with self._db.locked() as conn:
+            cursor = conn.execute(
+                "UPDATE queue_items SET status = 'cancelled', updated_at = datetime('now') "
+                "WHERE batch_id = ? AND status IN ('choose', 'review')",
+                (batch_id,),
+            )
+            conn.commit()
+            return cursor.rowcount
+
     def recent_batches(self, chat_id: int, limit: int) -> list[Batch]:
         """The chat's latest batches, newest first, whatever their status."""
         with self._db.locked() as conn:

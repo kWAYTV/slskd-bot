@@ -9,8 +9,8 @@ from slskd_importer.queue.progress import Progress
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.item_view import Card
 from slskd_importer.telegram.card.status import ATTENTION, Translate, item_icon, open_action
+from slskd_importer.telegram.card.summary_view import batch_title
 from slskd_importer.telegram.ui.formatting import clip
-from slskd_importer.telegram.ui.markdown import bold
 
 PAGE_SIZE = 8
 
@@ -32,7 +32,7 @@ def render_list(t: Translate, batch: Batch, items: list[Item], progress: dict[in
     page = max(0, min(page, pages - 1))
     shown = ordered[page * PAGE_SIZE : (page + 1) * PAGE_SIZE]
 
-    text = f"{bold(batch.name)}\n{t('list_page', page=page + 1, pages=pages, total=len(items))}"
+    text = f"{batch_title(t, batch, len(items))}\n{t('list_page', page=page + 1, pages=pages, total=len(items))}"
     rows = [
         [
             InlineKeyboardButton(

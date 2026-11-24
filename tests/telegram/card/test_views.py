@@ -9,6 +9,7 @@ from slskd_importer.queue.copies import Copies
 from slskd_importer.queue.progress import DOWNLOADING, SEARCHING, Progress
 from slskd_importer.sources.tracklist import Entry
 from slskd_importer.telegram.card import actions
+from slskd_importer.telegram.card.copy_token import copy_at, copy_number
 from slskd_importer.telegram.card.item_view import render_item
 from slskd_importer.telegram.card.list_view import PAGE_SIZE, render_list
 from slskd_importer.telegram.card.picker_view import render_picker
@@ -113,7 +114,7 @@ def test_summary_counts_progress_and_attention(store):
     store.update_item(items[4].id, status=ItemStatus.working)
     items = store.items(batch.id)
     text, markup = render_summary(t, batch, items, {items[4].id: Progress(DOWNLOADING, 50.0)})
-    assert text.startswith("*Test batch*\n")
+    assert text.startswith("*6 tracks*\n")
     assert "4 / 6" in text
     assert (
         "✅ 1 saved" in text
@@ -163,7 +164,7 @@ def test_picker_states(store):
     text, markup = render_picker(t, batch, item, copies, 0, 5)
     assert "7 copies — choose one" in text and "*#1*  🟢  `2:42`" in text and "[FLAC]" in text
     assert labels(markup) == ["#1", "#2", "#3", "#4", "#5", "Next", "« Back"]
-    assert callbacks(markup)[0] == actions.encode(actions.GET, batch.id, item.id, 0)
+    assert callbacks(markup)[0] == actions.encode(actions.GET, batch.id, item.id, copy_number(0, make_result(0)))
     _, second = render_picker(t, batch, item, copies, 1, 5)
     assert labels(second) == ["#6", "#7", "Previous", "« Back"]
     lossy, _ = render_picker(t, batch, item, Copies([make_result(0, "mp3")], lossy=True), 0, 5)
@@ -204,4 +205,54 @@ def test_tracks_nothing_was_found_for_are_counted_but_ask_for_nothing(store):
     store.close_if_finished(batch.id)
     text, markup = render_summary(t, store.get_batch(batch.id), store.items(batch.id), {})
     assert "❌ 1 not downloaded" in text
-    assert labels(markup) == ["👉  Nancy Sinatra — Song 1", "All tracks", "Retry 1"]
+    assert labels(markup) == ["👉 Pick copies (1)", "👉  Nancy Sinatra — Song 1", "All tracks", "Retry 1"]
+
+
+def test_copy_numbers_point_at_one_copy_only():
+    ranked = [make_result(0), make_result(1)]
+    assert copy_at(ranked, copy_number(1, ranked[1])) is ranked[1]
+    assert copy_at(ranked, copy_number(1, make_result(5))) is None  # another copy sits there now
+    assert copy_at(ranked, copy_number(7, ranked[1])) is None  # past the end of the list
+    assert copy_at(ranked, 1) is None  # a bare index from an old card
+
+
+def test_picker_shows_length_queue_and_a_copy_that_failed_before(store):
+    from slskd_importer.queue.pick import encode_pick
+    from slskd_importer.soulseek.result import SearchResult
+
+    batch, item = one_item(store)
+    busy = SearchResult(username="u", filename="\\Music\\Nancy Sinatra - Bang Bang.flac", size=1, queue_length=12)
+    store.update_item(item.id, status=ItemStatus.failed, pick=encode_pick(busy))
+    text, markup = render_picker(t, batch, store.get_item(item.id), Copies([busy]), 0, 5, remaining=4)
+    assert "*Nancy Sinatra — Bang Bang*  ·  2:42" in text
+    assert "👉 Left to pick: 4" in text and "🔴 queue 12" in text and "✗ this copy failed before" in text
+    assert labels(markup) == ["#1", "« Back"]  # a failed track has Skip on its own view, not here
+
+
+def test_summary_offers_to_pick_through_and_to_skip_the_waiting(store):
+    batch, items = many(store, 4)
+    for item in items[:3]:
+        store.update_item(item.id, status=ItemStatus.choose)
+    store.update_item(items[3].id, status=ItemStatus.doubt, saved_name="x.flac")
+    store.close_if_finished(batch.id)
+    text, markup = render_summary(t, store.get_batch(batch.id), store.items(batch.id), {})
+    assert "👉 Waiting for your pick: 3" in text
+    assert "👉 3 to pick  ·  👂 1 to review" in text
+    assert labels(markup) == [
+        "👉 Pick copies (3)",
+        "⚠️  Nancy Sinatra — Song 3",
+        "👉  Nancy Sinatra — Song 0",
+        "👉  Nancy Sinatra — Song 1",
+        "👉  Nancy Sinatra — Song 2",
+        "All tracks",
+        "Skip the 3 waiting",
+    ]
+
+
+def test_summary_headline_names_tracks_left_to_review(store):
+    batch, items = many(store, 2)
+    store.update_item(items[0].id, status=ItemStatus.doubt, saved_name="x.flac")
+    store.update_item(items[1].id, status=ItemStatus.done)
+    store.close_if_finished(batch.id)
+    text, _ = render_summary(t, store.get_batch(batch.id), store.items(batch.id), {})
+    assert "👂 To review: 1" in text and "Done" not in text
