@@ -312,3 +312,37 @@ async def test_track_waiting_for_a_pick_in_a_list_opens_on_its_copies(bot):
     assert markup.inline_keyboard[0][0].callback_data == actions.encode(actions.PICKER, batch.id, items[1].id)
     await press(bot, actions.PICKER, batch, items[1].id)
     assert "2 copies — choose one" in drawn_text(bot)
+
+
+async def test_doubted_copy_shows_on_the_summary_and_can_be_kept(bot):
+    batch, items = queue(bot, 3)
+    bot.queue_store.update_item(
+        items[0].id, status=ItemStatus.doubt, saved_name="x.flac", quality="FLAC", detail="verdict:SUSPICIOUS:17.8"
+    )
+    await bot.cards.draw(batch.id)
+    assert "👂 1 to review" in drawn_text(bot)
+    markup = bot.telegram.edit_message_text.call_args.kwargs["reply_markup"]
+    assert markup.inline_keyboard[0][0].text == "⚠️  Nancy Sinatra — Song 0"
+
+    await press(bot, actions.ITEM, batch, items[0].id)
+    text = drawn_text(bot)
+    assert "Likely transcode · cutoff 17.8 kHz" in text and "Keep it, or pick another?" in text
+    markup = bot.telegram.edit_message_text.call_args.kwargs["reply_markup"]
+    assert [button.text for button in markup.inline_keyboard[0]] == ["Keep", "Other copies", "Undo"]
+
+    await press(bot, actions.KEEP, batch, items[0].id)
+    assert bot.queue_store.get_item(items[0].id).status == ItemStatus.done
+    assert "/ 3" in drawn_text(bot)  # back on the summary
+
+
+async def test_doubted_copy_can_be_undone_or_replaced(bot):
+    batch, items = queue(bot, 2)
+    for item in items:
+        bot.queue_store.update_item(item.id, status=ItemStatus.doubt, saved_name="x.flac", history_id=3)
+    bot.runner.pipeline.finder._found[items[1].id] = Copies([make_result(0)])
+    with patch.object(bot.shelf, "remove", MagicMock(return_value=True)) as remove:
+        await press(bot, actions.UNDO, batch, items[0].id)
+        await press(bot, actions.GET, batch, items[1].id, 0)
+    remove.assert_called_once_with("x.flac", 3)
+    assert bot.queue_store.get_item(items[0].id).status == ItemStatus.removed
+    assert bot.runner.pipeline.replaces[items[1].id] == ("x.flac", 3)

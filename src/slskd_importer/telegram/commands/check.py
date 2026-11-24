@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes
 from slskd_importer.catalog.lookup import has_separator, track_from_text
 from slskd_importer.catalog.names import normalize, same_artist, same_title
 from slskd_importer.catalog.track import TrackInfo
-from slskd_importer.queue.batch import Item, ItemStatus
+from slskd_importer.queue.batch import SAVED_STATUSES, Item, ItemStatus
 from slskd_importer.queue.confidence import names_the_song
 from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.ui.editing import safe_query_edit
@@ -74,7 +74,7 @@ async def handle_check_undo(self, update: Update, context: ContextTypes.DEFAULT_
         return
     item = await asyncio.to_thread(self.queue_store.get_item, item_id)
     batch = await asyncio.to_thread(self.queue_store.get_batch_for_chat, item.batch_id, chat_id) if item else None
-    if batch is not None and item.status == ItemStatus.done and batch.to_library:
+    if batch is not None and item.status in SAVED_STATUSES and batch.to_library:
         await asyncio.to_thread(self.shelf.remove, item.saved_name, item.history_id)
         await asyncio.to_thread(self.queue_store.update_item, item.id, status=ItemStatus.removed)
         logger.info("chat=%s /check removed %s", chat_id, item.saved_name)
@@ -116,7 +116,7 @@ def _review_recent(self, chat_id: int) -> tuple[int, list[tuple[Item, str]]]:
     doubtful: list[tuple[Item, str]] = []
     for batch in self.queue_store.recent_batches(chat_id, RECENT_BATCHES):
         for item in self.queue_store.items(batch.id):
-            if item.status != ItemStatus.done or not item.saved_name:
+            if item.status not in SAVED_STATUSES or not item.saved_name:
                 continue
             saved += 1
             record = self.history_repo.get_for_chat(item.history_id, chat_id) if item.history_id else None
