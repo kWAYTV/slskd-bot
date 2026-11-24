@@ -17,6 +17,7 @@ from slskd_importer.catalog.musicbrainz import MusicBrainzClient
 from slskd_importer.catalog.spotify import SpotifyResolver
 from slskd_importer.history.store import HistoryRepository
 from slskd_importer.library.files import FileProcessor
+from slskd_importer.library.index import LibraryIndex
 from slskd_importer.queue.copies import CopyFinder
 from slskd_importer.queue.pipeline import ItemPipeline
 from slskd_importer.queue.runner import QueueRunner
@@ -66,7 +67,9 @@ class MusicBot:
         self._locales: dict[int, str] = self.prefs_repo.load_all_locales()
 
         self.queue_store = QueueRepository(self.db)
-        self.shelf = LibraryShelf(self.processor, self.spotify, self.history_repo)
+        # Raw downloads are not part of the collection, even when their folder sits inside it.
+        collection = LibraryIndex(config.library_sweep_dir, exclude=(config.download_dir,))
+        self.shelf = LibraryShelf(self.processor, self.spotify, self.history_repo, collection)
         pipeline = ItemPipeline(
             config=config,
             spotify=self.spotify,

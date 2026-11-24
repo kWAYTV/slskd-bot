@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Sources beyond Spotify: YouTube / YouTube Music (videos, playlists, albums, DJ-mix chapters), SoundCloud, Bandcamp (via `yt-dlp`), 1001Tracklists and MixesDB pages, and pasted tracklists (numbering, timestamps and `[Label]` tags stripped). Non-Spotify entries are matched against the catalog when processed
 - `/get` (alias `/import`) for people who prefer a command
+- The already-owned check covers the whole collection (`LIBRARY_SWEEP_DIR`), not only the save folder: any file named `Artist - Title` in any subfolder counts, ignoring case, accents, punctuation, track numbers and an album in the middle
 - `LIBRARY_SWEEP_DIR`: the sweep now walks a whole folder tree (default `OUTPUT_DIR`), so it can cover songs the bot did not save. A better copy replaces the song in its own folder. Changing the folder makes the next sweep measure every file again
 
 ### Removed

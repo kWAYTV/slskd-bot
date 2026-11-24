@@ -121,6 +121,19 @@ async def test_place_fails_for_a_missing_source(shelf):
     assert await library.place(make_track(), make_result(), str(tmp_path / "nope.flac"), 1) is None
 
 
+def test_owned_anywhere_in_the_collection(tmp_path):
+    from slskd_importer.library.index import LibraryIndex
+
+    other = tmp_path / "music" / "rekordbox" / "Nancy Sinatra - Bang Bang.mp3"
+    other.parent.mkdir(parents=True)
+    other.write_bytes(b"audio")
+    processor = FileProcessor(str(tmp_path / "downloads"), str(tmp_path / "music" / "soulseek"))
+    history = HistoryRepository(Database(str(tmp_path / "db" / "h.db")))
+    library = LibraryShelf(processor, MagicMock(), history, LibraryIndex(str(tmp_path / "music")))
+    assert library.owned_as(make_track()) == "rekordbox/Nancy Sinatra - Bang Bang.mp3"
+    assert library.owned_as(make_track("Something Else")) is None
+
+
 def test_record_delivery(shelf):
     library, _ = shelf
     assert library.record(make_track(), make_result(), "delivered", 67890) > 0
