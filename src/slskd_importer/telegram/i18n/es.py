@@ -6,7 +6,7 @@ STRINGS: dict[str, str] = {
     "auth_library": "Esto requiere acceso de biblioteca. Aun así puedes enviar canciones y recibir los archivos aquí.",
     "auth_library_undo": "Eliminar archivos de la biblioteca requiere acceso de biblioteca.",
     # Welcome and profile
-    "welcome": "*Envíame canciones* y las consigo de Soulseek — primero sin pérdida (FLAC, WAV, AIFF).\n\nUna por línea, tantas como quieras:\n`Nancy Sinatra - Bang Bang`\n`daft punk one more time`\n\nO pega enlaces: Spotify, YouTube, SoundCloud, Bandcamp, una página de 1001Tracklists o una lista de canciones copiada de cualquier sitio.\n\nCada mensaje recibe una tarjeta que se actualiza sobre la marcha. Una canción: tú eliges la copia. Una lista, playlist o tracklist: se elige la mejor copia de cada una, se comprueba y se guarda sin preguntar. Toca una pista para elegir otra copia, deshacerla o recibir el archivo.\n\n/status — qué hay en la cola\n/history — guardados recientes, con deshacer\n/check — comprueba que lo último descargado es lo que pediste\n/stats — totales\n/sweep — buscar mejores copias de lo que tienes\n/lang — idioma\n/cancel — detener todo",
+    "welcome": "*Envíame canciones* y las consigo de Soulseek — primero sin pérdida (FLAC, WAV, AIFF).\n\nUna por línea, tantas como quieras:\n`Nancy Sinatra - Bang Bang`\n`daft punk one more time`\n\nO pega enlaces: Spotify, YouTube, SoundCloud, Bandcamp, una página de 1001Tracklists o una lista de canciones copiada de cualquier sitio.\n\nCada mensaje recibe una tarjeta que se actualiza sobre la marcha. Tú eliges la copia de cada pista: toca una pista, mira las copias encontradas y elige. No se descarga nada hasta que lo hagas. Toca una pista para elegir otra copia, deshacerla o recibir el archivo.\n\n/status — qué hay en la cola\n/history — guardados recientes, con deshacer\n/check — comprueba que lo último descargado es lo que pediste\n/stats — totales\n/sweep — buscar mejores copias de lo que tienes\n/lang — idioma\n/cancel — detener todo",
     "bot_description": "Envía nombres de canciones o enlaces (Spotify, YouTube, SoundCloud, Bandcamp, tracklists) y consíguelas de Soulseek en la mejor calidad posible — FLAC primero. Envía tantas como quieras; cada mensaje recibe una tarjeta en vivo.",
     "bot_short_description": "Consigue canciones de Soulseek en la mejor calidad: nombres, enlaces, listas o tracklists enteros.",
     "lang_pick": "Elige tu idioma:",
@@ -104,6 +104,7 @@ STRINGS: dict[str, str] = {
     "picker_searching": "Buscando en Soulseek",
     "picker_choose": "{total} copias — elige una",
     "picker_lossy": "Ninguna copia sin pérdida — {total} con pérdida",
+    "picker_unsure": "❓ = el nombre del archivo no menciona esta canción",
     "oversize_note": "Copia OGG: el original supera el límite de {limit} MB de este bot.",
     # Buttons
     "btn_cancel": "Cancelar",

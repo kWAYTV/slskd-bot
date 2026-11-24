@@ -22,14 +22,14 @@ def store(tmp_path):
     return make_store(tmp_path)
 
 
-def make_pipeline(store, ranked=None, lossy=False, owned=None):
+def make_pipeline(store, ranked=None, lossy=False, owned=None, auto_pick=True):
     finder = MagicMock()
     finder.find = AsyncMock(return_value=Copies(ranked if ranked is not None else [make_result()], lossy))
     shelf = MagicMock()
     shelf.owned_as.return_value = owned
     shelf.place = AsyncMock(return_value=Placed("Nancy Sinatra - Bang Bang.flac", 7))
     return ItemPipeline(
-        config=SimpleNamespace(download_timeout_secs=5),
+        config=SimpleNamespace(download_timeout_secs=5, auto_pick=auto_pick),
         spotify=MagicMock(),
         slskd=MagicMock(),
         processor=MagicMock(),
@@ -287,3 +287,11 @@ async def test_only_copies_naming_the_song_are_fetched_unasked(store):
         item = await run(pipeline, store, make_batch(store))
     assert item.status == ItemStatus.done
     assert fetch.await_args.args[2].username == "user4"
+
+
+async def test_without_auto_pick_every_list_track_waits_for_a_pick(store):
+    pipeline = make_pipeline(store, auto_pick=False)
+    with patch(f"{PIPELINE}.fetch", landed()) as fetch:
+        item = await run(pipeline, store, make_batch(store))
+    assert item.status == ItemStatus.choose
+    fetch.assert_not_called()

@@ -5,6 +5,7 @@ from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from slskd_importer.queue.batch import Batch, Item, ItemStatus
+from slskd_importer.queue.confidence import names_the_song
 from slskd_importer.queue.copies import Copies
 from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.card import actions
@@ -33,7 +34,10 @@ def render_picker(
     shown = list(enumerate(ranked[start : start + page_size], start=start))
 
     lines = [head, t("picker_lossy" if copies.lossy else "picker_choose", total=len(ranked)), ""]
-    lines += [_copy_line(index, copy) for index, copy in shown]
+    track = item.track
+    lines += [_copy_line(index, copy, sure=track is None or names_the_song(track, copy)) for index, copy in shown]
+    if track is not None and not all(names_the_song(track, copy) for _, copy in shown):
+        lines += ["", t("picker_unsure")]
 
     numbers = [
         InlineKeyboardButton(f"#{index + 1}", callback_data=actions.encode(actions.GET, batch.id, item.id, index))
@@ -52,8 +56,9 @@ def _page_button(label: str, batch: Batch, item: Item, page: int) -> InlineKeybo
     return InlineKeyboardButton(label, callback_data=actions.encode(actions.PICKER, batch.id, item.id, page))
 
 
-def _copy_line(index: int, copy: SearchResult) -> str:
-    slot = "🟢" if copy.has_free_slot else "🔴"
+def _copy_line(index: int, copy: SearchResult, *, sure: bool) -> str:
+    """*sure*: the copy's path names the song; the others are marked so a look-alike is not picked by mistake."""
+    slot = ("🟢" if copy.has_free_slot else "🔴") + ("" if sure else " ❓")
     fmt = f"  [{copy.extension.upper()}]" if copy.extension else ""
     line = (
         f"*#{index + 1}*  {slot}  `{copy.duration_display}`  ·  {copy.quality_display}{fmt}  ·  {copy.size_mb:.0f} MB"

@@ -45,6 +45,8 @@ class Config:
         self.search_timeout_secs = int(os.getenv("SEARCH_TIMEOUT_SECS", "30"))
         self.download_timeout_secs = int(os.getenv("DOWNLOAD_TIMEOUT_SECS", "600"))
         self.max_concurrent_downloads = max(1, int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3")))
+        # Off: every track waits for its copy to be picked by hand. On: lists fetch the best sure copy unasked.
+        self.auto_pick = os.getenv("AUTO_PICK", "false").strip().lower() in ("1", "true", "yes", "on")
 
         exclude_kw = os.getenv(
             "EXCLUDE_KEYWORDS",
