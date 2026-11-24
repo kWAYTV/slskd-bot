@@ -312,3 +312,25 @@ def test_no_usable_entries_becomes_a_source_error(info: dict) -> None:
         _resolve(info)
 
     assert str(excinfo.value) == NO_TRACKS
+
+
+def test_share_links_are_followed_to_the_real_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+
+    from slskd_importer.sources.media import expand_short_link
+
+    def landed(url: str, status: int = 200):
+        return lambda *args, **kwargs: httpx.Response(status, request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "get", landed("https://soundcloud.com/isaiah/usually?si=abc&utm_source=clipboard"))
+    assert expand_short_link("https://on.soundcloud.com/CfGDY4rx7Azp") == "https://soundcloud.com/isaiah/usually"
+    assert expand_short_link("https://soundcloud.com/isaiah/usually") == "https://soundcloud.com/isaiah/usually"
+
+    monkeypatch.setattr(httpx, "get", landed("https://on.soundcloud.com/gone", 404))
+    assert expand_short_link("https://on.soundcloud.com/gone") == "https://on.soundcloud.com/gone"
+
+    def offline(*args, **kwargs):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(httpx, "get", offline)
+    assert expand_short_link("https://on.soundcloud.com/x") == "https://on.soundcloud.com/x"

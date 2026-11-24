@@ -25,6 +25,9 @@ NO_TRACKS = "No tracklist found on that page. Paste the track names as text inst
 
 _YOUTUBE_HOSTS = ("youtube.com", "youtu.be", "youtube-nocookie.com")
 _MEDIA_HOSTS = (*_YOUTUBE_HOSTS, "soundcloud.com", "bandcamp.com")
+# Share links from the SoundCloud app. yt-dlp has no extractor for them, so they are followed first.
+_SHORT_LINK_HOSTS = ("on.soundcloud.com",)
+_SHORT_LINK_TIMEOUT_SECS = 15
 # YouTube's removed-item rows, and the stub title yt-dlp invents for an unavailable item ("youtube video #id").
 _PLACEHOLDER_RE = re.compile(r"^(?:\[(?:private|deleted|unavailable) video\]|[\w-]+ video #\S+)$", re.IGNORECASE)
 _MIX_MIN_CHAPTERS = 4
@@ -50,7 +53,29 @@ class _QuietLog:
     def debug(self, message: str) -> None:
         logger.debug("yt-dlp: %s", message)
 
-    info = warning = error = debug
+    info = warning = debug
+
+    def error(self, message: str) -> None:
+        logger.warning("yt-dlp: %s", message)
+
+
+def expand_short_link(url: str) -> str:
+    """Follow a share link (``on.soundcloud.com/…``) to the page it points at; other URLs come back as they are."""
+    if not _on_host(url, _SHORT_LINK_HOSTS):
+        return url
+    import httpx
+
+    try:
+        response = httpx.get(url, follow_redirects=True, timeout=_SHORT_LINK_TIMEOUT_SECS)
+    except httpx.HTTPError:
+        logger.warning("Could not follow the share link %s", url, exc_info=True)
+        return url
+    target = urlsplit(str(response.url))
+    if response.status_code >= 400 or _on_host(str(response.url), _SHORT_LINK_HOSTS):
+        logger.warning("Share link %s did not lead anywhere (HTTP %s)", url, response.status_code)
+        return url
+    # Drop the tracking query (?si=…&utm_…); a private link's secret is part of the path.
+    return f"{target.scheme}://{target.netloc}{target.path}"
 
 
 def _extract(url: str) -> dict[str, Any] | None:
@@ -62,6 +87,7 @@ def _extract(url: str) -> dict[str, Any] | None:
     """
     import yt_dlp
 
+    url = expand_short_link(url)
     options = {
         "extract_flat": "in_playlist" if _on_host(url, _YOUTUBE_HOSTS) else False,
         "quiet": True,
