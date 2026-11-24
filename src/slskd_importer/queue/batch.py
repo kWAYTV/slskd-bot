@@ -87,6 +87,8 @@ class Item:
     forced: int
     created_at: str
     updated_at: str
+    # The copy picked by hand (JSON, see queue.pick), or "" when the queue chooses.
+    pick: str = ""
 
     @property
     def identified(self) -> bool:

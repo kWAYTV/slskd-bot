@@ -8,6 +8,7 @@ from telegram.error import RetryAfter
 
 from slskd_importer.queue.batch import Destination, ItemStatus
 from slskd_importer.queue.copies import Copies
+from slskd_importer.queue.pick import decode_pick
 from slskd_importer.sources.tracklist import Entry
 from slskd_importer.telegram.card import actions, board
 from slskd_importer.telegram.card.board import View
@@ -140,8 +141,8 @@ async def test_picker_searches_then_get_requeues_with_the_pick(bot):
     assert "2 copies — choose one" in drawn_text(bot)
 
     await press(bot, actions.GET, batch, item.id, 1)
-    assert bot.runner.pipeline.picks[item.id] is copies.ranked[1]
     again = bot.queue_store.get_item(item.id)
+    assert decode_pick(again.pick) == copies.ranked[1]
     assert again.status == ItemStatus.pending and again.forced == 1
 
 
@@ -153,7 +154,8 @@ async def test_get_replaces_a_saved_track(bot):
     with patch.object(bot.shelf, "remove", MagicMock(return_value=True)) as remove:
         await press(bot, actions.GET, batch, item.id, 0)
     remove.assert_not_called()  # the old file stays until the new copy has landed
-    assert bot.runner.pipeline.replaces[item.id] == ("old.flac", 3)
+    again = bot.queue_store.get_item(item.id)
+    assert (again.saved_name, again.history_id, bool(again.pick)) == ("old.flac", 3, True)
 
 
 async def test_get_ignores_a_stale_index(bot):
@@ -251,7 +253,7 @@ async def test_single_song_card_opens_on_its_copies_and_a_pick_fetches(bot):
 
     await press(bot, actions.GET, batch, item.id, 1)
     assert bot.queue_store.get_item(item.id).status == ItemStatus.pending
-    assert bot.runner.pipeline.picks[item.id].username == "user1"
+    assert decode_pick(bot.queue_store.get_item(item.id).pick).username == "user1"
 
 
 async def test_single_song_without_remembered_copies_offers_to_choose(bot):
@@ -345,4 +347,4 @@ async def test_doubted_copy_can_be_undone_or_replaced(bot):
         await press(bot, actions.GET, batch, items[1].id, 0)
     remove.assert_called_once_with("x.flac", 3)
     assert bot.queue_store.get_item(items[0].id).status == ItemStatus.removed
-    assert bot.runner.pipeline.replaces[items[1].id] == ("x.flac", 3)
+    assert bot.queue_store.get_item(items[1].id).pick

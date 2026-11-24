@@ -19,6 +19,7 @@ from slskd_importer.queue import progress as phases
 from slskd_importer.queue.batch import Batch, Item, ItemStatus
 from slskd_importer.queue.copies import CopyFinder
 from slskd_importer.queue.fetch import Landed, discard, fetch
+from slskd_importer.queue.pick import decode_pick
 from slskd_importer.queue.progress import Progress
 from slskd_importer.queue.shelf import LibraryShelf
 from slskd_importer.queue.store import QueueRepository
@@ -67,10 +68,6 @@ class ItemPipeline:
         self.finder = finder
         self.shelf = shelf
         self.deliver: DeliverHook | None = None
-        # A copy the requester picked by hand for an item: fetched as is, never second-guessed.
-        self.picks: dict[int, SearchResult] = {}
-        # The saved file (name, history id) a picked copy replaces; removed once the new copy is ready to place.
-        self.replaces: dict[int, tuple[str, int | None]] = {}
         # (peer, remote path) -> (lock, items waiting on or holding it)
         self._copy_locks: dict[tuple[str, str], tuple[asyncio.Lock, int]] = {}
 
@@ -86,8 +83,15 @@ class ItemPipeline:
         if item.track is None:
             report(Progress(phases.IDENTIFYING))
         track = await self.identified(item)
-        pick = self.picks.pop(item.id, None)
-        replaces = self.replaces.pop(item.id, None)
+        # A copy the requester picked by hand is fetched as is, never second-guessed. It lives on the
+        # item, so it survives a restart. If the item already has a saved file, the pick replaces it:
+        # the old file goes once the new copy is ready to place.
+        pick = decode_pick(item.pick)
+        replaces = (
+            (item.saved_name, item.history_id)
+            if pick is not None and item.saved_name and item.history_id is not None
+            else None
+        )
 
         if pick is None and batch.to_library and not item.forced:
             owned = await asyncio.to_thread(self.shelf.owned_as, track)
@@ -210,6 +214,7 @@ class ItemPipeline:
                 saved_name=placed.name,
                 quality=quality,
                 history_id=placed.history_id,
+                pick="",
             )
             return None
 
@@ -220,7 +225,7 @@ class ItemPipeline:
         await asyncio.to_thread(self.shelf.record, track, result, outcome, batch.chat_id)
         if not delivered:
             return "could not be sent to the chat"
-        await self._finish(item, ItemStatus.done, detail=detail, quality=quality)
+        await self._finish(item, ItemStatus.done, detail=detail, quality=quality, pick="")
         return None
 
     async def _finish(self, item: Item, status: ItemStatus, **fields: object) -> None:

@@ -7,7 +7,7 @@ from slskd_importer.queue.batch import Batch, Destination, Item, ItemStatus
 from slskd_importer.records.database import Database
 from slskd_importer.sources.tracklist import Entry
 
-_ITEM_FIELDS = frozenset({"status", "detail", "saved_name", "quality", "history_id", "forced"})
+_ITEM_FIELDS = frozenset({"status", "detail", "saved_name", "quality", "history_id", "forced", "pick"})
 
 # Fair order: the batch with the fewest tracks in flight goes first, so one song
 # never waits behind a 300-track playlist.
@@ -170,13 +170,17 @@ class QueueRepository:
             )
             conn.commit()
 
-    def requeue(self, item_id: int, *, forced: bool = False) -> None:
-        """Send one item through the queue again and reopen its batch."""
+    def requeue(self, item_id: int, *, forced: bool = False, pick: str | None = None) -> None:
+        """Send one item through the queue again and reopen its batch.
+
+        *pick*: the hand-picked copy to fetch (JSON), "" to let the queue search again, None to keep
+        whatever pick the item already has.
+        """
         with self._db.locked() as conn:
             conn.execute(
-                "UPDATE queue_items SET status = 'pending', detail = '', forced = ?, updated_at = datetime('now') "
-                "WHERE id = ?",
-                (int(forced), item_id),
+                "UPDATE queue_items SET status = 'pending', detail = '', forced = ?, pick = COALESCE(?, pick), "
+                "updated_at = datetime('now') WHERE id = ?",
+                (int(forced), pick, item_id),
             )
             conn.execute(
                 "UPDATE queue_batches SET status = 'active', updated_at = datetime('now') "
