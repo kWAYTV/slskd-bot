@@ -72,6 +72,7 @@ def _make_update(user_id=12345, chat_id=67890, text="Nancy Sinatra Bang Bang"):
     update.effective_chat.id = chat_id
     update.message = AsyncMock()
     update.message.text = text
+    update.message.reply_to_message = None
     update.message.message_id = 500
     update.message.reply_text = AsyncMock()
     return update

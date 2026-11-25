@@ -12,13 +12,14 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
 
+from slskd_importer.catalog.names import normalize
 from slskd_importer.soulseek.query import clean_query
 from slskd_importer.sources.titles import (
     MAX_ENTRIES,
-    has_separator,
     looks_like_track,
-    strip_label_tag,
+    split_once,
     strip_numbering,
+    strip_wrapping,
     unique_entries,
 )
 from slskd_importer.sources.tracklist import SourceError, Tracklist
@@ -122,16 +123,36 @@ def _artist(item: dict[str, Any]) -> tuple[str, bool]:
 
 def _query(item: dict[str, Any], fallback_artist: str = "") -> str:
     """Free-text ``Artist - Title`` for one video or track, or "" for a placeholder."""
-    title = strip_label_tag(str(item.get("track") or item.get("title") or "").strip())
-    if not title or _PLACEHOLDER_RE.match(title):
+    raw = str(item.get("track") or item.get("title") or "").strip()
+    if not raw or _PLACEHOLDER_RE.match(raw):
         return ""
+    title = strip_wrapping(raw)
     artist, structured = _artist(item)
     artist = artist or fallback_artist
+    if not artist:
+        return clean_query(title)
+    split = split_once(title)
+    if structured and split is not None and _same_name(artist, split[0]):
+        # The page names the artist in its own field and again in front of the title
+        # ("A. Morgan" / "A.Morgan — Decision"): trust the field, keep what follows the dash.
+        return clean_query(f"{artist} - {split[1]}")
     # A structured artist missing from the title means its dash is part of the track name ("Song - Live").
-    named = not structured or artist.lower() in title.lower()
-    if not artist or (has_separator(title) and named):
+    named = not structured or _compact(artist) in _compact(title)
+    if split is not None and named:
         return clean_query(title)
     return clean_query(f"{artist} - {title}")
+
+
+def _compact(text: str) -> str:
+    return normalize(text).replace(" ", "")
+
+
+def _same_name(artist: str, written: str) -> bool:
+    """True when *written* is the artist's name, however it is spaced or punctuated ("A. Morgan" / "A.Morgan").
+
+    A longer credit ("Major Lazer & DJ Snake") is not the same name: it says more than the field and is kept.
+    """
+    return bool(_compact(artist)) and _compact(artist) == _compact(written)
 
 
 def _chapter_queries(item: dict[str, Any]) -> list[str]:
@@ -140,7 +161,7 @@ def _chapter_queries(item: dict[str, Any]) -> list[str]:
     if len(chapters) < _MIX_MIN_CHAPTERS or (item.get("duration") or 0) <= _MIX_MIN_SECONDS:
         return []
     titles = (strip_numbering(_HANDLE_TAIL_RE.sub("", str(chapter.get("title") or ""))) for chapter in chapters)
-    return [clean_query(title) for title in titles if looks_like_track(title)]
+    return [clean_query(strip_wrapping(title)) for title in titles if looks_like_track(title)]
 
 
 def _is_album(info: dict[str, Any], title: str) -> bool:

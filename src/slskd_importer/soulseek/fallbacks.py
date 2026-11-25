@@ -1,11 +1,12 @@
 """Four-tier Soulseek search policy with progressively looser queries.
 
-Tiers: full ``artist title`` query, title-only, keyword reduction + year,
+Tiers: full ``artist title`` query, the same without punctuation, title-only, keyword reduction + year,
 artist + Latin keywords.  Each tier stops early when the caller reports
 cancellation via ``is_cancelled``.
 """
 
 import logging
+import re
 from collections.abc import Awaitable, Callable
 
 from slskd_importer.catalog.track import TrackInfo
@@ -43,6 +44,19 @@ async def search_with_fallbacks(
     ranked, is_fallback = rank_responses(raw_responses, track, scorer)
     if ranked:
         return ranked, is_fallback, False
+
+    # Soulseek matches whole words: "A.Morgan" finds nothing where files say "A. Morgan" or "A Morgan".
+    plain_query = " ".join(re.sub(r"[^\w\s]+", " ", search_query).split())
+    if plain_query and plain_query != search_query:
+        if on_tier:
+            await on_tier("plain")
+        logger.info("No results for '%s', retrying without punctuation: '%s'", search_query, plain_query)
+        raw_responses = await client.search(plain_query, timeout_secs=timeout_secs)
+        if is_cancelled():
+            return [], False, True
+        ranked, is_fallback = rank_responses(raw_responses, track, scorer)
+        if ranked:
+            return ranked, is_fallback, False
 
     if on_tier:
         await on_tier("title-only")

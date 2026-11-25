@@ -11,7 +11,7 @@ from slskd_importer.soulseek.result import SearchResult
 from slskd_importer.telegram.card import actions
 from slskd_importer.telegram.card.copy_token import copy_number
 from slskd_importer.telegram.card.item_view import Card
-from slskd_importer.telegram.card.status import Translate
+from slskd_importer.telegram.card.status import Translate, identity_lines
 from slskd_importer.telegram.ui.markdown import bold, code_span
 
 
@@ -43,7 +43,7 @@ def render_picker(
     head = bold(item.label)
     if track is not None and track.duration_ms:
         head += f"  ·  {track.duration_display}"
-    lines = [head]
+    lines = [head, *identity_lines(t, item)]
     if remaining:
         lines.append(t("picker_remaining", n=remaining))
     if copies is None:

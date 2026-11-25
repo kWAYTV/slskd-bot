@@ -256,3 +256,23 @@ def test_summary_headline_names_tracks_left_to_review(store):
     store.close_if_finished(batch.id)
     text, _ = render_summary(t, store.get_batch(batch.id), store.items(batch.id), {})
     assert "👂 To review: 1" in text and "Done" not in text
+
+
+def test_picker_says_what_is_being_searched_and_how_to_correct_it(store):
+    from slskd_importer.catalog.track import TrackInfo
+
+    batch = make_batch(
+        store, [Entry(track=make_track()), Entry(track=TrackInfo("A.Morgan", "Decision", "", 0, "", ""))]
+    )
+    known, guessed = store.items(batch.id)
+    text, _ = render_picker(t, batch, known, Copies([make_result(0)]), 0, 5)
+    assert "✓ In the catalog: How Does That Grab You? · 1966" in text
+    assert "Not this song? Reply to this message with `Artist - Title`." in text
+    text, _ = render_picker(t, batch, guessed, Copies([make_result(0)]), 0, 5)
+    assert "✎ Not in the catalog: searching the name as written" in text
+
+
+def test_not_found_track_shows_what_was_searched(store):
+    batch, item = one_item(store, status=ItemStatus.no_match)
+    text, _ = render_item(t, batch, item, None, alone=True)
+    assert "✓ In the catalog" in text and "Reply to this message" in text

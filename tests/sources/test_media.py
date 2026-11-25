@@ -334,3 +334,22 @@ def test_share_links_are_followed_to_the_real_page(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(httpx, "get", offline)
     assert expand_short_link("https://on.soundcloud.com/x") == "https://on.soundcloud.com/x"
+
+
+def test_artist_field_wins_over_the_same_name_written_differently_in_the_title() -> None:
+    # A real SoundCloud premiere upload: the uploader is a channel, the artist field is right.
+    info = {
+        "title": "Premiere: A.Morgan — Decision [Newrhythmic Recs]",
+        "track": "Premiere: A.Morgan — Decision [Newrhythmic Recs]",
+        "uploader": "Vanity Dust",
+        "artist": "A. Morgan",
+        "artists": ["A. Morgan"],
+    }
+    tracklist = resolve_media("https://soundcloud.com/vanitydust/a-morgan-decision", extract=lambda url: info)
+    assert [entry.query for entry in tracklist.entries] == ["A. Morgan - Decision"]
+
+
+def test_channel_uploads_lose_their_promo_wrapping() -> None:
+    info = {"title": "PREMIERE: Kuss - Obsessed [Mutual Rytm]", "uploader": "Some Channel"}
+    tracklist = resolve_media("https://soundcloud.com/channel/kuss-obsessed", extract=lambda url: info)
+    assert [entry.query for entry in tracklist.entries] == ["Kuss - Obsessed"]

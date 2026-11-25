@@ -112,6 +112,12 @@ STRINGS: dict[str, str] = {
     "verdict_suspicious": "🟠 Likely transcode · cutoff {khz} kHz",
     "verdict_fake": "❌ Fake lossless · cutoff {khz} kHz",
     # Choosing a copy
+    "identity_catalog": "✓ In the catalog: {release}",
+    "identity_catalog_bare": "✓ In the catalog",
+    "identity_text": "✎ Not in the catalog: searching the name as written",
+    "identity_fix_hint": "Not this song? Reply to this message with `Artist - Title`.",
+    "fix_open_track": "Open the track on the card first, then reply to it.",
+    "fix_busy": "That track is being worked on right now. Try again when it stops.",
     "picker_searching": "Searching Soulseek",
     "picker_choose": "{total} copies — choose one",
     "picker_lossy": "No lossless copy — {total} lossy copies",

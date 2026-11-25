@@ -134,3 +134,26 @@ def test_label_tags_go_but_version_tags_stay():
     assert strip_label_tag("Isaiah - Ain't Nobody Shake It Down [ISH EP 04]") == "Isaiah - Ain't Nobody Shake It Down"
     assert strip_label_tag("A - B [Extended Mix]") == "A - B [Extended Mix]"
     assert strip_label_tag("A - B") == "A - B"
+
+
+@pytest.mark.parametrize(
+    ("written", "name"),
+    [
+        ("Premiere: A.Morgan — Decision [Newrhythmic Recs]", "A.Morgan — Decision"),
+        ("[PREMIERE] Kuss - Obsessed (Original Mix) [FREE DL]", "Kuss - Obsessed (Original Mix)"),
+        ("FREE DOWNLOAD: Hujus - Slander", "Hujus - Slander"),
+        ("Filtrack - The Maze | Free Download", "Filtrack - The Maze"),
+        (
+            "Exclusive Premiere | DJ Rush - Get On Up (Thomas Schumacher Remix) [Kne Deep]",
+            "DJ Rush - Get On Up (Thomas Schumacher Remix)",
+        ),
+        ("Some - Track (Out Now)", "Some - Track"),
+        ("Low Blow - Time To Love [Extended Mix]", "Low Blow - Time To Love [Extended Mix]"),
+        ("Clip Clop - Preview Of Tomorrow", "Clip Clop - Preview Of Tomorrow"),
+    ],
+)
+def test_promo_words_and_label_tags_around_a_name_are_dropped(written, name):
+    from slskd_importer.sources.titles import strip_wrapping
+
+    assert strip_wrapping(written) == name
+    assert clean_line(f"03. {written}") == name

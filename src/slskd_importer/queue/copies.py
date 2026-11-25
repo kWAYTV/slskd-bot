@@ -53,6 +53,10 @@ class CopyFinder:
                 self._cache(item_id, copies)
         return copies
 
+    def forget(self, item_id: int) -> None:
+        """Drop the cached copies of an item (it was renamed; the store's row goes with the rename)."""
+        self._found.pop(item_id, None)
+
     async def find(self, item_id: int, track: TrackInfo) -> Copies:
         """Search Soulseek with the four-tier fallbacks and remember the best copies for *item_id*.
 

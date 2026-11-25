@@ -72,3 +72,26 @@ def test_filter_prefers_the_named_artist_and_drops_others():
 def test_filter_falls_back_when_the_artist_filter_empties_the_list():
     cover = track(artist="Tribute Band")
     assert filter_candidates("Daft Pnk - One More Time", [cover, cover]) == [cover]
+
+
+def test_identify_falls_back_to_musicbrainz_before_trusting_the_text():
+    spotify = MagicMock()
+    spotify.search_fielded.return_value = []
+    spotify.search_multiple.return_value = [track(artist="Someone Else", title="Decision")]
+    musicbrainz = MagicMock()
+    musicbrainz.search_recordings.return_value = [
+        track(artist="A. Morgan", title="Decision (Live)", secs=400),
+        track(artist="A. Morgan", title="Decision", album="Newrhythmic 12", secs=345, year="2026"),
+    ]
+    found = identify(spotify, "A.Morgan - Decision", musicbrainz)
+    assert (found.artist, found.title, found.duration_secs, found.album) == (
+        "A. Morgan",
+        "Decision",
+        345,
+        "Newrhythmic 12",
+    )
+    musicbrainz.search_recordings.assert_called_once_with("A.Morgan", "Decision", limit=10)
+
+    musicbrainz.search_recordings.return_value = []
+    unknown = identify(spotify, "A.Morgan - Decision", musicbrainz)
+    assert (unknown.artist, unknown.title, unknown.duration_ms) == ("A.Morgan", "Decision", 0)

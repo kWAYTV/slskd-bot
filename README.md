@@ -16,6 +16,7 @@
 - **One card per message** — every message becomes a batch with a single message that updates in place: progress, counts, what is downloading. Several batches run side by side without mixing. Your own message is reacted 👀 while it works, 👍 when something arrived, 🤷 when nothing did
 - **You pick every copy** — each track shows the copies found (format, length, quality, size, file and folder name) and waits for your tap, so you never get the wrong song or version. Only copies whose file path names the song are offered; a track with none simply counts as not found
 - **Optional auto-pick** — with `AUTO_PICK=true`, lists, playlists and tracklists fetch the best lossless copy that names the song on their own, run a spectrum check, skip fake FLACs for the next copy, and save. Only exceptions wait for you: no lossless copy exists (*Choose a copy*), nothing found, every copy failed
+- **You see what is searched, and can correct it** — each picker shows the song the bot understood (catalog match with album and year, or the name as written). Reply to the card with `Artist - Title` and it searches again under that name
 - **Fast review** — *Pick copies* walks through the waiting tracks one after another: one tap picks a copy and shows the next track
 - **Every track stays in reach** — tap a track on its card to choose another copy, undo the save, get the file sent to the chat, or retry
 - **Fair queue** — a fixed number of tracks at a time (`MAX_CONCURRENT_DOWNLOADS`), shared fairly: one song never waits behind a 300-track playlist. The queue survives restarts
