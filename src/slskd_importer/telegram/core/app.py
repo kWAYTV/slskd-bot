@@ -67,12 +67,14 @@ class MusicBot:
         self._locales: dict[int, str] = self.prefs_repo.load_all_locales()
 
         self.queue_store = QueueRepository(self.db)
+        self.musicbrainz = MusicBrainzClient()
         # Raw downloads are not part of the collection, even when their folder sits inside it.
         collection = LibraryIndex(config.library_sweep_dir, exclude=(config.download_dir,))
         self.shelf = LibraryShelf(self.processor, self.spotify, self.history_repo, collection)
         pipeline = ItemPipeline(
             config=config,
             spotify=self.spotify,
+            musicbrainz=self.musicbrainz,
             slskd=self.slskd,
             processor=self.processor,
             store=self.queue_store,
@@ -86,7 +88,6 @@ class MusicBot:
         # Set once the Application exists; cards and deliveries are sent outside any update.
         self.telegram: Bot | None = None
 
-        self.musicbrainz = MusicBrainzClient()
         self.sweep = LibrarySweep(
             config,
             self.db,

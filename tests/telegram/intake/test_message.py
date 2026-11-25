@@ -101,3 +101,74 @@ async def test_get_command_without_argument_explains(bot):
     update, _ = await send(bot, "/get", handler="cmd_get")
     update.message.reply_text.assert_awaited_once()
     assert bot.queue_store.active_batches() == []
+
+
+def reply_to(bot, message_id: int, text: str, user_id: int = 12345):
+    update = _make_update(user_id=user_id, text=text)
+    update.message.reply_to_message = MagicMock(message_id=message_id)
+    update.message.delete = AsyncMock()
+    return update
+
+
+async def test_replying_to_a_card_renames_its_track_and_searches_again(bot):
+    from slskd_importer.queue.batch import ItemStatus
+    from slskd_importer.queue.copies import Copies
+
+    batch = bot.queue_store.create_batch(
+        67890, 12345, "x", "track", [Entry(query="A. Morgan - Premiere: A.Morgan — Decision")], message_id=900
+    )
+    item = bot.queue_store.items(batch.id)[0]
+    bot.queue_store.update_item(item.id, status=ItemStatus.no_match)
+    bot.queue_store.save_copies(item.id, False, "[]")
+    bot.runner.pipeline.finder._found[item.id] = Copies()
+    bot.queue_store.close_if_finished(batch.id)
+
+    update = reply_to(bot, 900, "A.Morgan - Decision")
+    await bot.handle_text(update, context_with_card())
+
+    again = bot.queue_store.get_item(item.id)
+    assert (again.query, again.status, again.title) == ("A.Morgan - Decision", ItemStatus.pending, "")
+    assert bot.queue_store.load_copies(item.id) is None and bot.runner.pipeline.finder.remembered(item.id) is None
+    assert len(bot.queue_store.recent_batches(67890, 10)) == 1  # no new batch
+    assert bot.queue_store.get_batch(batch.id).status == "active"
+    update.message.delete.assert_awaited_once()
+    bot.runner.wake.assert_called()
+    assert "Searching Soulseek" in bot.telegram.edit_message_text.call_args.args[0]
+
+
+async def test_reply_in_a_list_renames_the_track_on_screen_or_asks_to_open_one(bot):
+    from slskd_importer.queue.batch import ItemStatus
+    from slskd_importer.telegram.card import board
+
+    batch = bot.queue_store.create_batch(
+        67890, 12345, "x", "list", [Entry(query="A - B"), Entry(query="C - D")], message_id=900
+    )
+    first, second = bot.queue_store.items(batch.id)
+    for item in (first, second):
+        bot.queue_store.update_item(item.id, status=ItemStatus.choose)
+
+    update = reply_to(bot, 900, "E - F")
+    await bot.handle_text(update, context_with_card())
+    update.message.reply_text.assert_awaited_once_with("Open the track on the card first, then reply to it.")
+    assert bot.queue_store.get_item(first.id).query == "A - B"
+
+    bot.cards.focus(batch.id, board.PICKER, second.id)
+    await bot.handle_text(reply_to(bot, 900, "E - F"), context_with_card())
+    assert bot.queue_store.get_item(second.id).query == "E - F"
+    assert bot.queue_store.get_item(first.id).query == "A - B"
+
+
+async def test_reply_to_a_track_in_flight_or_to_another_message(bot):
+    from slskd_importer.queue.batch import ItemStatus
+
+    batch = bot.queue_store.create_batch(67890, 12345, "x", "track", [Entry(query="A - B")], message_id=900)
+    item = bot.queue_store.items(batch.id)[0]
+    bot.queue_store.update_item(item.id, status=ItemStatus.working)
+    update = reply_to(bot, 900, "E - F")
+    await bot.handle_text(update, context_with_card())
+    update.message.reply_text.assert_awaited_once()
+    assert bot.queue_store.get_item(item.id).query == "A - B"
+
+    await bot.handle_text(reply_to(bot, 555, "G - H"), context_with_card())  # not a card: an ordinary request
+    await asyncio.sleep(0.05)
+    assert len(bot.queue_store.recent_batches(67890, 10)) == 2

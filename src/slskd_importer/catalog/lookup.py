@@ -7,6 +7,7 @@ same recording are collapsed, so the first candidate is the best guess.
 
 from __future__ import annotations
 
+from slskd_importer.catalog.musicbrainz import MusicBrainzClient
 from slskd_importer.catalog.names import normalize, same_artist, same_title
 from slskd_importer.catalog.spotify import SpotifyResolver
 from slskd_importer.catalog.track import TrackInfo
@@ -34,12 +35,12 @@ def find_candidates(spotify: SpotifyResolver, query: str) -> list[TrackInfo]:
     return filter_candidates(query, tracks)
 
 
-def identify(spotify: SpotifyResolver, query: str) -> TrackInfo:
+def identify(spotify: SpotifyResolver, query: str, musicbrainz: MusicBrainzClient | None = None) -> TrackInfo:
     """The track *query* means.
 
     ``Artist - Title`` is taken at its word: a catalog candidate is used only
     when its artist and title are the ones typed (it adds album, year and
-    length). Otherwise the track is built from the text, so an unreleased or
+    length), looked up on Spotify and then MusicBrainz. Otherwise the track is built from the text, so an unreleased or
     underground song is never swapped for whatever the catalog returned first.
     A query without a separator has no reliable artist/title split, so its
     best catalog candidate is used.
@@ -53,6 +54,13 @@ def identify(spotify: SpotifyResolver, query: str) -> TrackInfo:
                 wanted_title, normalize(candidate.title)
             ):
                 return candidate
+        if musicbrainz is not None:
+            # Much of what never reaches Spotify is still catalogued here.
+            for candidate in musicbrainz.search_recordings(artist, title, limit=10):
+                if same_artist(wanted_artist, normalize(candidate.artist)) and same_title(
+                    wanted_title, normalize(candidate.title)
+                ):
+                    return candidate
         return track_from_text(query)
     return candidates[0] if candidates else track_from_text(query)
 

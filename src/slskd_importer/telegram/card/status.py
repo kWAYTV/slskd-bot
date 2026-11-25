@@ -8,6 +8,7 @@ from slskd_importer.queue import progress as phases
 from slskd_importer.queue.batch import Item, ItemStatus
 from slskd_importer.queue.progress import Progress
 from slskd_importer.telegram.card import actions
+from slskd_importer.telegram.ui.markdown import escape_md
 
 # ``t(key, **kwargs)`` bound to the chat's locale.
 Translate = Callable[..., str]
@@ -38,6 +39,23 @@ _PHASE_ICONS = {
 # were not found or failed are not among them: there is nothing to decide, they are counted and can be
 # retried together.
 ATTENTION = (ItemStatus.choose, ItemStatus.doubt, ItemStatus.review)
+
+
+def identity_lines(t: Translate, item: Item) -> list[str]:
+    """What is being searched for, and how to say it is another song.
+
+    The requester must be able to see at a glance whether the bot understood the
+    request: a catalog match shows its album and year, a name taken from the text
+    says so, and either can be corrected by replying to the card.
+    """
+    if not item.identified:
+        return []
+    if item.confirmed:
+        release = " · ".join(part for part in (item.album, item.year) if part)
+        first = t("identity_catalog", release=escape_md(release)) if release else t("identity_catalog_bare")
+    else:
+        first = t("identity_text")
+    return [first, t("identity_fix_hint")]
 
 
 def open_action(item: Item) -> str:

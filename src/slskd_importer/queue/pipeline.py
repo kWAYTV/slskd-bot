@@ -11,6 +11,7 @@ import logging
 from collections.abc import Awaitable, Callable
 
 from slskd_importer.catalog.lookup import identify
+from slskd_importer.catalog.musicbrainz import MusicBrainzClient
 from slskd_importer.catalog.spotify import SpotifyResolver
 from slskd_importer.catalog.track import TrackInfo
 from slskd_importer.library.files import FileProcessor
@@ -57,6 +58,7 @@ class ItemPipeline:
         *,
         config: Config,
         spotify: SpotifyResolver,
+        musicbrainz: MusicBrainzClient | None = None,
         slskd: SlskdClient,
         processor: FileProcessor,
         store: QueueRepository,
@@ -65,6 +67,7 @@ class ItemPipeline:
     ) -> None:
         self._config = config
         self._spotify = spotify
+        self._musicbrainz = musicbrainz
         self._slskd = slskd
         self._processor = processor
         self._store = store
@@ -78,7 +81,7 @@ class ItemPipeline:
         """The item's catalog identity, looked up and stored on first use."""
         track = item.track
         if track is None:
-            track = await asyncio.to_thread(identify, self._spotify, item.query)
+            track = await asyncio.to_thread(identify, self._spotify, item.query, self._musicbrainz)
             await asyncio.to_thread(self._store.set_identity, item.id, track)
         return track
 

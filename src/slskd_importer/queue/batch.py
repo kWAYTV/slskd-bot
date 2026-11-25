@@ -111,6 +111,11 @@ class Item:
         )
 
     @property
+    def confirmed(self) -> bool:
+        """The identity came from a catalog (it has a length, an album or a link), not just from the text."""
+        return bool(self.duration_ms or self.spotify_url or self.album)
+
+    @property
     def label(self) -> str:
         """``Artist — Title``, or the raw query before the item is identified."""
         if not self.identified:

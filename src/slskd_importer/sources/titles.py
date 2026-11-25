@@ -41,6 +41,40 @@ def strip_label_tag(text: str) -> str:
     return text[: match.start()].rstrip()
 
 
+# What uploaders wrap around a track's name: "Premiere: …", "[FREE DL] …", "… (Out Now)", "… | Free Download".
+_PROMO = (
+    r"(?:(?:track|world|exclusive|sc|video|album)\s+)?premiere|exclusive|free\s+(?:download|dl)|out\s+now"
+    r"|pre-?order|preview|first\s+listen|snippet|teaser|clip|full\s+(?:track|stream)|official\s+(?:audio|video)"
+)
+_PROMO_PREFIX_RE = re.compile(
+    rf"^\s*(?:[\[(]\s*(?:{_PROMO})\s*[\])]\s*[:|–—-]?\s*|(?:{_PROMO})\s*[:|–—-]\s*)", re.IGNORECASE
+)
+_PROMO_SUFFIX_RE = re.compile(
+    rf"\s*(?:[\[(]\s*(?:{_PROMO})\b[^\])]*[\])]|\s[|–—-]\s*(?:{_PROMO})\s*)\s*$", re.IGNORECASE
+)
+
+
+def strip_wrapping(text: str) -> str:
+    """A track name without the promo words and label tags uploaders put around it.
+
+    ``Premiere: A.Morgan — Decision [Newrhythmic Recs]`` gives ``A.Morgan — Decision``;
+    a version tag such as ``[Extended Mix]`` stays.
+    """
+    previous = None
+    while text != previous:
+        previous = text
+        text = _PROMO_PREFIX_RE.sub("", text, count=1)
+        text = _PROMO_SUFFIX_RE.sub("", text, count=1)
+        text = strip_label_tag(text).strip()
+    return text
+
+
+def split_once(text: str) -> tuple[str, str] | None:
+    """``(left, right)`` around the first artist/title separator, or None when there is none."""
+    parts = _SEPARATOR_RE.split(text, maxsplit=1)
+    return (parts[0].strip(), parts[1].strip()) if len(parts) == 2 and all(parts) else None
+
+
 def has_separator(text: str) -> bool:
     """True when *text* already reads like ``Artist - Title``."""
     return bool(_SEPARATOR_RE.search(text))

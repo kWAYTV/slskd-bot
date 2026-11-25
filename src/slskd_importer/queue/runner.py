@@ -92,6 +92,13 @@ class QueueRunner:
         self._changed(item.batch_id)
         self.wake()
 
+    async def rename(self, item: Item, query: str) -> None:
+        """Start an item over as another song (the requester corrected its name)."""
+        await asyncio.to_thread(self.store.rename_item, item.id, query)
+        self.pipeline.finder.forget(item.id)
+        self._changed(item.batch_id)
+        self.wake()
+
     async def retry_failed(self, batch_id: int) -> int:
         count = await asyncio.to_thread(self.store.requeue_failed, batch_id)
         self._changed(batch_id)

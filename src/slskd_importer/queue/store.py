@@ -193,6 +193,36 @@ class QueueRepository:
             )
             conn.commit()
 
+    def batch_of_message(self, chat_id: int, message_id: int) -> Batch | None:
+        """The batch whose card is that chat message, or None."""
+        with self._db.locked() as conn:
+            row = conn.execute(
+                "SELECT * FROM queue_batches WHERE chat_id = ? AND message_id = ? ORDER BY id DESC LIMIT 1",
+                (chat_id, message_id),
+            ).fetchone()
+            return Batch(**dict(row)) if row else None
+
+    def rename_item(self, item_id: int, query: str) -> None:
+        """The requester says which song an item really is: start it over under that name.
+
+        Its identity, pick and remembered copies belonged to the wrong song and go; a file
+        already saved for it stays until a copy of the right song replaces it.
+        """
+        with self._db.locked() as conn:
+            conn.execute(
+                "UPDATE queue_items SET query = ?, artist = '', title = '', album = '', duration_ms = 0, "
+                "spotify_url = '', year = '', status = 'pending', detail = '', pick = '', forced = 0, "
+                "updated_at = datetime('now') WHERE id = ?",
+                (query, item_id),
+            )
+            conn.execute("DELETE FROM queue_copies WHERE item_id = ?", (item_id,))
+            conn.execute(
+                "UPDATE queue_batches SET status = 'active', updated_at = datetime('now') "
+                "WHERE id = (SELECT batch_id FROM queue_items WHERE id = ?)",
+                (item_id,),
+            )
+            conn.commit()
+
     def set_identity(self, item_id: int, track: TrackInfo) -> None:
         with self._db.locked() as conn:
             conn.execute(

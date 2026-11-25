@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/status` also lists batches waiting for your picks, with 📍 buttons that bring a card back to the bottom of the chat
 - A stale copy button (the track was searched again since) or the second tap of a double tap no longer fetches a copy you did not choose
 - When a replacement copy fails, the track stays saved with its old file instead of showing as failed
+- Every picker (and every not-found track) says which song is being searched: `✓ In the catalog: album · year` or `✎ name as written`. Reply to the card with `Artist - Title` to correct it; the track is searched again under that name
+- Names read from SoundCloud, YouTube and Bandcamp pages lose promo wrapping (`Premiere:`, `[FREE DL]`, `(Out Now)`, label tags) and use the page's own artist field when the title repeats it
+- Tracks Spotify does not know are looked up on MusicBrainz before falling back to the name as written
+- The Soulseek search retries without punctuation (`A.Morgan` → `A Morgan`) before loosening the query
 - A song sent on its own shows the copies found and waits for a pick; lists, playlists and tracklists run without asking
 - **No confirmation step for lists.** The best lossless copy is fetched, spectrum-checked and saved. A fake FLAC is discarded and the next copy tried (three per track). Tracks with only lossy copies wait under *Choose a copy* instead of being saved silently
 - Each track on a card can be opened: *Other copies*, *Undo*, *Send file*, *Retry*, *Download anyway* for songs already owned

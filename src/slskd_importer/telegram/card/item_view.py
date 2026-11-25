@@ -9,7 +9,7 @@ from slskd_importer.queue.batch import SAVED_STATUSES, Batch, Item, ItemStatus
 from slskd_importer.queue.pipeline import VERDICT_PREFIX
 from slskd_importer.queue.progress import Progress
 from slskd_importer.telegram.card import actions
-from slskd_importer.telegram.card.status import Translate, item_icon
+from slskd_importer.telegram.card.status import Translate, identity_lines, item_icon
 from slskd_importer.telegram.ui.formatting import progress_bar
 from slskd_importer.telegram.ui.markdown import bold, code_span, escape_md
 
@@ -46,6 +46,9 @@ def _body(t: Translate, batch: Batch, item: Item, progress: Progress | None) -> 
     lines = [t(f"item_{status}")]
     if item.detail and status in (ItemStatus.review, ItemStatus.failed):
         lines.append(escape_md(item.detail))
+    if status in (ItemStatus.no_match, ItemStatus.failed, ItemStatus.choose, ItemStatus.review):
+        # Nothing (right) was found: the first thing to check is whether the song was understood.
+        lines += identity_lines(t, item)
     return lines
 
 
