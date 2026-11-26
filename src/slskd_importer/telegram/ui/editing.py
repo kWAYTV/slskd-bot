@@ -1,10 +1,8 @@
 """Safe Telegram message edits that swallow transient API failures."""
 
-import contextlib
 import logging
 
 from telegram import Message
-from telegram.constants import ParseMode
 from telegram.error import BadRequest, NetworkError, TimedOut
 
 logger = logging.getLogger(__name__)
@@ -62,18 +60,3 @@ async def safe_bot_edit(bot, chat_id: int, message_id: int, text: str, **kwargs)
 async def safe_query_edit(query, text: str, **kwargs) -> bool:
     """Edit a callback query message, swallowing transient Telegram errors."""
     return await _edit_text(query.edit_message_text, text, **kwargs)
-
-
-async def edit_approval_message(query, text: str, **kwargs):
-    """Edit an audio caption or text message (sweep reviews, download approvals).
-
-    Extra kwargs (e.g. ``reply_markup``) are forwarded. Caption edits are tried
-    first — review pairs and approvals are audio messages.
-    """
-    try:
-        await query.edit_message_caption(caption=text, parse_mode=ParseMode.MARKDOWN, **kwargs)
-        return
-    except Exception:
-        pass
-    with contextlib.suppress(Exception):
-        await query.edit_message_text(text=text, parse_mode=ParseMode.MARKDOWN, **kwargs)

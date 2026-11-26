@@ -7,7 +7,7 @@ import numpy as np
 import soundfile as sf
 
 from slskd_importer.library.lossless import LosslessVerdict, analyze_lossless
-from slskd_importer.library.preview import convert_to_ogg, create_preview_clip
+from slskd_importer.library.preview import convert_to_ogg
 
 
 class TestLosslessVerdict:
@@ -125,85 +125,6 @@ class TestAnalyzeFlac:
             assert result.verdict == "AUTHENTIC"
             assert result.sample_rate == 96000
             assert result.nyquist_khz == 48.0
-        finally:
-            os.unlink(path)
-
-
-class TestCreatePreviewClip:
-    """Test create_preview_clip function."""
-
-    @staticmethod
-    def _create_test_flac(filepath: str, sample_rate: int = 44100, duration: float = 60.0):
-        """Create a test FLAC file of the given duration."""
-        rng = np.random.default_rng(42)
-        n_samples = int(sample_rate * duration)
-        data = (rng.standard_normal(n_samples) * 0.3).astype(np.float32)
-        sf.write(filepath, data, sample_rate, subtype="PCM_16")
-
-    def test_creates_preview_clip(self):
-        """Preview clip should be shorter than the original."""
-        with tempfile.NamedTemporaryFile(suffix=".flac", delete=False) as f:
-            path = f.name
-        try:
-            self._create_test_flac(path, duration=120.0)
-            original_size = os.path.getsize(path)
-
-            preview_path = create_preview_clip(path, duration_secs=30.0)
-            assert preview_path is not None
-            assert os.path.isfile(preview_path)
-
-            # Preview should be significantly smaller than the 120s original
-            preview_size = os.path.getsize(preview_path)
-            assert preview_size < original_size * 0.5
-
-            # Verify the preview is valid OGG Opus audio (always 48 kHz)
-            info = sf.info(preview_path)
-            assert info.samplerate == 48000
-            assert preview_path.endswith(".ogg")
-            preview_duration = info.frames / info.samplerate
-            assert 29.0 <= preview_duration <= 31.0
-
-            os.unlink(preview_path)
-        finally:
-            os.unlink(path)
-
-    def test_short_file_returns_full(self):
-        """If the file is shorter than the preview duration, return the whole thing."""
-        with tempfile.NamedTemporaryFile(suffix=".flac", delete=False) as f:
-            path = f.name
-        try:
-            self._create_test_flac(path, duration=10.0)
-            preview_path = create_preview_clip(path, duration_secs=30.0)
-            assert preview_path is not None
-
-            info = sf.info(preview_path)
-            preview_duration = info.frames / info.samplerate
-            # Should contain the full ~10s (starting at 20% = ~2s, so ~8s remaining)
-            assert preview_duration > 5.0
-
-            os.unlink(preview_path)
-        finally:
-            os.unlink(path)
-
-    def test_nonexistent_file_returns_none(self):
-        """Non-existent file should return None."""
-        result = create_preview_clip("/tmp/nonexistent_preview_test.flac")
-        assert result is None
-
-    def test_preview_outputs_ogg_opus(self):
-        """Preview always outputs OGG Opus at 48 kHz regardless of source sample rate."""
-        with tempfile.NamedTemporaryFile(suffix=".flac", delete=False) as f:
-            path = f.name
-        try:
-            self._create_test_flac(path, sample_rate=96000, duration=60.0)
-            preview_path = create_preview_clip(path, duration_secs=30.0)
-            assert preview_path is not None
-            assert preview_path.endswith(".ogg")
-
-            info = sf.info(preview_path)
-            assert info.samplerate == 48000
-
-            os.unlink(preview_path)
         finally:
             os.unlink(path)
 

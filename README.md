@@ -22,7 +22,6 @@
 - **Fair queue** — a fixed number of tracks at a time (`MAX_CONCURRENT_DOWNLOADS`), shared fairly: one song never waits behind a 300-track playlist. The queue survives restarts
 - **Friends without touching your library** — people in `TELEGRAM_ALLOWED_USERS` but not in `TELEGRAM_LIBRARY_USERS` get their files sent to the chat (up to 2000 MB with a self-hosted Bot API server); nothing of theirs is ever saved to the library
 - **Smart ranking** — FLAC, then WAV, then AIFF; scored by duration, hi-res quality, source reliability and filename; live/remix noise filtered out unless you asked for it
-- **Library sweep** — walks the library (subfolders included; `LIBRARY_SWEEP_DIR` can point at your whole collection), looks on Soulseek for a better lossless copy of each song, and sends side-by-side pairs (`Keep mine` / `Take new` / `Keep both`). Never auto-replaces. Runs on a schedule or via `/sweep`
 - **Library hygiene** — canonical tags and artwork on save, songs you already have anywhere in your collection are skipped (matched by `Artist - Title` file name; versions like `(Extended Mix)` are kept apart), `/undo` and `/history` ↩️ remove saves, `/stats` for totals
 - **Languages** — English (default), Spanish, Galician, German. First `/start` picks a language; `/lang` changes it later
 - **Docker-ready** — image published to `ghcr.io/kwaytv/slskd-bot` on every push to `main`
@@ -72,7 +71,6 @@ uv run python -m slskd_importer run
 | `/check` | Compare the latest saved tracks with what you asked for and list the doubtful ones |
 | `/undo` | Remove the last track saved to the library |
 | `/stats` | Download totals and library size for this chat |
-| `/sweep` | Start a library sweep now (`/sweep force`, `/sweep stop`, `/sweep status`, `/sweep reviews`) |
 | `/lang` | Change language (`/language` also works) |
 | `/cancel` | Stop everything this chat has in the queue |
 
@@ -91,14 +89,14 @@ uv run python -m slskd_importer run
 |----------|----------|---------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | — | Bot token from @BotFather |
 | `TELEGRAM_ALLOWED_USERS` | Yes | — | Comma-separated user IDs allowed to use the bot (empty denies everyone) |
-| `TELEGRAM_LIBRARY_USERS` | No | — | User IDs whose downloads are saved to the library and who get `/sweep` and `/undo`. Other allowed users get files sent to their chat (empty = all allowed users save) |
+| `TELEGRAM_LIBRARY_USERS` | No | — | User IDs whose downloads are saved to the library and who get `/undo`. Other allowed users get files sent to their chat (empty = all allowed users save) |
 | `TELEGRAM_API_BASE_URL` | No | — | Self-hosted [telegram-bot-api](https://github.com/tdlib/telegram-bot-api) URL; raises the upload limit to 2000 MB |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | Yes | — | Spotify Developer app credentials |
 | `SLSKD_HOST` | Yes | — | slskd instance URL |
 | `SLSKD_API_KEY` | Yes | — | slskd API key (Settings > Security > API Keys) |
 | `DOWNLOAD_DIR` | No | `/downloads` | Where slskd stores completed downloads (keep it outside the library) |
 | `OUTPUT_DIR` | No | `/music` | Where renamed files are placed |
-| `DATA_DIR` | No | `/data` | SQLite directory (queue, history, sweep) |
+| `DATA_DIR` | No | `/data` | SQLite directory (queue, history) |
 | `MAX_CONCURRENT_DOWNLOADS` | No | `3` | Tracks the queue works on at the same time |
 | `AUTO_PICK` | No | `false` | `true` lets lists, playlists and tracklists fetch the best sure copy without asking; a song sent alone always asks |
 | `MAX_RESULTS` | No | `5` | Copies shown per page when choosing one by hand |
@@ -107,14 +105,10 @@ uv run python -m slskd_importer run
 | `DOWNLOAD_TIMEOUT_SECS` | No | `600` | Download completion timeout |
 | `EXCLUDE_KEYWORDS` | No | `live,remix,...` | Keywords filtered from results |
 | `FILENAME_TEMPLATE` | No | `{artist} - {title}` | Output filename template |
-| `LIBRARY_SWEEP_DIR` | No | `OUTPUT_DIR` | Root of your collection: the sweep walks it (subfolders included), and a song found anywhere under it by its `Artist - Title` file name is not downloaded again. Hidden folders are skipped |
-| `LIBRARY_SWEEP_SCHEDULE` | No | `weekly:sun:04:00` | When the sweep starts on its own (`weekly:<mon..sun>:HH:MM`, `daily:HH:MM`, or `off`) |
-| `LIBRARY_SWEEP_PAUSE_SECS` | No | `20` | Pause between songs that searched Soulseek |
-| `LIBRARY_SWEEP_KEEP_DAYS` | No | `7` | Days a replaced original stays in `.sweep-replaced/` (`0` = purge at once, `never` = keep) |
+| `COLLECTION_DIR` | No | `OUTPUT_DIR` | Root of your whole collection: a song found anywhere under it by its `Artist - Title` file name is not downloaded again. Hidden folders are skipped (formerly `LIBRARY_SWEEP_DIR`, still read) |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | `HEALTH_PORT` | No | `8080` | Health check HTTP port (`/health`, `/ready`) |
 
-The sweep needs `ffmpeg` and the `analysis` extra (`numpy` / `scipy` / `soundfile`; already in the Docker image). Optional `fpcalc` (Chromaprint) improves the same-recording check; without it the sweep falls back to length and tags.
 
 ## License
 

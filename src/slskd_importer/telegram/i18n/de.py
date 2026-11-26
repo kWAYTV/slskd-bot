@@ -6,7 +6,7 @@ STRINGS: dict[str, str] = {
     "auth_library": "Dafür ist Bibliothekszugriff nötig. Du kannst trotzdem Songs schicken und die Dateien hier bekommen.",
     "auth_library_undo": "Dateien aus der Bibliothek entfernen erfordert Bibliothekszugriff.",
     # Welcome and profile
-    "welcome": "*Schick mir Songs* und ich hole sie von Soulseek — verlustfrei zuerst (FLAC, WAV, AIFF).\n\nEiner pro Zeile, so viele du willst:\n`Nancy Sinatra - Bang Bang`\n`daft punk one more time`\n\nOder füge Links ein: Spotify, YouTube, SoundCloud, Bandcamp, eine 1001Tracklists-Seite oder eine irgendwo kopierte Tracklist.\n\nJede Nachricht bekommt eine Karte, die sich laufend aktualisiert. Du wählst die Kopie für jeden Track: Tippe auf einen Track, sieh dir die gefundenen Kopien an und wähle. Nichts wird geladen, bevor du es tust. Tippe auf einen Track, um eine andere Kopie zu wählen, ihn rückgängig zu machen oder die Datei zu bekommen.\n\n/status — was in der Warteschlange ist\n/history — letzte Speicherungen, mit Rückgängig\n/check — sind die letzten Downloads die richtigen Songs\n/stats — Gesamtwerte\n/sweep — bessere Kopien deiner Songs suchen\n/lang — Sprache\n/cancel — alles stoppen",
+    "welcome": "*Schick mir Songs* und ich hole sie von Soulseek — verlustfrei zuerst (FLAC, WAV, AIFF).\n\nEiner pro Zeile, so viele du willst:\n`Nancy Sinatra - Bang Bang`\n`daft punk one more time`\n\nOder füge Links ein: Spotify, YouTube, SoundCloud, Bandcamp, eine 1001Tracklists-Seite oder eine irgendwo kopierte Tracklist.\n\nJede Nachricht bekommt eine Karte, die sich laufend aktualisiert. Du wählst die Kopie für jeden Track: Tippe auf einen Track, sieh dir die gefundenen Kopien an und wähle. Nichts wird geladen, bevor du es tust. Tippe auf einen Track, um eine andere Kopie zu wählen, ihn rückgängig zu machen oder die Datei zu bekommen.\n\n/status — was in der Warteschlange ist\n/history — letzte Speicherungen, mit Rückgängig\n/check — sind die letzten Downloads die richtigen Songs\n/stats — Gesamtwerte\n/lang — Sprache\n/cancel — alles stoppen",
     "bot_description": "Schick Songnamen oder Links (Spotify, YouTube, SoundCloud, Bandcamp, Tracklists) und bekomme sie von Soulseek in der besten verfügbaren Qualität — FLAC zuerst. Schick so viele du willst; jede Nachricht bekommt eine Live-Karte.",
     "bot_short_description": "Holt Songs von Soulseek in bester Qualität: Namen, Links, Playlists oder ganze Tracklists.",
     "lang_pick": "Wähle deine Sprache:",
@@ -19,7 +19,6 @@ STRINGS: dict[str, str] = {
     "cmd_check": "Prüfen, ob die Downloads die richtigen Songs sind",
     "cmd_stats": "Bibliotheks- und Download-Gesamtwerte",
     "cmd_undo": "Zuletzt gespeicherten Track entfernen",
-    "cmd_sweep": "Bessere Kopien deiner Bibliothek suchen",
     "cmd_cancel": "Alles in der Warteschlange stoppen",
     "cmd_lang": "Sprache ändern",
     # Commands

@@ -66,8 +66,6 @@ async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TY
         "hu": self._handle_history_undo,
         "cu": self._handle_check_undo,
         "sb": self._handle_bring_card,
-        "swp": self._handle_sweep_decision,
-        "swr": self._handle_sweep_reason,
         "cancel_all": self._handle_cancel_all,
     }.get(prefix)
 

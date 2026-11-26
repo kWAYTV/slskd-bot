@@ -39,11 +39,8 @@ services:
       EXCLUDE_KEYWORDS: ${EXCLUDE_KEYWORDS:-live,remix,acoustic,karaoke,instrumental,cover,demo,radio edit,tribute,remaster}
       FILENAME_TEMPLATE: ${FILENAME_TEMPLATE:-{artist} - {title}}
 
-      # Library sweep
-      LIBRARY_SWEEP_DIR: ${LIBRARY_SWEEP_DIR:-}
-      LIBRARY_SWEEP_SCHEDULE: ${LIBRARY_SWEEP_SCHEDULE:-weekly:sun:04:00}
-      LIBRARY_SWEEP_PAUSE_SECS: ${LIBRARY_SWEEP_PAUSE_SECS:-20}
-      LIBRARY_SWEEP_KEEP_DAYS: ${LIBRARY_SWEEP_KEEP_DAYS:-7}
+      # Root of the whole collection for the already-owned check (empty = OUTPUT_DIR)
+      COLLECTION_DIR: ${COLLECTION_DIR:-}
 
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -59,7 +56,7 @@ services:
       # This is where renamed FLAC files are placed
       - ${MUSIC_OUTPUT_PATH:-./music}:/music
 
-      # Persistent data (SQLite database for the queue, history and sweep)
+      # Persistent data (SQLite database for the queue and history)
       - ${DATA_PATH:-./data}:/data
 
     # Security hardening

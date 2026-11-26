@@ -20,10 +20,6 @@ class TestDatabaseNormalCreation:
         assert "queue_batches" in tables
         assert "queue_items" in tables
         assert "chat_prefs" in tables
-        assert "sweep_songs" in tables
-        assert "sweep_runs" in tables
-        assert "sweep_reviews" in tables
-        assert "sweep_replacements" in tables
         db.close()
 
     def test_database_schema_version(self, tmp_path):

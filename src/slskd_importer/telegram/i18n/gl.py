@@ -6,7 +6,7 @@ STRINGS: dict[str, str] = {
     "auth_library": "Isto require acceso de biblioteca. Aínda así podes enviar cancións e recibir os ficheiros aquí.",
     "auth_library_undo": "Eliminar ficheiros da biblioteca require acceso de biblioteca.",
     # Welcome and profile
-    "welcome": "*Envíame cancións* e consígoas de Soulseek — primeiro sen perda (FLAC, WAV, AIFF).\n\nUnha por liña, tantas como queiras:\n`Nancy Sinatra - Bang Bang`\n`daft punk one more time`\n\nOu pega ligazóns: Spotify, YouTube, SoundCloud, Bandcamp, unha páxina de 1001Tracklists ou unha lista de cancións copiada de calquera sitio.\n\nCada mensaxe recibe unha tarxeta que se actualiza sobre a marcha. Ti escolles a copia de cada pista: toca unha pista, mira as copias atopadas e escolle. Non se descarga nada ata que o fagas. Toca unha pista para escoller outra copia, desfacela ou recibir o ficheiro.\n\n/status — que hai na cola\n/history — gardados recentes, con desfacer\n/check — comproba que o último descargado é o que pediches\n/stats — totais\n/sweep — buscar mellores copias do que tes\n/lang — idioma\n/cancel — deter todo",
+    "welcome": "*Envíame cancións* e consígoas de Soulseek — primeiro sen perda (FLAC, WAV, AIFF).\n\nUnha por liña, tantas como queiras:\n`Nancy Sinatra - Bang Bang`\n`daft punk one more time`\n\nOu pega ligazóns: Spotify, YouTube, SoundCloud, Bandcamp, unha páxina de 1001Tracklists ou unha lista de cancións copiada de calquera sitio.\n\nCada mensaxe recibe unha tarxeta que se actualiza sobre a marcha. Ti escolles a copia de cada pista: toca unha pista, mira as copias atopadas e escolle. Non se descarga nada ata que o fagas. Toca unha pista para escoller outra copia, desfacela ou recibir o ficheiro.\n\n/status — que hai na cola\n/history — gardados recentes, con desfacer\n/check — comproba que o último descargado é o que pediches\n/stats — totais\n/lang — idioma\n/cancel — deter todo",
     "bot_description": "Envía nomes de cancións ou ligazóns (Spotify, YouTube, SoundCloud, Bandcamp, tracklists) e conségueas de Soulseek na mellor calidade posible — FLAC primeiro. Envía tantas como queiras; cada mensaxe recibe unha tarxeta en vivo.",
     "bot_short_description": "Consegue cancións de Soulseek na mellor calidade: nomes, ligazóns, listas ou tracklists enteiros.",
     "lang_pick": "Escolle o teu idioma:",
@@ -19,7 +19,6 @@ STRINGS: dict[str, str] = {
     "cmd_check": "Comprobar que o descargado é o que pediches",
     "cmd_stats": "Totais de biblioteca e descargas",
     "cmd_undo": "Quitar a última pista gardada",
-    "cmd_sweep": "Buscar mellores copias das túas cancións",
     "cmd_cancel": "Deter todo o que hai na cola",
     "cmd_lang": "Cambiar idioma",
     # Commands
