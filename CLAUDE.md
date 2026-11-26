@@ -42,14 +42,13 @@ The package is organized by **what the app does** (Screaming Architecture), not 
 
 ```
 src/slskd_importer/
-  catalog/     # Track identity — TrackInfo, Spotify, MusicBrainz, query -> track lookup
+  catalog/     # Track identity — TrackInfo, Spotify, MusicBrainz, name comparison, query -> track lookup
   sources/     # What a message asks for — Spotify links, media pages (yt-dlp), tracklist pages, typed lines
   queue/       # The download queue — batches/items, store, runner, per-item pipeline, fetch, library shelf
   soulseek/    # Find and fetch files — search lifecycle, transfers, ranking, fallbacks
   library/     # The collection on disk — rename, tags, formats, ownership, lossless check, OGG conversion
-  sweep/       # Library upgrade scout — audit, fingerprint, sound, judge, fetch, decide, schedule
   history/     # Download history records
-  records/     # Shared SQLite (queue, history, prefs, sweep)
+  records/     # Shared SQLite (queue, history, prefs)
   telegram/    # Conversation delivery (feature subpackages, see below)
   settings/    # Environment configuration and logging
   health/      # Process health-check endpoint
@@ -66,7 +65,6 @@ telegram/
   card/           # the batch's live message: views (summary, list, item, picker), button actions, redraw board
   delivery/       # sending track files to a chat (audio, document fallback, OGG when oversize)
   commands/       # one module per command: basics, preferences, status, stats, history, undo, cancel
-  library_sweep/  # /sweep, review pairs, Keep mine reasons, schedule lifecycle
   ui/             # presentation primitives only — markdown, safe edits, reactions, reply-to
   i18n/           # per-locale string modules (en/es/gl/de) + thin catalog lookup
 ```
@@ -78,7 +76,6 @@ telegram/
 - **Every track is picked by hand by default**: after the search an item ends as `choose` and opens on the picker. Only with `AUTO_PICK=true` (`Config.auto_pick`) do lists fetch the best sure copy unasked; a song sent alone (`Batch.asks_which_copy`, kind `track`) always asks
 - **Exceptions, not questions**: only-lossy results end as `review`, nothing found as `no_match`, all copies failing as `failed`. The requester acts from the card; a hand-picked copy (stored on the item as `queue_items.pick`, see `queue/pick.py`, so it survives a restart) is fetched as is, with no owned check and no fake-lossless gate
 - **Sources return text** unless they know the catalog identity: only Spotify builds `TrackInfo`. Media pages and tracklists yield `Entry(query="Artist - Title")` and never carry durations (video lengths would break duration scoring)
-- **Sweep scope**: `LibrarySweep.root` is `Config.library_sweep_dir` and is walked recursively (`sweep.place.library_files`, hidden folders skipped). A song's `file` / `stem` are its path under that root with forward slashes; use `sweep.identity.leaf(stem)` wherever only the file name is meant (identity, judging, staged names)
 - Soulseek search policy (FLAC → WAV → AIFF, then any audio; query fallbacks: as written, without punctuation, title only, keywords + year, artist + keywords) lives in `soulseek/scoring.py` and `soulseek/fallbacks.py`
 - Audio format allow-list is defined once in `library/formats.py`
 
@@ -118,14 +115,14 @@ Exclude keywords filter out live/remix/etc unless the original title contains th
 - **A summary must fit one message**: at most `WORKING_LINES` tracks in flight by name and `ATTENTION_BUTTONS` track buttons; the rest are counts (`summary_more`, `summary_parked`). The headline says what the batch is waiting for, not just "done": in flight → progress, `choose` left → waiting for a pick, `doubt`/`review` left → to review
 - **A typed list has no stored name worth showing**: render it with `summary_view.batch_title` (`list_name` in the chat's language), never `batch.name`
 - **/status** lists batches that are active *or* have tracks waiting for a decision (`QueueRepository.open_batches`); its 📍 buttons (`sb:<batch>`) post the card again at the bottom of the chat and retire the old message (`commands/status.handle_bring_card`)
-- **Buttons**: callback data is `q:<action>:<batch>:<item>:<number>` (`card/actions.py`). `core/routing` dispatches by prefix (`q`, `hu`, `cu`, `sb`, `swp`, `swr`, `cancel_all`, `lang`) and answers every tap, with a toast for the ones that start work
+- **Buttons**: callback data is `q:<action>:<batch>:<item>:<number>` (`card/actions.py`). `core/routing` dispatches by prefix (`q`, `hu`, `cu`, `sb`, `cancel_all`, `lang`) and answers every tap, with a toast for the ones that start work
 - **Batch ownership**: card callbacks load the batch with `get_batch_for_chat`, so a button can never reach another chat's queue. Undo and replacing a saved track also need `can_save_library`
 - **Markdown escaping**: Dynamic text (filenames, paths from Soulseek, item details) must be escaped with `escape_md()` or wrapped via `code_span()` / `md_code_safe()` to avoid `BadRequest` from Telegram's legacy Markdown parser
 - **Safe edits**: use `safe_edit()` / `safe_query_edit()` / `safe_bot_edit()` (catch `BadRequest`, `TimedOut`, `NetworkError`; "message is not modified" counts as success) instead of raw edits
 - **Feedback without messages** (`ui/feedback.py`, all errors swallowed): the request message is reacted 👀 at intake and 👍 / 🤷 by the board when the batch finishes (Telegram's fixed reaction set has no ✅); `show_typing` / `show_uploading` bracket lookups and uploads
 - **Startup**: `basics.register_bot_commands` sets the command menu and the per-locale descriptions (`bot_description` ≤ 512 chars, `bot_short_description` ≤ 120); `runner.start()` requeues items a restart interrupted and every active batch's card is redrawn
 - **Concurrency**: `Application.concurrent_updates(True)` — a button that searches (the picker) must not block other updates. `QueueRunner` runs at most `MAX_CONCURRENT_DOWNLOADS` items; `QueueRepository.claim_next` prefers the batch with the fewest items in flight
-- **Owned check**: `LibraryShelf.owned_as` — an exact file name in the save folder, a past successful save whose file still exists, or a file named `Artist - Title` anywhere under `LIBRARY_SWEEP_DIR` (`library/index.LibraryIndex`: file names only, cached two minutes, `DOWNLOAD_DIR` and hidden folders excluded, versions kept apart). Skipped for `forced` items (*Download anyway*) and for delivery batches
+- **Owned check**: `LibraryShelf.owned_as` — an exact file name in the save folder, a past successful save whose file still exists, or a file named `Artist - Title` anywhere under `COLLECTION_DIR` (`Config.collection_dir`; `library/index.LibraryIndex`: file names only, cached two minutes, `DOWNLOAD_DIR` and hidden folders excluded, versions kept apart). Skipped for `forced` items (*Download anyway*) and for delivery batches
 - **Parked transfers**: an item whose transfer waits in a peer's upload queue (`Progress.queued`) does not count against the worker slots (`QueueRunner._has_free_slot`), up to `runner.MAX_PARKED`
 - **Peer queues**: an automatically chosen copy that stays queued at its peer for `pipeline.QUEUE_PATIENCE_SECS` is dropped for the next copy (`queue/fetch.py`); a hand-picked copy may wait `PICKED_QUEUE_PATIENCE_SECS` in the queue. `DOWNLOAD_TIMEOUT_SECS` only limits a transfer that is running
 - **Doubted copies** (`ItemStatus.doubt`): a copy saved to the library whose verdict is not `AUTHENTIC` is in `ATTENTION` until the requester keeps it (`done`), picks another (replaced on success) or undoes it. `SAVED_STATUSES` (`done`, `doubt`) is what "the file is in the library" means everywhere

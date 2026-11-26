@@ -28,7 +28,7 @@ def _make_config():
     config.exclude_keywords = ["live", "remix"]
     config.download_dir = os.path.join(td, "downloads")
     config.output_dir = os.path.join(td, "music")
-    config.library_sweep_dir = config.output_dir
+    config.collection_dir = config.output_dir
     config.data_dir = os.path.join(td, "data")
     config.filename_template = "{artist} - {title}"
     config.search_timeout_secs = 30

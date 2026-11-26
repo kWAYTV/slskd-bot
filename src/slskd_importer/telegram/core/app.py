@@ -28,7 +28,6 @@ from slskd_importer.records.prefs import ChatPrefsRepository
 from slskd_importer.settings.config import Config
 from slskd_importer.soulseek.client import SlskdClient
 from slskd_importer.soulseek.scoring import ResultScorer
-from slskd_importer.sweep import LibrarySweep
 from slskd_importer.telegram.card import callbacks as card_callbacks
 from slskd_importer.telegram.card.board import CardBoard
 from slskd_importer.telegram.commands import basics, cancel, check, history, preferences, stats, status, undo
@@ -37,9 +36,6 @@ from slskd_importer.telegram.delivery import handoff
 from slskd_importer.telegram.i18n import DEFAULT_LOCALE, normalize_locale
 from slskd_importer.telegram.i18n import t as translate
 from slskd_importer.telegram.intake import message as intake
-from slskd_importer.telegram.library_sweep import callbacks as sweep_callbacks
-from slskd_importer.telegram.library_sweep import command as sweep_command
-from slskd_importer.telegram.library_sweep import lifecycle as sweep_lifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +65,7 @@ class MusicBot:
         self.queue_store = QueueRepository(self.db)
         self.musicbrainz = MusicBrainzClient()
         # Raw downloads are not part of the collection, even when their folder sits inside it.
-        collection = LibraryIndex(config.library_sweep_dir, exclude=(config.download_dir,))
+        collection = LibraryIndex(config.collection_dir, exclude=(config.download_dir,))
         self.shelf = LibraryShelf(self.processor, self.spotify, self.history_repo, collection)
         pipeline = ItemPipeline(
             config=config,
@@ -87,16 +83,6 @@ class MusicBot:
         self.runner.on_change = self.cards.request
         # Set once the Application exists; cards and deliveries are sent outside any update.
         self.telegram: Bot | None = None
-
-        self.sweep = LibrarySweep(
-            config,
-            self.db,
-            self.spotify,
-            self.musicbrainz,
-            self.slskd,
-            self.scorer,
-            self.processor,
-        )
 
     def attach(self, telegram: Bot) -> None:
         self.telegram = telegram
@@ -148,10 +134,6 @@ class MusicBot:
     _deliver_copy = handoff.deliver_copy
     _send_saved_file = handoff.send_saved_file
 
-    cmd_sweep = sweep_command.cmd_sweep
-    _handle_sweep_decision = sweep_callbacks.handle_sweep_decision
-    _handle_sweep_reason = sweep_callbacks.handle_sweep_reason
-
 
 def create_bot(config: Config) -> Application:
     """Create and configure the Telegram bot application."""
@@ -164,11 +146,9 @@ def create_bot(config: Config) -> Application:
         bot.runner.start()
         for batch in bot.queue_store.active_batches():
             bot.cards.request(batch.id)
-        sweep_lifecycle.start_library_sweep(bot, application)
 
     async def _post_shutdown(application: Application) -> None:
         await bot.runner.stop()
-        await sweep_lifecycle.stop_library_sweep(application)
 
     # Default media_write_timeout is 20s; large lossless uploads routinely exceed that.
     builder = (
@@ -201,7 +181,6 @@ def create_bot(config: Config) -> Application:
     app.add_handler(CommandHandler("history", bot.cmd_history))
     app.add_handler(CommandHandler("stats", bot.cmd_stats))
     app.add_handler(CommandHandler("check", bot.cmd_check))
-    app.add_handler(CommandHandler("sweep", bot.cmd_sweep))
     app.add_handler(CommandHandler("cancel", bot.cmd_cancel))
     app.add_handler(CallbackQueryHandler(bot.handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_text))

@@ -24,11 +24,6 @@ logger = logging.getLogger(__name__)
 CHECKABLE_EXTENSIONS = frozenset({"flac", "wav", "aiff", "aif"})
 
 
-def not_checked_display(extension: str) -> str:
-    """Line shown when the spectrum check cannot read a lossless format."""
-    return f"\u2754 Lossless check: not checked ({extension.upper()})"
-
-
 @dataclass
 class LosslessVerdict:
     """Result of the lossless spectrum check."""

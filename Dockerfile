@@ -5,10 +5,9 @@ WORKDIR /app
 
 # Install system dependencies
 # libsndfile1: FLAC spectral analysis (soundfile)
-# ffmpeg: audio trimming/conversion for Telegram previews + sweep decode
-# libchromaprint-tools (fpcalc): library sweep same-recording check
+# ffmpeg: OGG conversion of files over Telegram's upload limit
 RUN apt-get update -qq && \
-    apt-get install -y --no-install-recommends libsndfile1 ffmpeg libchromaprint-tools && \
+    apt-get install -y --no-install-recommends libsndfile1 ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

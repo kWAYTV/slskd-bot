@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- The library sweep (`/sweep`, the weekly schedule, `LIBRARY_SWEEP_SCHEDULE` / `_PAUSE_SECS` / `_KEEP_DAYS`, the `fpcalc` dependency). Its tables stay in the database, unused; `.sweep-review/` and `.sweep-replaced/` folders in the library are no longer touched and can be deleted. `LIBRARY_SWEEP_DIR` lives on as `COLLECTION_DIR` (the old name is still read) for the already-owned check
 - The Spotify version picker, the per-download preview with Save/Discard approval, `APPROVAL_TTL_SECS`, and the separate playlist-import flow (`import_jobs` / `import_tracks` stay in the database, unused; unfinished imports are not carried over)
 
 ### Fixed
@@ -81,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- The library sweep (`/sweep`, the weekly schedule, `LIBRARY_SWEEP_SCHEDULE` / `_PAUSE_SECS` / `_KEEP_DAYS`, the `fpcalc` dependency). Its tables stay in the database, unused; `.sweep-review/` and `.sweep-replaced/` folders in the library are no longer touched and can be deleted. `LIBRARY_SWEEP_DIR` lives on as `COLLECTION_DIR` (the old name is still read) for the already-owned check
 - Auto mode (`/auto`, `AUTO_MODE`). Results always show a pick keyboard; "Auto-pick best" remains a one-click `#1`
 
 ### Changed

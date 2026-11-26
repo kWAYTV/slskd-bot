@@ -27,11 +27,6 @@ _FORMAT_RANK = {
 }
 
 
-def is_lossless(extension: str) -> bool:
-    """True when *extension* (with or without the dot, any case) is a lossless format."""
-    return extension.lower().lstrip(".") in LOSSLESS_EXTENSIONS
-
-
 def format_rank(extension: str) -> int:
     """Lower is better. Unknown / lossy extensions sort after preferred lossless."""
     return _FORMAT_RANK.get(extension.lower(), 4)

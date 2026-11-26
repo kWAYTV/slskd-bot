@@ -56,17 +56,11 @@ class Config:
 
         self.filename_template = os.getenv("FILENAME_TEMPLATE", "{artist} - {title}")
 
-        # Library sweep: always on for library ACL users (personal bot).
-        # The sweep walks this whole tree; by default only where the bot saves.
-        self.library_sweep_dir = os.getenv("LIBRARY_SWEEP_DIR", "").strip() or self.output_dir
-        self.library_sweep_schedule = os.getenv("LIBRARY_SWEEP_SCHEDULE", "").strip()
-        # Imported here: the sweep package imports Config.
-        from slskd_importer.sweep.schedule import parse_schedule
-
-        parse_schedule(self.library_sweep_schedule)  # typo stops boot, not the first sweep
-        self.library_sweep_pause_secs = max(0, int(os.getenv("LIBRARY_SWEEP_PAUSE_SECS") or "20"))
-        keep = (os.getenv("LIBRARY_SWEEP_KEEP_DAYS") or "7").strip().lower()
-        self.library_sweep_keep_days = None if keep == "never" else max(0, int(keep))
+        # Root of the whole music collection: a song found anywhere under it counts as already owned.
+        # LIBRARY_SWEEP_DIR is the variable's former name and is still read.
+        self.collection_dir = (
+            os.getenv("COLLECTION_DIR", "").strip() or os.getenv("LIBRARY_SWEEP_DIR", "").strip() or self.output_dir
+        )
 
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         if log_level == "WARN":
@@ -105,13 +99,7 @@ class Config:
         else:
             logger.info("TELEGRAM_LIBRARY_USERS is empty — all allowed users can save to the library")
 
-        logger.info(
-            "Library sweep: dir=%s schedule=%r pause=%ss keep_days=%s",
-            self.library_sweep_dir,
-            self.library_sweep_schedule or "weekly:sun:04:00",
-            self.library_sweep_pause_secs,
-            self.library_sweep_keep_days if self.library_sweep_keep_days is not None else "never",
-        )
+        logger.info("Collection root for the already-owned check: %s", self.collection_dir)
 
     def _get_required_env(self, key: str) -> str:
         """Get a required environment variable."""
